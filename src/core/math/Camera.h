@@ -41,8 +41,8 @@ public:
 
     void SetPosition(const glm::vec3& pos) { _position = pos; }
     void SetFov(float fov) { _fov = fov; }
-    void SetNearPlane(float near) { _nearPlane = near; }
-    void SetFarPlane(float far) { _farPlane = far; }
+    void SetNearPlane(float nearDist) { _nearPlane = nearDist; }
+    void SetFarPlane(float farDist) { _farPlane = farDist; }
 
     float GetYaw() const { return _yaw; }
     float GetPitch() const { return _pitch; }

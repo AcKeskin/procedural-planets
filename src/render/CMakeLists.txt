@@ -2,8 +2,12 @@
 add_library(render STATIC
     Window.cpp
     Shader.cpp
+    ComputeShader.cpp
     Gui.cpp
     Renderer.cpp
+    Mesh.cpp
+    MeshGenerator.cpp
+    TerrainGenerator.cpp
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/imgui_draw.cpp

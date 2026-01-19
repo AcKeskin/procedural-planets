@@ -4,6 +4,7 @@ struct GLFWwindow;
 
 namespace planets::core {
 class Camera;
+class Planet;
 }
 
 namespace planets::render {
@@ -24,6 +25,12 @@ public:
     void EndFrame();
 
     void DrawDebugPanel(const planets::core::Camera& camera);
+
+    // Returns true if planet needs regeneration
+    bool DrawPlanetPanel(planets::core::Planet& planet);
+
+    // GPU compute panel with timing info
+    void DrawGpuPanel(bool& useGpu, float cpuTimeMs, float gpuTimeMs, bool gpuAvailable);
 
 private:
     bool _initialized;
