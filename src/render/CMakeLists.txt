@@ -8,6 +8,10 @@ add_library(render STATIC
     Mesh.cpp
     MeshGenerator.cpp
     TerrainGenerator.cpp
+    CelestialBody.cpp
+    Earth.cpp
+    Framebuffer.cpp
+    PostProcessor.cpp
     lod/SpherePatch.cpp
     lod/PatchLodSystem.cpp
     effects/OceanRenderer.cpp

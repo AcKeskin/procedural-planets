@@ -6,11 +6,14 @@
 #include "Mesh.h"
 #include "MeshGenerator.h"
 #include "TerrainGenerator.h"
+#include "Framebuffer.h"
+#include "PostProcessor.h"
 #include "lod/PatchLodSystem.h"
 #include "effects/OceanRenderer.h"
 #include "effects/AtmosphereRenderer.h"
 #include "math/Camera.h"
 #include "generation/Planet.h"
+#include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <chrono>
@@ -34,6 +37,30 @@ int main()
 
     planets::render::Gui gui;
     gui.Initialize(window.GetHandle());
+
+    // Initialize framebuffer for off-screen rendering
+    planets::render::Framebuffer sceneFbo;
+    if (!sceneFbo.Create(window.GetWidth(), window.GetHeight()))
+    {
+        std::cerr << "Failed to create scene framebuffer" << std::endl;
+        return -1;
+    }
+
+    // Initialize post-processor for fullscreen blitting
+    planets::render::PostProcessor postProcessor;
+    if (!postProcessor.Initialize())
+    {
+        std::cerr << "Failed to initialize post-processor" << std::endl;
+        return -1;
+    }
+
+    // Load passthrough shader for blitting scene to screen
+    planets::render::Shader passthroughShader;
+    if (!passthroughShader.LoadFromFiles("shaders/passthrough.vert", "shaders/passthrough.frag"))
+    {
+        std::cerr << "Failed to load passthrough shader" << std::endl;
+        return -1;
+    }
 
     // Load planet shader
     planets::render::Shader planetShader;
@@ -186,6 +213,10 @@ int main()
     float moveSpeed = 15.0f;  // Adjustable via GUI
     const float lookSpeed = 0.1f;
 
+    // Track window dimensions for framebuffer resize
+    int previousWidth = window.GetWidth();
+    int previousHeight = window.GetHeight();
+
     // Light direction
     glm::vec3 lightDir = glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f));
 
@@ -238,8 +269,19 @@ int main()
         if (input.IsKeyDown(planets::app::Key::Q))
             camera.MoveUp(-speed);
 
-        // Render
-        renderer.BeginFrame();
+        // Handle window resize - recreate framebuffer if dimensions changed
+        int currentWidth = window.GetWidth();
+        int currentHeight = window.GetHeight();
+        if (currentWidth != previousWidth || currentHeight != previousHeight)
+        {
+            sceneFbo.Resize(currentWidth, currentHeight);
+            previousWidth = currentWidth;
+            previousHeight = currentHeight;
+        }
+
+        // Phase 1: Render scene to framebuffer
+        sceneFbo.Bind();
+        renderer.BeginFrame();  // Clear color and depth
 
         // Draw planet
         planetShader.Use();
@@ -272,6 +314,18 @@ int main()
         {
             planetMesh.Draw();
         }
+
+        sceneFbo.Unbind();
+
+        // Phase 2: Blit scene to default framebuffer
+        renderer.BeginFrame();  // Clear default framebuffer
+
+        // Render fullscreen quad with scene texture (passthrough for now)
+        passthroughShader.Use();
+        passthroughShader.SetInt("uSceneTexture", 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, sceneFbo.GetColorTexture());
+        postProcessor.RenderQuad();
 
         // GUI
         gui.BeginFrame();
@@ -329,6 +383,7 @@ int main()
         window.SwapBuffers();
     }
 
+    postProcessor.Shutdown();
     gui.Shutdown();
     renderer.Shutdown();
     window.Shutdown();

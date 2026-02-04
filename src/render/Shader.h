@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_set>
 #include <glm/glm.hpp>
 
 namespace planets::render {
@@ -27,6 +28,9 @@ public:
 private:
     bool CompileShader(unsigned int& shader, unsigned int type, const std::string& source);
     std::string LoadFile(const std::string& path);
+
+    // Process #include directives recursively with cycle detection
+    std::string PreprocessIncludes(const std::string& source, const std::string& sourcePath, std::unordered_set<std::string>& includedFiles);
 
     unsigned int _program;
 };
