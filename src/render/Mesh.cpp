@@ -56,6 +56,39 @@ Mesh::~Mesh()
     Cleanup();
 }
 
+Mesh::Mesh(Mesh&& other) noexcept
+    : _vao(other._vao)
+    , _vbo(other._vbo)
+    , _ebo(other._ebo)
+    , _vertexCount(other._vertexCount)
+    , _indexCount(other._indexCount)
+{
+    other._vao = 0;
+    other._vbo = 0;
+    other._ebo = 0;
+    other._vertexCount = 0;
+    other._indexCount = 0;
+}
+
+Mesh& Mesh::operator=(Mesh&& other) noexcept
+{
+    if (this != &other)
+    {
+        Cleanup();
+        _vao = other._vao;
+        _vbo = other._vbo;
+        _ebo = other._ebo;
+        _vertexCount = other._vertexCount;
+        _indexCount = other._indexCount;
+        other._vao = 0;
+        other._vbo = 0;
+        other._ebo = 0;
+        other._vertexCount = 0;
+        other._indexCount = 0;
+    }
+    return *this;
+}
+
 void Mesh::Upload(const MeshData& data)
 {
     Cleanup();

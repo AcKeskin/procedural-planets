@@ -6,6 +6,9 @@
 #include "Mesh.h"
 #include "MeshGenerator.h"
 #include "TerrainGenerator.h"
+#include "lod/PatchLodSystem.h"
+#include "effects/OceanRenderer.h"
+#include "effects/AtmosphereRenderer.h"
 #include "math/Camera.h"
 #include "generation/Planet.h"
 #include <GLFW/glfw3.h>
@@ -52,14 +55,36 @@ int main()
         std::cout << "[TerrainGenerator] GPU compute shader not available, using CPU" << std::endl;
     }
 
-    // Create planet with higher quality defaults
-    planets::core::PlanetSettings planetSettings;
-    planetSettings.radius = 2.0f;
-    planetSettings.seaLevel = 0.4f;
-    planetSettings.heightScale = 1.0f;  // Increased for visible terrain
-    planetSettings.subdivisions = 6;     // Higher quality (40k vertices)
-    planetSettings.seed = 42;
+    // Planet settings
+    float planetRadius = 10.0f;  // Larger planet for LOD system
+    float seaLevel = 0.4f;
+    int subdivisions = 6;
+    uint32_t seed = 42;
 
+    // LOD system settings
+    bool useLodSystem = true;
+    int patchSubdivisions = 2;  // 0=20, 1=80, 2=320 patches
+
+    // Earth terrain settings with realistic defaults
+    planets::render::EarthTerrainSettings terrainSettings;
+
+    // LOD patch system
+    planets::render::lod::PatchLodSystem lodSystem;
+
+    // Ocean rendering
+    planets::render::effects::OceanRenderer oceanRenderer;
+    planets::render::effects::OceanSettings oceanSettings;
+
+    // Atmosphere rendering
+    planets::render::effects::AtmosphereRenderer atmosphereRenderer;
+    planets::render::effects::AtmosphereSettings atmosphereSettings;
+
+    // For CPU fallback, still need Planet object
+    planets::core::PlanetSettings planetSettings;
+    planetSettings.radius = planetRadius;
+    planetSettings.seaLevel = seaLevel;
+    planetSettings.subdivisions = subdivisions;
+    planetSettings.seed = seed;
     planets::core::Planet planet(planetSettings);
 
     // Generation timing
@@ -72,8 +97,13 @@ int main()
     auto regeneratePlanetCpu = [&]() {
         auto start = std::chrono::high_resolution_clock::now();
 
-        auto meshData = planets::render::MeshGenerator::GeneratePlanetMesh(
-            planet, planet.GetSettings().subdivisions);
+        // Update planet settings for CPU path
+        planetSettings.subdivisions = subdivisions;
+        planetSettings.seed = seed;
+        planet.Configure(planetSettings);
+        planet.Reseed(seed);
+
+        auto meshData = planets::render::MeshGenerator::GeneratePlanetMesh(planet, subdivisions);
         planetMesh.Upload(meshData);
 
         auto end = std::chrono::high_resolution_clock::now();
@@ -93,60 +123,14 @@ int main()
         auto start = std::chrono::high_resolution_clock::now();
 
         // Get sphere vertices for compute shader
-        auto vertices = planets::render::MeshGenerator::GetIcosphereVertices(
-            planet.GetSettings().subdivisions);
+        auto vertices = planets::render::MeshGenerator::GetIcosphereVertices(subdivisions);
 
-        // Use Planet's first noise layer for GPU parameters
-        const auto& layer0 = planet.GetNoiseLayer(0).GetSettings();
-        float heightMult = planet.GetSettings().heightScale;
-
-        planets::render::ComputeNoiseParams continentParams;
-        continentParams.offset = glm::vec3(0.0f);
-        continentParams.numLayers = layer0.octaves;
-        continentParams.scale = layer0.scale;
-        continentParams.persistence = layer0.persistence;
-        continentParams.lacunarity = layer0.lacunarity;
-        continentParams.multiplier = layer0.strength * heightMult;
-
-        // Mountain params (higher frequency detail)
-        planets::render::ComputeNoiseParams mountainParams;
-        mountainParams.offset = glm::vec3(1000.0f);
-        mountainParams.numLayers = layer0.octaves + 1;
-        mountainParams.scale = layer0.scale * 2.0f;
-        mountainParams.persistence = layer0.persistence;
-        mountainParams.lacunarity = layer0.lacunarity;
-        mountainParams.multiplier = layer0.strength * heightMult;
-        mountainParams.power = 2.0f;
-        mountainParams.gain = 1.0f;
-        mountainParams.smoothOffset = 0.3f;
-
-        // Mask params
-        planets::render::ComputeNoiseParams maskParams;
-        maskParams.offset = glm::vec3(2000.0f);
-        maskParams.numLayers = 4;
-        maskParams.scale = layer0.scale * 0.75f;
-        maskParams.persistence = 0.5f;
-        maskParams.lacunarity = 2.0f;
-        maskParams.multiplier = 1.0f;
-
-        // Generate heights on GPU (Solar-System reference values)
-        auto heights = terrainGenerator.GenerateHeights(
-            vertices,
-            planet.GetSettings().seed,
-            continentParams,
-            mountainParams,
-            maskParams,
-            5.0f,   // oceanDepthMultiplier (exaggerate ocean depth)
-            1.5f,   // oceanFloorDepth (minimum ocean depth)
-            0.5f,   // oceanFloorSmoothing (transition zone)
-            1.2f    // mountainBlend (elevation-based blend zone)
-        );
+        // Generate heights using Earth terrain settings
+        auto heights = terrainGenerator.GenerateHeights(vertices, seed, terrainSettings);
 
         // Apply heights to mesh
         auto meshData = planets::render::MeshGenerator::GeneratePlanetMesh(
-            planet.GetSettings().subdivisions,
-            planet.GetSettings().radius,
-            heights);
+            subdivisions, planetRadius, heights);
         planetMesh.Upload(meshData);
 
         auto end = std::chrono::high_resolution_clock::now();
@@ -156,8 +140,37 @@ int main()
                   << " vertices in " << lastGpuTimeMs << " ms" << std::endl;
     };
 
+    // LOD system regeneration
+    auto regenerateLodSystem = [&]() {
+        if (!terrainGenerator.IsReady())
+        {
+            std::cerr << "[LOD] GPU compute shader required for LOD system" << std::endl;
+            return;
+        }
+
+        auto start = std::chrono::high_resolution_clock::now();
+
+        lodSystem.Initialize(planetRadius, patchSubdivisions, terrainGenerator, terrainSettings, seed);
+
+        // Initialize ocean at sea level
+        oceanRenderer.Initialize(planetRadius, seaLevel, 5);
+
+        // Initialize atmosphere
+        atmosphereRenderer.Initialize(planetRadius, 4);
+
+        auto end = std::chrono::high_resolution_clock::now();
+        lastGpuTimeMs = std::chrono::duration<float, std::milli>(end - start).count();
+
+        std::cout << "[LOD] Generated " << lodSystem.GetPatchCount()
+                  << " patches in " << lastGpuTimeMs << " ms" << std::endl;
+    };
+
     // Initial generation
-    if (useGpu)
+    if (useLodSystem && useGpu)
+    {
+        regenerateLodSystem();
+    }
+    else if (useGpu)
     {
         regeneratePlanetGpu();
     }
@@ -167,10 +180,10 @@ int main()
     }
 
     planets::core::Camera camera;
-    camera.SetPosition(glm::vec3(0.0f, 0.0f, 6.0f));
+    camera.SetPosition(glm::vec3(0.0f, 0.0f, 25.0f));  // Farther for larger planet
 
     float lastTime = static_cast<float>(glfwGetTime());
-    const float moveSpeed = 5.0f;
+    float moveSpeed = 15.0f;  // Adjustable via GUI
     const float lookSpeed = 0.1f;
 
     // Light direction
@@ -209,8 +222,9 @@ int main()
             }
         }
 
-        // Camera movement
-        float speed = moveSpeed * deltaTime;
+        // Camera movement with shift boost
+        float speedMultiplier = input.IsKeyDown(planets::app::Key::LeftShift) ? 5.0f : 1.0f;
+        float speed = moveSpeed * deltaTime * speedMultiplier;
         if (input.IsKeyDown(planets::app::Key::W))
             camera.MoveForward(speed);
         if (input.IsKeyDown(planets::app::Key::S))
@@ -233,26 +247,74 @@ int main()
         glm::mat4 model = glm::mat4(1.0f);
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 projection = camera.GetProjectionMatrix(window.GetAspectRatio());
+        glm::mat4 viewProjection = projection * view;
 
         planetShader.SetMat4("uModel", model);
         planetShader.SetMat4("uView", view);
         planetShader.SetMat4("uProjection", projection);
         planetShader.SetVec3("uLightDir", lightDir);
         planetShader.SetVec3("uCameraPos", camera.GetPosition());
-        planetShader.SetFloat("uSeaLevel", planet.GetSettings().seaLevel);
+        planetShader.SetFloat("uSeaLevel", seaLevel);
 
-        planetMesh.Draw();
+        if (useLodSystem && useGpu)
+        {
+            lodSystem.UpdateLods(camera.GetPosition(), viewProjection);
+            lodSystem.Render(planetShader);
+
+            // Render ocean
+            oceanRenderer.Render(view, projection, camera.GetPosition(), lightDir, oceanSettings);
+
+            // Render atmosphere (last, additive blend)
+            atmosphereRenderer.Render(view, projection, camera.GetPosition(), lightDir,
+                                      planetRadius, atmosphereSettings);
+        }
+        else
+        {
+            planetMesh.Draw();
+        }
 
         // GUI
         gui.BeginFrame();
-        gui.DrawDebugPanel(camera);
+        gui.DrawDebugPanel(camera, moveSpeed);
 
         // GPU toggle and timing display
         gui.DrawGpuPanel(useGpu, lastCpuTimeMs, lastGpuTimeMs, terrainGenerator.IsReady());
 
-        if (gui.DrawPlanetPanel(planet))
+        // LOD System panel
+        bool lodNeedsRegen = gui.DrawLodPanel(
+            useLodSystem,
+            patchSubdivisions,
+            planetRadius,
+            lodSystem.GetPatchCount(),
+            lodSystem.GetVisiblePatchCount(),
+            lodSystem.GetTotalVertexCount());
+
+        // Ocean panel
+        gui.DrawOceanPanel(oceanSettings, seaLevel);
+
+        // Atmosphere panel
+        gui.DrawAtmospherePanel(atmosphereSettings);
+
+        // Earth terrain panel (GPU mode) or Planet panel (CPU mode)
+        bool needsRegen = false;
+        if (useGpu)
         {
-            if (useGpu)
+            needsRegen = gui.DrawEarthTerrainPanel(terrainSettings, seed, subdivisions);
+        }
+        else
+        {
+            needsRegen = gui.DrawPlanetPanel(planet);
+            subdivisions = planet.GetSettings().subdivisions;
+            seed = planet.GetSettings().seed;
+        }
+
+        if (needsRegen || lodNeedsRegen)
+        {
+            if (useLodSystem && useGpu)
+            {
+                regenerateLodSystem();
+            }
+            else if (useGpu)
             {
                 regeneratePlanetGpu();
             }

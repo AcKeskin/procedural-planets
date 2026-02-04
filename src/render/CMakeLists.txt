@@ -8,6 +8,10 @@ add_library(render STATIC
     Mesh.cpp
     MeshGenerator.cpp
     TerrainGenerator.cpp
+    lod/SpherePatch.cpp
+    lod/PatchLodSystem.cpp
+    effects/OceanRenderer.cpp
+    effects/AtmosphereRenderer.cpp
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
