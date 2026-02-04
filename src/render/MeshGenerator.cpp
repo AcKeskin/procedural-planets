@@ -19,6 +19,7 @@ MeshData MeshGenerator::GenerateIcosphere(int subdivisions)
         v.position = pos;
         v.normal = pos;
         v.uv = SphericalUV(pos);
+        v.shadingData = glm::vec4(0.0f);
         mesh.vertices.push_back(v);
         return static_cast<uint32_t>(mesh.vertices.size() - 1);
     };
@@ -99,6 +100,44 @@ MeshData MeshGenerator::GeneratePlanetMesh(
         mesh.vertices[i].position = dir * radius;
         // Store height for coloring (normalized around 1.0)
         mesh.vertices[i].uv.x = (heights[i] - 1.0f) * 10.0f + 0.5f;
+        // shadingData already initialized to vec4(0) by GenerateIcosphere
+    }
+
+    mesh.RecalculateNormals();
+    return mesh;
+}
+
+MeshData MeshGenerator::GeneratePlanetMesh(
+    int subdivisions,
+    float baseRadius,
+    const std::vector<float>& heights,
+    const std::vector<glm::vec4>& shadingData)
+{
+    MeshData mesh = GenerateIcosphere(subdivisions);
+
+    if (heights.size() != mesh.vertices.size())
+    {
+        return mesh;
+    }
+
+    // Apply GPU-computed heights and shading data
+    for (size_t i = 0; i < mesh.vertices.size(); ++i)
+    {
+        glm::vec3 dir = glm::normalize(mesh.vertices[i].position);
+        float radius = heights[i] * baseRadius;
+        mesh.vertices[i].position = dir * radius;
+        // Store height for coloring (normalized around 1.0)
+        mesh.vertices[i].uv.x = (heights[i] - 1.0f) * 10.0f + 0.5f;
+
+        // Assign shading data if available
+        if (i < shadingData.size())
+        {
+            mesh.vertices[i].shadingData = shadingData[i];
+        }
+        else
+        {
+            mesh.vertices[i].shadingData = glm::vec4(0.0f);
+        }
     }
 
     mesh.RecalculateNormals();
@@ -170,6 +209,7 @@ uint32_t MeshGenerator::GetMidpoint(
     midVertex.position = midPos;
     midVertex.normal = midPos;
     midVertex.uv = SphericalUV(midPos);
+    midVertex.shadingData = glm::vec4(0.0f);
 
     uint32_t index = static_cast<uint32_t>(mesh.vertices.size());
     mesh.vertices.push_back(midVertex);

@@ -41,7 +41,8 @@ void PatchLodSystem::Initialize(
     float planetRadius,
     int patchSubdivisions,
     TerrainGenerator& terrainGen,
-    const EarthTerrainSettings& settings,
+    const EarthTerrainSettings& terrainSettings,
+    const EarthShadingSettings& shadingSettings,
     uint32_t seed)
 {
     _planetRadius = planetRadius;
@@ -56,7 +57,7 @@ void PatchLodSystem::Initialize(
     int patchIndex = 0;
     for (auto& patch : _patches)
     {
-        GenerateTerrainForPatch(patch, terrainGen, settings, seed);
+        GenerateTerrainForPatch(patch, terrainGen, terrainSettings, shadingSettings, seed);
         ++patchIndex;
 
         if (patchIndex % 10 == 0)
@@ -123,7 +124,8 @@ void PatchLodSystem::CreateIcosahedronPatches(int subdivisions)
 void PatchLodSystem::GenerateTerrainForPatch(
     SpherePatch& patch,
     TerrainGenerator& terrainGen,
-    const EarthTerrainSettings& settings,
+    const EarthTerrainSettings& terrainSettings,
+    const EarthShadingSettings& shadingSettings,
     uint32_t seed)
 {
     // Generate terrain for all LOD levels
@@ -133,14 +135,27 @@ void PatchLodSystem::GenerateTerrainForPatch(
 
         if (terrainGen.IsReady())
         {
-            auto heights = terrainGen.GenerateHeights(vertices, seed, settings);
-            patch.GenerateLod(lod, heights);
+            auto heights = terrainGen.GenerateHeights(vertices, seed, terrainSettings);
+
+            // Generate shading data if available
+            std::vector<glm::vec4> shadingData;
+            if (terrainGen.IsShadingReady())
+            {
+                shadingData = terrainGen.GenerateShadingData(vertices, seed, shadingSettings);
+            }
+            else
+            {
+                shadingData.resize(vertices.size(), glm::vec4(0.0f));
+            }
+
+            patch.GenerateLod(lod, heights, shadingData);
         }
         else
         {
-            // Fallback: all heights = 1.0 (unit sphere)
+            // Fallback: all heights = 1.0 (unit sphere), no shading
             std::vector<float> heights(vertices.size(), 1.0f);
-            patch.GenerateLod(lod, heights);
+            std::vector<glm::vec4> shadingData(vertices.size(), glm::vec4(0.0f));
+            patch.GenerateLod(lod, heights, shadingData);
         }
     }
 }

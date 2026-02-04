@@ -1,231 +1,237 @@
 #version 450 core
 
+#include "math.glsl"
+
 in vec3 vNormal;
 in vec3 vWorldPos;
 in float vHeight;
+in vec4 vShadingData; // x=large, y=detail, z=small, w=biomeBlend
 
 out vec4 FragColor;
 
+// Scene uniforms
 uniform vec3 uLightDir;
 uniform vec3 uCameraPos;
 uniform float uSeaLevel;
 
-// Biome settings
+// Biome control
 uniform bool uUseBiomes;
-uniform float uTempScale;
-uniform float uHumidityScale;
-uniform float uLatitudeInfluence;
+uniform float uSteepnessThreshold;
+uniform float uFlatToSteepBlend;
+uniform float uSnowLatitude;
+uniform float uSnowBlend;
 uniform float uSnowLine;
+uniform float uShoreHeight;
 
-// Biome colors
-const vec3 SNOW = vec3(0.95, 0.95, 0.98);
-const vec3 TUNDRA = vec3(0.6, 0.55, 0.45);
-const vec3 TAIGA = vec3(0.2, 0.35, 0.25);
-const vec3 FOREST = vec3(0.15, 0.4, 0.15);
-const vec3 PLAINS = vec3(0.45, 0.55, 0.3);
-const vec3 SAVANNA = vec3(0.7, 0.65, 0.4);
-const vec3 DESERT = vec3(0.85, 0.75, 0.55);
-const vec3 JUNGLE = vec3(0.1, 0.45, 0.15);
-const vec3 BEACH = vec3(0.76, 0.70, 0.50);
-const vec3 ROCK = vec3(0.40, 0.38, 0.35);
+// Color uniforms (gradient pairs)
+uniform vec3 uShoreLow;
+uniform vec3 uShoreHigh;
+uniform vec3 uFlatLowA;
+uniform vec3 uFlatHighA;
+uniform vec3 uFlatLowB;
+uniform vec3 uFlatHighB;
+uniform vec3 uSteepLow;
+uniform vec3 uSteepHigh;
+uniform vec3 uSnowColor;
 
-// Ocean colors (still used when below sea level)
-const vec3 COLOR_DEEP_OCEAN = vec3(0.02, 0.05, 0.15);
-const vec3 COLOR_SHALLOW_OCEAN = vec3(0.05, 0.15, 0.35);
+// Color blending parameters
+uniform float uFlatColBlend;
+uniform float uFlatColBlendNoise;
 
-// Simplex noise helpers
-vec3 mod289(vec3 x) { return x - floor(x / 289.0) * 289.0; }
-vec4 mod289(vec4 x) { return x - floor(x / 289.0) * 289.0; }
-vec4 permute(vec4 x) { return mod289((x * 34.0 + 1.0) * x); }
-vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+// Height range for normalization
+uniform vec2 uHeightMinMax;
 
-float snoise(vec3 v)
+// Lighting controls
+uniform float uSunIntensity;
+uniform float uAmbientLight;
+uniform float uSpecularStrength;
+uniform float uSpecularPower;
+
+// Ocean colors (fallback for underwater terrain)
+const vec3 DEEP_OCEAN = vec3(0.02, 0.05, 0.15);
+const vec3 SHALLOW_OCEAN = vec3(0.05, 0.15, 0.35);
+
+// Calculate steepness from sphere normal vs terrain normal
+// Returns 0 for flat terrain, 1 for vertical cliff
+float calcSteepness(vec3 worldPos, vec3 normal)
 {
-    const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
-    const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+    vec3 sphereNormal = normalize(worldPos);
 
-    vec3 i = floor(v + dot(v, C.yyy));
-    vec3 x0 = v - i + dot(i, C.xxx);
+    // Guard against degenerate normals (zero or NaN)
+    float normalLen = length(normal);
+    if (normalLen < 0.001)
+    {
+        return 0.0; // Treat degenerate normals as flat terrain
+    }
 
-    vec3 g = step(x0.yzx, x0.xyz);
-    vec3 l = 1.0 - g;
-    vec3 i1 = min(g.xyz, l.zxy);
-    vec3 i2 = max(g.xyz, l.zxy);
+    vec3 terrainNormal = normal / normalLen;
 
-    vec3 x1 = x0 - i1 + C.xxx;
-    vec3 x2 = x0 - i2 + C.yyy;
-    vec3 x3 = x0 - D.yyy;
+    // Handle potentially inverted normals (pointing inward instead of outward)
+    // If normal points away from sphere center, flip it
+    float dotWithSphere = dot(sphereNormal, terrainNormal);
+    if (dotWithSphere < 0.0)
+    {
+        terrainNormal = -terrainNormal;
+        dotWithSphere = -dotWithSphere;
+    }
 
-    i = mod289(i);
-    vec4 p = permute(permute(permute(
-        i.z + vec4(0.0, i1.z, i2.z, 1.0))
-        + i.y + vec4(0.0, i1.y, i2.y, 1.0))
-        + i.x + vec4(0.0, i1.x, i2.x, 1.0));
-
-    float n_ = 0.142857142857;
-    vec3 ns = n_ * D.wyz - D.xzx;
-
-    vec4 j = p - 49.0 * floor(p / 49.0);
-    vec4 x_ = floor(j / 7.0);
-    vec4 y_ = floor(j - 7.0 * x_);
-
-    vec4 x = (x_ * 2.0 + 0.5) / 7.0 - 1.0;
-    vec4 y = (y_ * 2.0 + 0.5) / 7.0 - 1.0;
-    vec4 h = 1.0 - abs(x) - abs(y);
-
-    vec4 b0 = vec4(x.xy, y.xy);
-    vec4 b1 = vec4(x.zw, y.zw);
-
-    vec4 s0 = floor(b0) * 2.0 + 1.0;
-    vec4 s1 = floor(b1) * 2.0 + 1.0;
-    vec4 sh = -step(h, vec4(0.0));
-
-    vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
-    vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
-
-    vec3 p0 = vec3(a0.xy, h.x);
-    vec3 p1 = vec3(a0.zw, h.y);
-    vec3 p2 = vec3(a1.xy, h.z);
-    vec3 p3 = vec3(a1.zw, h.w);
-
-    vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
-    p0 *= norm.x;
-    p1 *= norm.y;
-    p2 *= norm.z;
-    p3 *= norm.w;
-
-    vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
-    m = m * m;
-    return 42.0 * dot(m * m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+    float dotProduct = clamp(dotWithSphere, 0.0, 1.0);
+    return 1.0 - dotProduct;
 }
 
-vec3 getBiomeColor(vec3 pos, float height, float seaLevel)
+// Get terrain color - simple height-based zones from sea level
+vec3 getTerrainColor(vec3 worldPos, vec3 normal, float height)
 {
-    // Beach zone
-    float beachThreshold = seaLevel + 0.02;
-    if (height < beachThreshold && height >= seaLevel)
+    // Noise for variation (fallback to 0.5 if not generated)
+    float noise = vShadingData.x > 0.001 ? vShadingData.x : 0.5;
+    float detailNoise = vShadingData.y > 0.001 ? vShadingData.y : 0.5;
+
+    // Core metrics
+    float steepness = calcSteepness(worldPos, normal);
+    float latitude = abs(normalize(worldPos).y);
+
+    // Height normalized from sea level (0) to max terrain (1)
+    // This is the PRIMARY driver of biome coloring
+    float h = clamp((height - uSeaLevel) / (uHeightMinMax.y - uSeaLevel), 0.0, 1.0);
+
+    // === HEIGHT-BASED COLOR ZONES ===
+    // Zone thresholds (relative to height above sea level)
+    float shoreEnd = uShoreHeight;
+    float lowlandEnd = 0.35;
+    float midlandEnd = 0.65;
+    float highlandEnd = uSnowLine;
+
+    // Shore (beach/sand) - near sea level
+    vec3 shoreColor = mix(uShoreLow, uShoreHigh, h + (noise - 0.5) * 0.2);
+
+    // Lowland (plains/grassland) - low elevation
+    vec3 lowColor = mix(uFlatLowA, uFlatHighA, h + (detailNoise - 0.5) * 0.3);
+
+    // Midland (forest) - mid elevation
+    vec3 midColor = mix(uFlatLowB, uFlatHighB, h + (detailNoise - 0.5) * 0.3);
+
+    // Highland (rock/mountain) - high elevation
+    vec3 highColor = mix(uSteepLow, uSteepHigh, h);
+
+    // Snow - highest peaks
+    vec3 snowColor = uSnowColor;
+
+    // === BLEND BETWEEN ZONES BASED ON HEIGHT ===
+    vec3 flatColor;
+
+    if (h < shoreEnd)
     {
-        return BEACH;
+        // Shore zone
+        float t = h / shoreEnd;
+        flatColor = mix(shoreColor, lowColor, smoothstep(0.7, 1.0, t));
     }
-
-    // High elevation = always snow/rock
-    float normalizedHeight = (height - seaLevel) / (1.0 - seaLevel);
-    if (normalizedHeight > uSnowLine)
+    else if (h < lowlandEnd)
     {
-        return SNOW;
+        // Lowland zone
+        float t = (h - shoreEnd) / (lowlandEnd - shoreEnd);
+        flatColor = mix(lowColor, midColor, smoothstep(0.7, 1.0, t));
     }
-
-    // Rock transition
-    if (normalizedHeight > uSnowLine - 0.15)
+    else if (h < midlandEnd)
     {
-        float t = (normalizedHeight - (uSnowLine - 0.15)) / 0.15;
-        return mix(ROCK, SNOW, t);
+        // Midland zone
+        float t = (h - lowlandEnd) / (midlandEnd - lowlandEnd);
+        flatColor = mix(midColor, highColor, smoothstep(0.7, 1.0, t));
     }
-
-    // Temperature: latitude-biased + noise
-    vec3 unitPos = normalize(pos);
-    float lat = abs(unitPos.y);  // 0 at equator, 1 at poles
-    float tempNoise = snoise(pos * uTempScale) * 0.5 + 0.5;
-    float temp = mix(tempNoise, 1.0 - lat, uLatitudeInfluence);
-
-    // Humidity: pure noise with offset
-    float humidity = snoise(pos * uHumidityScale + vec3(1000.0, 0.0, 0.0)) * 0.5 + 0.5;
-
-    // 2D biome blend using temperature and humidity
-    // Cold-dry to cold-wet
-    vec3 coldDry = mix(SNOW, TUNDRA, smoothstep(0.0, 0.3, temp));
-    vec3 coldWet = mix(TUNDRA, TAIGA, smoothstep(0.0, 0.3, temp));
-
-    // Warm-dry to warm-wet
-    vec3 warmDry = mix(PLAINS, DESERT, smoothstep(0.5, 1.0, temp));
-    vec3 warmWet = mix(FOREST, JUNGLE, smoothstep(0.5, 1.0, temp));
-
-    // Mid temperatures
-    vec3 midDry = mix(TUNDRA, SAVANNA, smoothstep(0.3, 0.7, temp));
-    vec3 midWet = mix(TAIGA, FOREST, smoothstep(0.3, 0.7, temp));
-
-    // Blend based on temperature zones
-    vec3 dryBiome, wetBiome;
-    if (temp < 0.3)
+    else if (h < highlandEnd)
     {
-        dryBiome = coldDry;
-        wetBiome = coldWet;
-    }
-    else if (temp < 0.7)
-    {
-        float t = (temp - 0.3) / 0.4;
-        dryBiome = mix(coldDry, warmDry, t);
-        wetBiome = mix(coldWet, warmWet, t);
+        // Highland zone
+        float t = (h - midlandEnd) / (highlandEnd - midlandEnd);
+        flatColor = mix(highColor, snowColor, smoothstep(0.8, 1.0, t));
     }
     else
     {
-        dryBiome = warmDry;
-        wetBiome = warmWet;
+        // Snow zone
+        flatColor = snowColor;
     }
 
-    // Final blend based on humidity
-    return mix(dryBiome, wetBiome, humidity);
+    // === STEEPNESS: Rock on steep slopes ===
+    // Only apply rock color where terrain is actually steep
+    vec3 rockColor = mix(uSteepLow, uSteepHigh, h * 0.5 + 0.25);
+    float rockBlend = smoothstep(uSteepnessThreshold - uFlatToSteepBlend,
+                                  uSteepnessThreshold + uFlatToSteepBlend,
+                                  steepness);
+    vec3 terrainColor = mix(flatColor, rockColor, rockBlend);
+
+    // === LATITUDE: Extra snow at poles ===
+    float polarSnow = smoothstep(uSnowLatitude - uSnowBlend, uSnowLatitude, latitude);
+    terrainColor = mix(terrainColor, snowColor, polarSnow * 0.8);
+
+    return terrainColor;
 }
 
-vec3 GetTerrainColorLegacy(float height, float seaLevel)
+// Legacy terrain color (height-based only, no biomes)
+vec3 getTerrainColorLegacy(float height)
 {
-    // Legacy height-based coloring
-    float beachThreshold = seaLevel + 0.02;
-    float grassThreshold = seaLevel + 0.15;
-    float forestThreshold = seaLevel + 0.30;
-    float rockThreshold = seaLevel + 0.50;
-    float snowThreshold = seaLevel + 0.70;
+    float beachThreshold = uSeaLevel + 0.02;
+    float grassThreshold = uSeaLevel + 0.15;
+    float forestThreshold = uSeaLevel + 0.30;
+    float rockThreshold = uSeaLevel + 0.50;
+    float snowThreshold = uSeaLevel + 0.70;
 
-    if (height < seaLevel - 0.1)
-        return COLOR_DEEP_OCEAN;
-    else if (height < seaLevel)
-        return mix(COLOR_DEEP_OCEAN, COLOR_SHALLOW_OCEAN, (height - (seaLevel - 0.1)) / 0.1);
+    vec3 beach = vec3(0.76, 0.70, 0.50);
+    vec3 grass = vec3(0.45, 0.55, 0.30);
+    vec3 forest = vec3(0.15, 0.40, 0.15);
+    vec3 rock = vec3(0.40, 0.38, 0.35);
+    vec3 snow = vec3(0.95, 0.95, 0.98);
+
+    if (height < uSeaLevel - 0.1)
+        return DEEP_OCEAN;
+    else if (height < uSeaLevel)
+        return mix(DEEP_OCEAN, SHALLOW_OCEAN, remap01(height, uSeaLevel - 0.1, uSeaLevel));
     else if (height < beachThreshold)
-        return mix(COLOR_SHALLOW_OCEAN, BEACH, (height - seaLevel) / (beachThreshold - seaLevel));
+        return mix(SHALLOW_OCEAN, beach, remap01(height, uSeaLevel, beachThreshold));
     else if (height < grassThreshold)
-        return mix(BEACH, PLAINS, (height - beachThreshold) / (grassThreshold - beachThreshold));
+        return mix(beach, grass, remap01(height, beachThreshold, grassThreshold));
     else if (height < forestThreshold)
-        return mix(PLAINS, FOREST, (height - grassThreshold) / (forestThreshold - grassThreshold));
+        return mix(grass, forest, remap01(height, grassThreshold, forestThreshold));
     else if (height < rockThreshold)
-        return mix(FOREST, ROCK, (height - forestThreshold) / (rockThreshold - forestThreshold));
+        return mix(forest, rock, remap01(height, forestThreshold, rockThreshold));
     else if (height < snowThreshold)
-        return mix(ROCK, SNOW, (height - rockThreshold) / (snowThreshold - rockThreshold));
+        return mix(rock, snow, remap01(height, rockThreshold, snowThreshold));
     else
-        return SNOW;
+        return snow;
 }
 
 void main()
 {
-    vec3 normal = normalize(vNormal);
+    // Guard against degenerate normals
+    float normalLen = length(vNormal);
+    vec3 normal = normalLen > 0.001 ? vNormal / normalLen : normalize(vWorldPos);
     vec3 lightDir = normalize(uLightDir);
 
-    // Diffuse lighting
+    // Diffuse lighting with intensity control
     float diff = max(dot(normal, lightDir), 0.0);
 
-    // Ambient
-    float ambient = 0.15;
+    // Specular lighting (Blinn-Phong)
+    vec3 viewDir = normalize(uCameraPos - vWorldPos);
+    vec3 halfDir = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(normal, halfDir), 0.0), uSpecularPower) * uSpecularStrength;
 
     // Get terrain color
     vec3 terrainColor;
     if (vHeight < uSeaLevel)
     {
-        // Underwater - show ocean floor colors
-        if (vHeight < uSeaLevel - 0.1)
-            terrainColor = COLOR_DEEP_OCEAN;
-        else
-            terrainColor = mix(COLOR_DEEP_OCEAN, COLOR_SHALLOW_OCEAN, (vHeight - (uSeaLevel - 0.1)) / 0.1);
+        // Underwater (ocean floor visible through shallow water)
+        float oceanDepth = remap01(vHeight, uSeaLevel - 0.1, uSeaLevel);
+        terrainColor = mix(DEEP_OCEAN, SHALLOW_OCEAN, oceanDepth);
     }
     else if (uUseBiomes)
     {
-        terrainColor = getBiomeColor(vWorldPos, vHeight, uSeaLevel);
+        // Pass the corrected normal, not raw vNormal
+        terrainColor = getTerrainColor(vWorldPos, normal, vHeight);
     }
     else
     {
-        terrainColor = GetTerrainColorLegacy(vHeight, uSeaLevel);
+        terrainColor = getTerrainColorLegacy(vHeight);
     }
 
-    // Final color
-    vec3 color = terrainColor * (ambient + diff * 0.85);
+    // Final color with lighting (ambient + diffuse * intensity + specular)
+    vec3 color = terrainColor * (uAmbientLight + diff * uSunIntensity) + vec3(spec);
 
     FragColor = vec4(color, 1.0);
 }

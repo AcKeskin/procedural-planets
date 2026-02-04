@@ -177,7 +177,7 @@ void SpherePatch::GenerateGridIndices(int resolution, std::vector<uint32_t>& ind
     }
 }
 
-void SpherePatch::GenerateLod(int lod, const std::vector<float>& heights)
+void SpherePatch::GenerateLod(int lod, const std::vector<float>& heights, const std::vector<glm::vec4>& shadingData)
 {
     if (lod < 0 || lod >= MaxLodLevels) return;
 
@@ -193,14 +193,10 @@ void SpherePatch::GenerateLod(int lod, const std::vector<float>& heights)
         float h = (i < heights.size()) ? heights[i] : 1.0f;
         glm::vec3 pos = unitVertices[i] * _planetRadius * h;
 
-        // Calculate UV from spherical coordinates
-        glm::vec3 n = glm::normalize(pos);
-        float u = 0.5f + std::atan2(n.z, n.x) / (2.0f * 3.14159265f);
-        float v = 0.5f - std::asin(std::clamp(n.y, -1.0f, 1.0f)) / 3.14159265f;
-
         meshData.vertices[i].position = pos;
         meshData.vertices[i].normal = glm::vec3(0.0f); // Will be calculated below
-        meshData.vertices[i].uv = glm::vec2(u, v);
+        meshData.vertices[i].uv = glm::vec2(h, 0.0f);  // Store height in UV.x for shader access
+        meshData.vertices[i].shadingData = (i < shadingData.size()) ? shadingData[i] : glm::vec4(0.0f);
     }
 
     // Generate indices

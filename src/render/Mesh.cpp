@@ -134,6 +134,11 @@ void Mesh::Upload(const MeshData& data)
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
         reinterpret_cast<void*>(offsetof(Vertex, uv)));
 
+    // Shading data attribute
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+        reinterpret_cast<void*>(offsetof(Vertex, shadingData)));
+
     glBindVertexArray(0);
 }
 

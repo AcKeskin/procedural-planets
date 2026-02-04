@@ -1,0 +1,97 @@
+#version 450
+layout(local_size_x = 256) in;
+
+#include "noise.glsl"
+
+// ============================================================================
+// Earth Shading Compute Shader
+// Pre-computes per-vertex shading data for gradient-based terrain coloring
+// Outputs: x=large, y=detail, z=small, w=biomeBlend
+// ============================================================================
+
+layout(std430, binding = 0) readonly buffer Vertices
+{
+    float vertexData[];
+};
+
+layout(std430, binding = 1) writeonly buffer ShadingData
+{
+    vec4 shadingOutput[];
+};
+
+uniform uint numVertices;
+uniform uint seed;
+
+// Noise parameters
+uniform float largeNoiseScale;    // ~0.3 (climate zones)
+uniform int largeNoiseOctaves;    // 3
+uniform float detailNoiseScale;   // ~2.0 (terrain texture)
+uniform float smallNoiseScale;    // ~15.0 (micro-detail)
+uniform int smallNoiseOctaves;    // 5
+uniform float warpStrength;       // ~0.1 (biome boundary irregularity)
+
+// Multi-octave normalized noise (returns 0-1)
+float multiOctaveNoise(vec3 pos, float scale, int octaves, uint baseSeed)
+{
+    float sum = 0.0;
+    float amplitude = 1.0;
+    float frequency = scale;
+    float maxValue = 0.0;
+
+    for (int i = 0; i < octaves; i++)
+    {
+        sum += snoise(pos * frequency, baseSeed + uint(i)) * amplitude;
+        maxValue += amplitude;
+        amplitude *= 0.5;
+        frequency *= 2.0;
+    }
+
+    return sum / maxValue;
+}
+
+// Warped noise for irregular boundaries
+float warpedNoise(vec3 pos, float scale, float warpAmount, uint baseSeed)
+{
+    // Sample warp offset
+    float warpX = snoise(pos * scale * 0.5, baseSeed) * 2.0 - 1.0;
+    float warpY = snoise(pos * scale * 0.5 + vec3(31.7, 47.3, 89.1), baseSeed) * 2.0 - 1.0;
+    float warpZ = snoise(pos * scale * 0.5 + vec3(73.1, 23.9, 61.7), baseSeed) * 2.0 - 1.0;
+
+    // Apply warp and sample again
+    vec3 warpedPos = pos + vec3(warpX, warpY, warpZ) * warpAmount;
+    return snoise(warpedPos * scale, baseSeed + 100u);
+}
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= numVertices) return;
+
+    uint baseIdx = id * 3u;
+    vec3 pos = vec3(vertexData[baseIdx], vertexData[baseIdx + 1u], vertexData[baseIdx + 2u]);
+    vec3 dir = normalize(pos);
+
+    // Large-scale noise (continental climate zones)
+    // Used for broad biome distribution: tropical/temperate/polar gradients
+    float largeNoise = multiOctaveNoise(dir, largeNoiseScale, largeNoiseOctaves, seed);
+
+    // Detail noise with domain warping (natural biome boundaries)
+    // Warping creates irregular, organic-looking transitions
+    float detailNoise = warpedNoise(dir, detailNoiseScale, warpStrength, seed + 1u);
+
+    // Small-scale noise (high-frequency surface detail)
+    // Used for color variation within terrain types (rock banding, grass patches)
+    float smallNoise = multiOctaveNoise(dir, smallNoiseScale, smallNoiseOctaves, seed + 2u);
+
+    // Biome blend noise (for A/B terrain variant mixing)
+    // Separate from large noise to allow independent control
+    vec3 blendWarp;
+    blendWarp.x = snoise(dir * largeNoiseScale * 0.7, seed + 200u) * 2.0 - 1.0;
+    blendWarp.y = snoise(dir * largeNoiseScale * 0.7 + vec3(99.0, 0.0, 0.0), seed + 200u) * 2.0 - 1.0;
+    blendWarp.z = snoise(dir * largeNoiseScale * 0.7 - vec3(99.0, 0.0, 0.0), seed + 200u) * 2.0 - 1.0;
+    float biomeBlendNoise = multiOctaveNoise(dir + blendWarp * 0.1, largeNoiseScale * 1.5, 3, seed + 3u);
+
+    // Output packed shading data
+    // All values in [0, 1] range for easy shader use
+    shadingOutput[id] = vec4(largeNoise, detailNoise, smallNoise, biomeBlendNoise);
+}

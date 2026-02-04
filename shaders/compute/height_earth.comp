@@ -231,6 +231,14 @@ uniform float oceanFloorDepth;
 uniform float oceanFloorSmoothing;
 uniform float mountainBlend;
 uniform float heightScale;
+uniform float continentBaseLevel;  // Vertical shift - negative = more ocean
+
+// Perturbation (micro-detail roughness)
+uniform float perturbStrength;
+uniform float perturbScale;
+
+// Global frequency multiplier (higher = more detail = planet feels larger)
+uniform float globalFrequency;
 
 void main()
 {
@@ -242,10 +250,19 @@ void main()
     vec3 pos = vec3(vertexData[baseIdx], vertexData[baseIdx + 1u], vertexData[baseIdx + 2u]);
     vec3 dir = normalize(pos);
 
+    // Apply global frequency to all scales
+    float contScale = continentScale * globalFrequency;
+    float mtnScale = mountainScale * globalFrequency;
+    float mskScale = maskScale * globalFrequency;
+    float ptbScale = perturbScale * globalFrequency;
+
     // Continental shape (large-scale landmass definition)
     // Center around zero for proper ocean/land distribution
-    float continentShape = fbm(dir, continentOffset, continentLayers, continentScale,
+    float continentShape = fbm(dir, continentOffset, continentLayers, contScale,
                                continentPersistence, continentLacunarity, continentMultiplier, seed);
+
+    // Apply vertical shift (negative = more terrain below sea level = more ocean)
+    continentShape += continentBaseLevel;
 
     // Ocean floor clamping with smooth transition (creates continental shelves)
     continentShape = smoothMax(continentShape, -oceanFloorDepth, oceanFloorSmoothing);
@@ -257,13 +274,13 @@ void main()
     }
 
     // Mountain ridges (fine-scale detail on landmasses)
-    float ridges = smoothedRidgeNoise(dir, mountainOffset, mountainLayers, mountainScale,
+    float ridges = smoothedRidgeNoise(dir, mountainOffset, mountainLayers, mtnScale,
                                       mountainPersistence, mountainLacunarity, mountainMultiplier,
                                       mountainPower, mountainGain, mountainSmooth, seed + 1u);
 
     // Mask noise determines where mountains appear
     // Blends mountains onto elevated terrain (continents)
-    float maskNoise = fbm(dir, maskOffset, maskLayers, maskScale,
+    float maskNoise = fbm(dir, maskOffset, maskLayers, mskScale,
                           maskPersistence, maskLacunarity, maskMultiplier, seed + 2u);
 
     // Elevation-based mask: mountains only on land above certain height
@@ -272,9 +289,16 @@ void main()
     float noiseMask = Blend(0.0, mountainBlend * 0.5, maskNoise);
     float combinedMask = elevationMask * noiseMask;
 
-    // Final height: base (1.0) + terrain displacement
-    // heightScale controls overall terrain amplitude (typically 0.02-0.08 for Earth-like)
-    float finalHeight = 1.0 + (continentShape + ridges * combinedMask) * heightScale;
+    // Base terrain height
+    float terrainHeight = (continentShape + ridges * combinedMask) * heightScale;
+
+    // Perturbation: high-frequency micro-detail for surface roughness
+    float perturbNoise = snoise(dir * ptbScale, seed + 10u) * 2.0 - 1.0;
+    perturbNoise += (snoise(dir * ptbScale * 2.0, seed + 11u) * 2.0 - 1.0) * 0.5;
+    float perturbation = perturbNoise * perturbStrength;
+
+    // Final height: base (1.0) + terrain displacement + perturbation
+    float finalHeight = 1.0 + terrainHeight + perturbation;
 
     heights[id] = finalHeight;
 }
