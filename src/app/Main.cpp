@@ -445,55 +445,30 @@ int main()
 
         // GUI
         gui.BeginFrame();
-        gui.DrawDebugPanel(camera, moveSpeed);
 
-        // GPU toggle and timing display
-        gui.DrawGpuPanel(useGpu, lastCpuTimeMs, lastGpuTimeMs, terrainGenerator.IsReady());
+        gui.DrawScenePanel(lightDir, sunSize, sunColor, starDensity, lightingSettings);
 
-        // LOD System panel
-        bool lodNeedsRegen = gui.DrawLodPanel(
-            useLodSystem,
-            patchSubdivisions,
-            planetRadius,
+        bool needsRegen = gui.DrawTerrainPanel(
+            useGpu,
+            terrainSettings, seed, subdivisions,
+            planet,
+            useLodSystem, patchSubdivisions, planetRadius,
             lodSystem.GetPatchCount(),
             lodSystem.GetVisiblePatchCount(),
-            lodSystem.GetTotalVertexCount());
+            lodSystem.GetTotalVertexCount(),
+            lastCpuTimeMs, lastGpuTimeMs, terrainGenerator.IsReady());
 
-        // Ocean panel
-        gui.DrawOceanPanel(oceanSettings, seaLevel);
-
-        // Atmosphere panel
-        gui.DrawAtmospherePanel(atmosphereSettings);
-
-        // Space and sun panel
-        gui.DrawSpacePanel(lightDir, sunSize, sunColor, starDensity);
-
-        // Lighting panel
-        gui.DrawLightingPanel(lightingSettings);
-
-        // Biome panel
-        gui.DrawBiomePanel(biomeSettings);
-
-        // Earth colors panel (gradient pairs)
-        gui.DrawEarthColorsPanel(earthColors);
-
-        // Shading noise panel
-        gui.DrawShadingPanel(shadingSettings);
-
-        // Earth terrain panel (GPU mode) or Planet panel (CPU mode)
-        bool needsRegen = false;
-        if (useGpu)
+        if (!useGpu)
         {
-            needsRegen = gui.DrawEarthTerrainPanel(terrainSettings, seed, subdivisions);
-        }
-        else
-        {
-            needsRegen = gui.DrawPlanetPanel(planet);
             subdivisions = planet.GetSettings().subdivisions;
             seed = planet.GetSettings().seed;
         }
 
-        if (needsRegen || lodNeedsRegen)
+        gui.DrawSurfacePanel(biomeSettings, earthColors, shadingSettings, oceanSettings, seaLevel);
+        gui.DrawAtmospherePanel(atmosphereSettings);
+        gui.DrawDebugPanel(camera, moveSpeed);
+
+        if (needsRegen)
         {
             if (useLodSystem && useGpu)
             {
@@ -508,6 +483,7 @@ int main()
                 regeneratePlanetCpu();
             }
         }
+
         gui.EndFrame();
 
         renderer.EndFrame();

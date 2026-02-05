@@ -6,6 +6,7 @@
 #include "../core/generation/Planet.h"
 #include "../core/generation/NoiseLayer.h"
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <GLFW/glfw3.h>
@@ -16,6 +17,7 @@ namespace planets::render {
 
 Gui::Gui()
     : _initialized(false)
+    , _resetLayout(false)
 {
 }
 
@@ -58,6 +60,8 @@ void Gui::BeginFrame()
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+
+    SetupDockspace();
 }
 
 void Gui::EndFrame()
@@ -66,166 +70,238 @@ void Gui::EndFrame()
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
+void Gui::SetupDockspace()
+{
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowSize(viewport->WorkSize);
+    ImGui::SetNextWindowViewport(viewport->ID);
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_MenuBar
+        | ImGuiWindowFlags_NoDocking
+        | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
+        | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
+        | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus
+        | ImGuiWindowFlags_NoBackground;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::Begin("##Dockspace", nullptr, flags);
+    ImGui::PopStyleVar(3);
+
+    // Menu bar with panel visibility toggles
+    if (ImGui::BeginMenuBar())
+    {
+        if (ImGui::BeginMenu("View"))
+        {
+            ImGui::MenuItem("Scene", nullptr, &_visibility.scene);
+            ImGui::MenuItem("Terrain", nullptr, &_visibility.terrain);
+            ImGui::MenuItem("Surface", nullptr, &_visibility.surface);
+            ImGui::MenuItem("Atmosphere", nullptr, &_visibility.atmosphere);
+            ImGui::MenuItem("Debug", nullptr, &_visibility.debug);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Reset Layout"))
+            {
+                _resetLayout = true;
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::EndMenuBar();
+    }
+
+    ImGuiID dockspaceId = ImGui::GetID("MainDockspace");
+
+    // Build default layout if no saved layout exists or reset requested
+    bool needsBuild = (ImGui::DockBuilderGetNode(dockspaceId) == nullptr) || _resetLayout;
+    _resetLayout = false;
+
+    if (needsBuild)
+    {
+        ImGui::DockBuilderRemoveNode(dockspaceId);
+        ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+        ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
+
+        ImGuiID dockMain = dockspaceId;
+        ImGuiID dockRight = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.25f, nullptr, &dockMain);
+        ImGuiID dockBottom = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Down, 0.25f, nullptr, &dockMain);
+
+        ImGui::DockBuilderDockWindow("Scene", dockRight);
+        ImGui::DockBuilderDockWindow("Terrain", dockRight);
+        ImGui::DockBuilderDockWindow("Surface", dockRight);
+        ImGui::DockBuilderDockWindow("Atmosphere", dockRight);
+        ImGui::DockBuilderDockWindow("Debug", dockBottom);
+
+        ImGui::DockBuilderFinish(dockspaceId);
+    }
+
+    ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+    ImGui::End();
+}
+
+// ============================================================================
+// Consolidated Panel Methods
+// ============================================================================
+
+void Gui::DrawScenePanel(
+    glm::vec3& lightDir, float& sunSize, glm::vec3& sunColor,
+    float& starDensity, LightingSettings& lighting)
+{
+    if (!_visibility.scene) return;
+
+    ImGui::Begin("Scene", &_visibility.scene);
+
+    if (ImGui::CollapsingHeader("Space & Sun", ImGuiTreeNodeFlags_DefaultOpen))
+        DrawSpaceContent(lightDir, sunSize, sunColor, starDensity);
+
+    if (ImGui::CollapsingHeader("Lighting", ImGuiTreeNodeFlags_DefaultOpen))
+        DrawLightingContent(lighting);
+
+    ImGui::End();
+}
+
+bool Gui::DrawTerrainPanel(
+    bool& useGpu,
+    EarthTerrainSettings& terrainSettings, uint32_t& seed, int& subdivisions,
+    planets::core::Planet& planet,
+    bool& useLodSystem, int& patchSubdivisions, float& planetRadius,
+    int patchCount, int visiblePatchCount, int vertexCount,
+    float cpuTimeMs, float gpuTimeMs, bool gpuAvailable)
+{
+    if (!_visibility.terrain) return false;
+
+    bool regen = false;
+    ImGui::Begin("Terrain", &_visibility.terrain);
+
+    if (ImGui::CollapsingHeader("GPU Compute"))
+        DrawGpuContent(useGpu, cpuTimeMs, gpuTimeMs, gpuAvailable);
+
+    if (ImGui::CollapsingHeader("Generation", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        if (useGpu)
+            regen |= DrawEarthTerrainContent(terrainSettings, seed, subdivisions);
+        else
+            regen |= DrawPlanetContent(planet);
+    }
+
+    if (ImGui::CollapsingHeader("LOD System"))
+        regen |= DrawLodContent(useLodSystem, patchSubdivisions, planetRadius, patchCount, visiblePatchCount, vertexCount);
+
+    ImGui::End();
+    return regen;
+}
+
+void Gui::DrawSurfacePanel(
+    BiomeSettings& biomes, EarthColors& colors,
+    EarthShadingSettings& shading,
+    effects::OceanSettings& ocean, float& seaLevel)
+{
+    if (!_visibility.surface) return;
+
+    ImGui::Begin("Surface", &_visibility.surface);
+
+    if (ImGui::CollapsingHeader("Biomes", ImGuiTreeNodeFlags_DefaultOpen))
+        DrawBiomeContent(biomes);
+
+    if (ImGui::CollapsingHeader("Colors"))
+        DrawEarthColorsContent(colors);
+
+    if (ImGui::CollapsingHeader("Shading Noise"))
+        DrawShadingContent(shading);
+
+    if (ImGui::CollapsingHeader("Ocean"))
+        DrawOceanContent(ocean, seaLevel);
+
+    ImGui::End();
+}
+
+void Gui::DrawAtmospherePanel(effects::AtmosphereSettings& settings)
+{
+    if (!_visibility.atmosphere) return;
+
+    ImGui::Begin("Atmosphere", &_visibility.atmosphere);
+    DrawAtmosphereContent(settings);
+    ImGui::End();
+}
+
 void Gui::DrawDebugPanel(const planets::core::Camera& camera, float& moveSpeed)
 {
-    ImGui::Begin("Debug");
+    if (!_visibility.debug) return;
 
-    const auto& pos = camera.GetPosition();
-    ImGui::Text("Camera Position: %.2f, %.2f, %.2f", pos.x, pos.y, pos.z);
-    ImGui::Text("Yaw: %.2f  Pitch: %.2f", camera.GetYaw(), camera.GetPitch());
-
-    const char* modeStr = camera.GetMode() == planets::core::CameraMode::FreeFly ? "Free-Fly" : "Orbit";
-    ImGui::Text("Mode: %s", modeStr);
-
-    ImGui::Separator();
-    ImGui::Text("Movement");
-    ImGui::SliderFloat("Speed", &moveSpeed, 1.0f, 100.0f, "%.1f");
-
-    ImGui::Separator();
-    ImGui::Text("Controls:");
-    ImGui::BulletText("WASD - Move");
-    ImGui::BulletText("Mouse (RMB) - Look");
-    ImGui::BulletText("Q/E - Up/Down");
-    ImGui::BulletText("Shift - Boost");
-    ImGui::BulletText("ESC - Exit");
-
+    ImGui::Begin("Debug", &_visibility.debug);
+    DrawDebugContent(camera, moveSpeed);
     ImGui::End();
 }
 
-bool Gui::DrawPlanetPanel(planets::core::Planet& planet)
+// ============================================================================
+// Content Helpers (stripped of Begin/End)
+// ============================================================================
+
+void Gui::DrawSpaceContent(glm::vec3& lightDir, float& sunSize, glm::vec3& sunColor, float& starDensity)
+{
+    ImGui::Text("Sun Direction");
+    ImGui::Separator();
+
+    // Convert to spherical for easier editing
+    float lightLength = glm::length(lightDir);
+    glm::vec3 normalizedDir = lightDir / lightLength;
+
+    float azimuth = atan2(normalizedDir.x, normalizedDir.z);
+    float elevation = asin(normalizedDir.y);
+
+    bool changed = false;
+    changed |= ImGui::SliderAngle("Azimuth", &azimuth, -180.0f, 180.0f);
+    changed |= ImGui::SliderAngle("Elevation", &elevation, -90.0f, 90.0f);
+
+    if (changed)
+    {
+        lightDir.x = cos(elevation) * sin(azimuth);
+        lightDir.y = sin(elevation);
+        lightDir.z = cos(elevation) * cos(azimuth);
+        lightDir = glm::normalize(lightDir);
+    }
+
+    ImGui::Separator();
+    ImGui::Text("Sun Appearance");
+
+    ImGui::SliderFloat("Sun Size", &sunSize, 0.01f, 0.1f, "%.3f rad");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Angular size in radians");
+
+    ImGui::ColorEdit3("Sun Color", &sunColor.x);
+
+    ImGui::Separator();
+    ImGui::Text("Stars");
+
+    ImGui::SliderFloat("Star Density", &starDensity, 0.0f, 3.0f);
+}
+
+void Gui::DrawLightingContent(LightingSettings& settings)
+{
+    ImGui::Text("Sun Lighting");
+    ImGui::Separator();
+
+    ImGui::SliderFloat("Sun Intensity", &settings.sunIntensity, 0.1f, 5.0f, "%.2f");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Overall brightness of sunlight on terrain");
+
+    ImGui::SliderFloat("Ambient Light", &settings.ambientLight, 0.0f, 0.5f, "%.3f");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Base illumination in shadows");
+
+    ImGui::Separator();
+    ImGui::Text("Specular");
+
+    ImGui::SliderFloat("Specular Strength", &settings.specularStrength, 0.0f, 1.0f, "%.2f");
+    ImGui::SliderFloat("Specular Power", &settings.specularPower, 4.0f, 128.0f, "%.0f");
+
+    ImGui::Separator();
+    if (ImGui::Button("Reset"))
+    {
+        settings = LightingSettings();
+    }
+}
+
+bool Gui::DrawEarthTerrainContent(EarthTerrainSettings& settings, uint32_t& seed, int& subdivisions)
 {
     bool needsRegeneration = false;
-
-    ImGui::Begin("Planet");
-
-    auto& settings = planet.GetSettings();
-
-    ImGui::Text("Planet Settings");
-    ImGui::Separator();
-
-    if (ImGui::SliderFloat("Radius", &settings.radius, 0.5f, 5.0f))
-    {
-        needsRegeneration = true;
-    }
-
-    if (ImGui::SliderFloat("Sea Level", &settings.seaLevel, 0.0f, 1.0f))
-    {
-        // Sea level doesn't require mesh regeneration, just shader uniform update
-    }
-
-    if (ImGui::SliderFloat("Height Scale", &settings.heightScale, 0.0f, 0.2f))
-    {
-        needsRegeneration = true;
-    }
-
-    if (ImGui::SliderInt("Subdivisions", &settings.subdivisions, 1, 6))
-    {
-        needsRegeneration = true;
-    }
-
-    int seed = static_cast<int>(settings.seed);
-    if (ImGui::InputInt("Seed", &seed))
-    {
-        settings.seed = static_cast<uint32_t>(seed);
-        planet.Reseed(settings.seed);
-        needsRegeneration = true;
-    }
-
-    ImGui::Separator();
-    ImGui::Text("Noise Layers: %zu", planet.GetNoiseLayerCount());
-
-    for (size_t i = 0; i < planet.GetNoiseLayerCount(); ++i)
-    {
-        auto& layer = planet.GetNoiseLayer(i);
-        auto& layerSettings = layer.GetSettings();
-
-        ImGui::PushID(static_cast<int>(i));
-
-        if (ImGui::CollapsingHeader(("Layer " + std::to_string(i)).c_str()))
-        {
-            if (ImGui::Checkbox("Enabled", &layerSettings.enabled))
-            {
-                layer.Configure(layerSettings);
-                needsRegeneration = true;
-            }
-
-            if (ImGui::SliderFloat("Scale", &layerSettings.scale, 0.1f, 10.0f))
-            {
-                layer.Configure(layerSettings);
-                needsRegeneration = true;
-            }
-
-            if (ImGui::SliderFloat("Strength", &layerSettings.strength, 0.0f, 2.0f))
-            {
-                layer.Configure(layerSettings);
-                needsRegeneration = true;
-            }
-
-            if (ImGui::SliderInt("Octaves", &layerSettings.octaves, 1, 8))
-            {
-                layer.Configure(layerSettings);
-                needsRegeneration = true;
-            }
-
-            if (ImGui::SliderFloat("Persistence", &layerSettings.persistence, 0.1f, 1.0f))
-            {
-                layer.Configure(layerSettings);
-                needsRegeneration = true;
-            }
-
-            if (ImGui::SliderFloat("Lacunarity", &layerSettings.lacunarity, 1.0f, 4.0f))
-            {
-                layer.Configure(layerSettings);
-                needsRegeneration = true;
-            }
-        }
-
-        ImGui::PopID();
-    }
-
-    if (ImGui::Button("Regenerate"))
-    {
-        needsRegeneration = true;
-    }
-
-    ImGui::End();
-
-    return needsRegeneration;
-}
-
-void Gui::DrawGpuPanel(bool& useGpu, float cpuTimeMs, float gpuTimeMs, bool gpuAvailable)
-{
-    ImGui::Begin("GPU Compute");
-
-    if (!gpuAvailable)
-    {
-        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "GPU compute not available");
-        ImGui::Text("Using CPU fallback");
-    }
-    else
-    {
-        ImGui::Checkbox("Use GPU", &useGpu);
-
-        ImGui::Separator();
-        ImGui::Text("Generation Times:");
-        ImGui::BulletText("CPU: %.2f ms", cpuTimeMs);
-        ImGui::BulletText("GPU: %.2f ms", gpuTimeMs);
-
-        if (cpuTimeMs > 0.0f && gpuTimeMs > 0.0f)
-        {
-            float speedup = cpuTimeMs / gpuTimeMs;
-            ImGui::Text("Speedup: %.1fx", speedup);
-        }
-    }
-
-    ImGui::End();
-}
-
-bool Gui::DrawEarthTerrainPanel(EarthTerrainSettings& settings, uint32_t& seed, int& subdivisions)
-{
-    bool needsRegeneration = false;
-
-    ImGui::Begin("Earth Terrain");
 
     // Basic settings
     ImGui::Text("Basic Settings");
@@ -349,12 +425,107 @@ bool Gui::DrawEarthTerrainPanel(EarthTerrainSettings& settings, uint32_t& seed, 
         needsRegeneration = true;
     }
 
-    ImGui::End();
+    return needsRegeneration;
+}
+
+bool Gui::DrawPlanetContent(planets::core::Planet& planet)
+{
+    bool needsRegeneration = false;
+
+    auto& settings = planet.GetSettings();
+
+    ImGui::Text("Planet Settings");
+    ImGui::Separator();
+
+    if (ImGui::SliderFloat("Radius", &settings.radius, 0.5f, 5.0f))
+    {
+        needsRegeneration = true;
+    }
+
+    if (ImGui::SliderFloat("Sea Level", &settings.seaLevel, 0.0f, 1.0f))
+    {
+        // Sea level doesn't require mesh regeneration, just shader uniform update
+    }
+
+    if (ImGui::SliderFloat("Height Scale", &settings.heightScale, 0.0f, 0.2f))
+    {
+        needsRegeneration = true;
+    }
+
+    if (ImGui::SliderInt("Subdivisions", &settings.subdivisions, 1, 6))
+    {
+        needsRegeneration = true;
+    }
+
+    int seed = static_cast<int>(settings.seed);
+    if (ImGui::InputInt("Seed", &seed))
+    {
+        settings.seed = static_cast<uint32_t>(seed);
+        planet.Reseed(settings.seed);
+        needsRegeneration = true;
+    }
+
+    ImGui::Separator();
+    ImGui::Text("Noise Layers: %zu", planet.GetNoiseLayerCount());
+
+    for (size_t i = 0; i < planet.GetNoiseLayerCount(); ++i)
+    {
+        auto& layer = planet.GetNoiseLayer(i);
+        auto& layerSettings = layer.GetSettings();
+
+        ImGui::PushID(static_cast<int>(i));
+
+        if (ImGui::CollapsingHeader(("Layer " + std::to_string(i)).c_str()))
+        {
+            if (ImGui::Checkbox("Enabled", &layerSettings.enabled))
+            {
+                layer.Configure(layerSettings);
+                needsRegeneration = true;
+            }
+
+            if (ImGui::SliderFloat("Scale", &layerSettings.scale, 0.1f, 10.0f))
+            {
+                layer.Configure(layerSettings);
+                needsRegeneration = true;
+            }
+
+            if (ImGui::SliderFloat("Strength", &layerSettings.strength, 0.0f, 2.0f))
+            {
+                layer.Configure(layerSettings);
+                needsRegeneration = true;
+            }
+
+            if (ImGui::SliderInt("Octaves", &layerSettings.octaves, 1, 8))
+            {
+                layer.Configure(layerSettings);
+                needsRegeneration = true;
+            }
+
+            if (ImGui::SliderFloat("Persistence", &layerSettings.persistence, 0.1f, 1.0f))
+            {
+                layer.Configure(layerSettings);
+                needsRegeneration = true;
+            }
+
+            if (ImGui::SliderFloat("Lacunarity", &layerSettings.lacunarity, 1.0f, 4.0f))
+            {
+                layer.Configure(layerSettings);
+                needsRegeneration = true;
+            }
+        }
+
+        ImGui::PopID();
+    }
+
+    if (ImGui::Button("Regenerate"))
+    {
+        needsRegeneration = true;
+    }
 
     return needsRegeneration;
 }
 
-bool Gui::DrawLodPanel(
+bool Gui::DrawLodContent(
     bool& useLodSystem,
     int& patchSubdivisions,
     float& planetRadius,
@@ -363,8 +534,6 @@ bool Gui::DrawLodPanel(
     int vertexCount)
 {
     bool needsRegeneration = false;
-
-    ImGui::Begin("LOD System");
 
     ImGui::Checkbox("Enable LOD System", &useLodSystem);
 
@@ -401,15 +570,137 @@ bool Gui::DrawLodPanel(
         }
     }
 
-    ImGui::End();
-
     return needsRegeneration;
 }
 
-void Gui::DrawOceanPanel(effects::OceanSettings& settings, float& seaLevel)
+void Gui::DrawGpuContent(bool& useGpu, float cpuTimeMs, float gpuTimeMs, bool gpuAvailable)
 {
-    ImGui::Begin("Ocean");
+    if (!gpuAvailable)
+    {
+        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "GPU compute not available");
+        ImGui::Text("Using CPU fallback");
+    }
+    else
+    {
+        ImGui::Checkbox("Use GPU", &useGpu);
 
+        ImGui::Separator();
+        ImGui::Text("Generation Times:");
+        ImGui::BulletText("CPU: %.2f ms", cpuTimeMs);
+        ImGui::BulletText("GPU: %.2f ms", gpuTimeMs);
+
+        if (cpuTimeMs > 0.0f && gpuTimeMs > 0.0f)
+        {
+            float speedup = cpuTimeMs / gpuTimeMs;
+            ImGui::Text("Speedup: %.1fx", speedup);
+        }
+    }
+}
+
+void Gui::DrawBiomeContent(BiomeSettings& settings)
+{
+    ImGui::Checkbox("Enable Biomes", &settings.enabled);
+
+    if (settings.enabled)
+    {
+        ImGui::Separator();
+        ImGui::Text("Height Zones (0=sea, 1=max)");
+
+        ImGui::SliderFloat("Shore Zone", &settings.shoreHeight, 0.02f, 0.25f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Beach height above sea level");
+
+        ImGui::SliderFloat("Snow Line", &settings.snowLine, 0.5f, 0.98f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Height where snow starts on peaks");
+
+        ImGui::Separator();
+        ImGui::Text("Cliff Rock");
+
+        ImGui::SliderFloat("Rock Threshold", &settings.steepnessThreshold, 0.1f, 0.5f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Steepness for rock texture\nLower = more rock");
+        ImGui::SliderFloat("Rock Blend", &settings.flatToSteepBlend, 0.05f, 0.25f, "%.2f");
+
+        ImGui::Separator();
+        ImGui::Text("Polar Snow");
+
+        ImGui::SliderFloat("Snow Latitude", &settings.snowLatitude, 0.5f, 0.95f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Latitude for polar snow");
+        ImGui::SliderFloat("Snow Blend", &settings.snowBlend, 0.02f, 0.2f, "%.2f");
+
+        ImGui::Separator();
+        ImGui::Checkbox("Auto Height Range", &settings.autoHeightRange);
+
+        if (!settings.autoHeightRange)
+        {
+            ImGui::SliderFloat("Height Min", &settings.heightRangeMin, 0.8f, 1.0f, "%.4f");
+            ImGui::SliderFloat("Height Max", &settings.heightRangeMax, 1.0f, 1.2f, "%.4f");
+        }
+    }
+}
+
+void Gui::DrawEarthColorsContent(EarthColors& colors)
+{
+    ImGui::Text("Shore (Beach)");
+    ImGui::ColorEdit3("Shore Low", &colors.shoreLow.x);
+    ImGui::ColorEdit3("Shore High", &colors.shoreHigh.x);
+
+    ImGui::Separator();
+    ImGui::Text("Flat Terrain A (Plains)");
+    ImGui::ColorEdit3("Flat A Low", &colors.flatLowA.x);
+    ImGui::ColorEdit3("Flat A High", &colors.flatHighA.x);
+
+    ImGui::Separator();
+    ImGui::Text("Flat Terrain B (Forest)");
+    ImGui::ColorEdit3("Flat B Low", &colors.flatLowB.x);
+    ImGui::ColorEdit3("Flat B High", &colors.flatHighB.x);
+
+    ImGui::Separator();
+    ImGui::Text("Steep Terrain (Rock)");
+    ImGui::ColorEdit3("Steep Low", &colors.steepLow.x);
+    ImGui::ColorEdit3("Steep High", &colors.steepHigh.x);
+
+    ImGui::Separator();
+    ImGui::ColorEdit3("Snow", &colors.snow.x);
+
+    ImGui::Separator();
+    if (ImGui::Button("Reset to Earth Preset"))
+    {
+        colors = EarthColors();
+    }
+}
+
+void Gui::DrawShadingContent(EarthShadingSettings& settings)
+{
+    ImGui::Text("Noise Scales");
+    ImGui::Separator();
+
+    ImGui::SliderFloat("Large Scale", &settings.largeNoiseScale, 0.1f, 1.0f);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Climate zone scale");
+
+    ImGui::SliderInt("Large Octaves", &settings.largeNoiseOctaves, 1, 5);
+
+    ImGui::SliderFloat("Detail Scale", &settings.detailNoiseScale, 0.5f, 5.0f);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Terrain texture variation");
+
+    ImGui::SliderFloat("Small Scale", &settings.smallNoiseScale, 5.0f, 30.0f);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("High-frequency surface detail");
+
+    ImGui::SliderInt("Small Octaves", &settings.smallNoiseOctaves, 3, 8);
+
+    ImGui::SliderFloat("Warp Strength", &settings.warpStrength, 0.0f, 0.5f);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Biome boundary irregularity");
+
+    ImGui::Separator();
+    ImGui::Text("Color Blending");
+
+    ImGui::SliderFloat("Flat Col Blend", &settings.flatColBlend, 0.5f, 3.0f);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Height threshold for low/high gradient");
+
+    ImGui::SliderFloat("Flat Col Noise", &settings.flatColBlendNoise, 0.0f, 0.6f);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Noise influence on gradient blend");
+}
+
+void Gui::DrawOceanContent(effects::OceanSettings& settings, float& seaLevel)
+{
     ImGui::Checkbox("Enable Ocean", &settings.enabled);
 
     if (settings.enabled)
@@ -427,14 +718,10 @@ void Gui::DrawOceanPanel(effects::OceanSettings& settings, float& seaLevel)
         ImGui::SliderFloat("Fresnel Power", &settings.fresnelPower, 1.0f, 5.0f);
         ImGui::SliderFloat("Specular Power", &settings.specularPower, 16.0f, 128.0f);
     }
-
-    ImGui::End();
 }
 
-void Gui::DrawAtmospherePanel(effects::AtmosphereSettings& settings)
+void Gui::DrawAtmosphereContent(effects::AtmosphereSettings& settings)
 {
-    ImGui::Begin("Atmosphere");
-
     ImGui::Checkbox("Enable Atmosphere", &settings.enabled);
 
     if (settings.enabled)
@@ -499,192 +786,28 @@ void Gui::DrawAtmospherePanel(effects::AtmosphereSettings& settings)
             settings.ditherScale = 4.0f;
         }
     }
-
-    ImGui::End();
 }
 
-void Gui::DrawBiomePanel(BiomeSettings& settings)
+void Gui::DrawDebugContent(const planets::core::Camera& camera, float& moveSpeed)
 {
-    ImGui::Begin("Biomes");
+    const auto& pos = camera.GetPosition();
+    ImGui::Text("Camera Position: %.2f, %.2f, %.2f", pos.x, pos.y, pos.z);
+    ImGui::Text("Yaw: %.2f  Pitch: %.2f", camera.GetYaw(), camera.GetPitch());
 
-    ImGui::Checkbox("Enable Biomes", &settings.enabled);
-
-    if (settings.enabled)
-    {
-        ImGui::Separator();
-        ImGui::Text("Height Zones (0=sea, 1=max)");
-
-        ImGui::SliderFloat("Shore Zone", &settings.shoreHeight, 0.02f, 0.25f, "%.2f");
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Beach height above sea level");
-
-        ImGui::SliderFloat("Snow Line", &settings.snowLine, 0.5f, 0.98f, "%.2f");
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Height where snow starts on peaks");
-
-        ImGui::Separator();
-        ImGui::Text("Cliff Rock");
-
-        ImGui::SliderFloat("Rock Threshold", &settings.steepnessThreshold, 0.1f, 0.5f, "%.2f");
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Steepness for rock texture\nLower = more rock");
-        ImGui::SliderFloat("Rock Blend", &settings.flatToSteepBlend, 0.05f, 0.25f, "%.2f");
-
-        ImGui::Separator();
-        ImGui::Text("Polar Snow");
-
-        ImGui::SliderFloat("Snow Latitude", &settings.snowLatitude, 0.5f, 0.95f, "%.2f");
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Latitude for polar snow");
-        ImGui::SliderFloat("Snow Blend", &settings.snowBlend, 0.02f, 0.2f, "%.2f");
-
-        ImGui::Separator();
-        ImGui::Checkbox("Auto Height Range", &settings.autoHeightRange);
-
-        if (!settings.autoHeightRange)
-        {
-            ImGui::SliderFloat("Height Min", &settings.heightRangeMin, 0.8f, 1.0f, "%.4f");
-            ImGui::SliderFloat("Height Max", &settings.heightRangeMax, 1.0f, 1.2f, "%.4f");
-        }
-    }
-
-    ImGui::End();
-}
-
-void Gui::DrawEarthColorsPanel(EarthColors& colors)
-{
-    ImGui::Begin("Earth Colors");
-
-    ImGui::Text("Shore (Beach)");
-    ImGui::ColorEdit3("Shore Low", &colors.shoreLow.x);
-    ImGui::ColorEdit3("Shore High", &colors.shoreHigh.x);
+    const char* modeStr = camera.GetMode() == planets::core::CameraMode::FreeFly ? "Free-Fly" : "Orbit";
+    ImGui::Text("Mode: %s", modeStr);
 
     ImGui::Separator();
-    ImGui::Text("Flat Terrain A (Plains)");
-    ImGui::ColorEdit3("Flat A Low", &colors.flatLowA.x);
-    ImGui::ColorEdit3("Flat A High", &colors.flatHighA.x);
+    ImGui::Text("Movement");
+    ImGui::SliderFloat("Speed", &moveSpeed, 1.0f, 100.0f, "%.1f");
 
     ImGui::Separator();
-    ImGui::Text("Flat Terrain B (Forest)");
-    ImGui::ColorEdit3("Flat B Low", &colors.flatLowB.x);
-    ImGui::ColorEdit3("Flat B High", &colors.flatHighB.x);
-
-    ImGui::Separator();
-    ImGui::Text("Steep Terrain (Rock)");
-    ImGui::ColorEdit3("Steep Low", &colors.steepLow.x);
-    ImGui::ColorEdit3("Steep High", &colors.steepHigh.x);
-
-    ImGui::Separator();
-    ImGui::ColorEdit3("Snow", &colors.snow.x);
-
-    ImGui::Separator();
-    if (ImGui::Button("Reset to Earth Preset"))
-    {
-        colors = EarthColors();
-    }
-
-    ImGui::End();
-}
-
-void Gui::DrawShadingPanel(EarthShadingSettings& settings)
-{
-    ImGui::Begin("Shading Noise");
-
-    ImGui::Text("Noise Scales");
-    ImGui::Separator();
-
-    ImGui::SliderFloat("Large Scale", &settings.largeNoiseScale, 0.1f, 1.0f);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Climate zone scale");
-
-    ImGui::SliderInt("Large Octaves", &settings.largeNoiseOctaves, 1, 5);
-
-    ImGui::SliderFloat("Detail Scale", &settings.detailNoiseScale, 0.5f, 5.0f);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Terrain texture variation");
-
-    ImGui::SliderFloat("Small Scale", &settings.smallNoiseScale, 5.0f, 30.0f);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("High-frequency surface detail");
-
-    ImGui::SliderInt("Small Octaves", &settings.smallNoiseOctaves, 3, 8);
-
-    ImGui::SliderFloat("Warp Strength", &settings.warpStrength, 0.0f, 0.5f);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Biome boundary irregularity");
-
-    ImGui::Separator();
-    ImGui::Text("Color Blending");
-
-    ImGui::SliderFloat("Flat Col Blend", &settings.flatColBlend, 0.5f, 3.0f);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Height threshold for low/high gradient");
-
-    ImGui::SliderFloat("Flat Col Noise", &settings.flatColBlendNoise, 0.0f, 0.6f);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Noise influence on gradient blend");
-
-    ImGui::End();
-}
-
-void Gui::DrawSpacePanel(glm::vec3& lightDir, float& sunSize, glm::vec3& sunColor, float& starDensity)
-{
-    ImGui::Begin("Space & Sun");
-
-    ImGui::Text("Sun Direction");
-    ImGui::Separator();
-
-    // Convert to spherical for easier editing
-    float lightLength = glm::length(lightDir);
-    glm::vec3 normalizedDir = lightDir / lightLength;
-
-    float azimuth = atan2(normalizedDir.x, normalizedDir.z);
-    float elevation = asin(normalizedDir.y);
-
-    bool changed = false;
-    changed |= ImGui::SliderAngle("Azimuth", &azimuth, -180.0f, 180.0f);
-    changed |= ImGui::SliderAngle("Elevation", &elevation, -90.0f, 90.0f);
-
-    if (changed)
-    {
-        lightDir.x = cos(elevation) * sin(azimuth);
-        lightDir.y = sin(elevation);
-        lightDir.z = cos(elevation) * cos(azimuth);
-        lightDir = glm::normalize(lightDir);
-    }
-
-    ImGui::Separator();
-    ImGui::Text("Sun Appearance");
-
-    ImGui::SliderFloat("Sun Size", &sunSize, 0.01f, 0.1f, "%.3f rad");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Angular size in radians");
-
-    ImGui::ColorEdit3("Sun Color", &sunColor.x);
-
-    ImGui::Separator();
-    ImGui::Text("Stars");
-
-    ImGui::SliderFloat("Star Density", &starDensity, 0.0f, 3.0f);
-
-    ImGui::End();
-}
-
-void Gui::DrawLightingPanel(LightingSettings& settings)
-{
-    ImGui::Begin("Lighting");
-
-    ImGui::Text("Sun Lighting");
-    ImGui::Separator();
-
-    ImGui::SliderFloat("Sun Intensity", &settings.sunIntensity, 0.1f, 5.0f, "%.2f");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Overall brightness of sunlight on terrain");
-
-    ImGui::SliderFloat("Ambient Light", &settings.ambientLight, 0.0f, 0.5f, "%.3f");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Base illumination in shadows");
-
-    ImGui::Separator();
-    ImGui::Text("Specular");
-
-    ImGui::SliderFloat("Specular Strength", &settings.specularStrength, 0.0f, 1.0f, "%.2f");
-    ImGui::SliderFloat("Specular Power", &settings.specularPower, 4.0f, 128.0f, "%.0f");
-
-    ImGui::Separator();
-    if (ImGui::Button("Reset"))
-    {
-        settings = LightingSettings();
-    }
-
-    ImGui::End();
+    ImGui::Text("Controls:");
+    ImGui::BulletText("WASD - Move");
+    ImGui::BulletText("Mouse (RMB) - Look");
+    ImGui::BulletText("Q/E - Up/Down");
+    ImGui::BulletText("Shift - Boost");
+    ImGui::BulletText("ESC - Exit");
 }
 
 } // namespace planets::render

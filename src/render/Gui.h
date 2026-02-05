@@ -60,43 +60,6 @@ public:
     void BeginFrame();
     void EndFrame();
 
-    void DrawDebugPanel(const planets::core::Camera& camera, float& moveSpeed);
-
-    // Returns true if planet needs regeneration
-    bool DrawPlanetPanel(planets::core::Planet& planet);
-
-    // GPU compute panel with timing info
-    void DrawGpuPanel(bool& useGpu, float cpuTimeMs, float gpuTimeMs, bool gpuAvailable);
-
-    // Earth terrain generation panel
-    // Returns true if terrain needs regeneration
-    bool DrawEarthTerrainPanel(EarthTerrainSettings& settings, uint32_t& seed, int& subdivisions);
-
-    // LOD system panel
-    // Returns true if LOD system needs regeneration
-    bool DrawLodPanel(
-        bool& useLodSystem,
-        int& patchSubdivisions,
-        float& planetRadius,
-        int patchCount,
-        int visiblePatchCount,
-        int vertexCount);
-
-    // Ocean settings panel
-    void DrawOceanPanel(effects::OceanSettings& settings, float& seaLevel);
-
-    // Atmosphere settings panel
-    void DrawAtmospherePanel(effects::AtmosphereSettings& settings);
-
-    // Biome settings panel
-    void DrawBiomePanel(BiomeSettings& settings);
-
-    // Earth colors panel (gradient pairs for terrain)
-    void DrawEarthColorsPanel(EarthColors& colors);
-
-    // Shading settings panel
-    void DrawShadingPanel(EarthShadingSettings& settings);
-
     // Lighting settings for terrain
     struct LightingSettings
     {
@@ -106,14 +69,60 @@ public:
         float specularPower = 32.0f;    // Specular shininess
     };
 
-    // Space/sun settings panel
-    void DrawSpacePanel(glm::vec3& lightDir, float& sunSize, glm::vec3& sunColor, float& starDensity);
+    // Consolidated panel methods
+    void DrawScenePanel(
+        glm::vec3& lightDir, float& sunSize, glm::vec3& sunColor,
+        float& starDensity, LightingSettings& lighting);
 
-    // Lighting settings panel
-    void DrawLightingPanel(LightingSettings& settings);
+    // Returns true if planet needs regeneration
+    bool DrawTerrainPanel(
+        bool& useGpu,
+        EarthTerrainSettings& terrainSettings, uint32_t& seed, int& subdivisions,
+        planets::core::Planet& planet,
+        bool& useLodSystem, int& patchSubdivisions, float& planetRadius,
+        int patchCount, int visiblePatchCount, int vertexCount,
+        float cpuTimeMs, float gpuTimeMs, bool gpuAvailable);
+
+    void DrawSurfacePanel(
+        BiomeSettings& biomes, EarthColors& colors,
+        EarthShadingSettings& shading,
+        effects::OceanSettings& ocean, float& seaLevel);
+
+    void DrawAtmospherePanel(effects::AtmosphereSettings& settings);
+
+    void DrawDebugPanel(const planets::core::Camera& camera, float& moveSpeed);
 
 private:
+    void SetupDockspace();
+
+    void DrawSpaceContent(glm::vec3& lightDir, float& sunSize, glm::vec3& sunColor, float& starDensity);
+    void DrawLightingContent(LightingSettings& settings);
+
+    bool DrawEarthTerrainContent(EarthTerrainSettings& settings, uint32_t& seed, int& subdivisions);
+    bool DrawPlanetContent(planets::core::Planet& planet);
+    bool DrawLodContent(bool& useLodSystem, int& patchSubdivisions, float& planetRadius,
+        int patchCount, int visiblePatchCount, int vertexCount);
+    void DrawGpuContent(bool& useGpu, float cpuTimeMs, float gpuTimeMs, bool gpuAvailable);
+
+    void DrawBiomeContent(BiomeSettings& settings);
+    void DrawEarthColorsContent(EarthColors& colors);
+    void DrawShadingContent(EarthShadingSettings& settings);
+    void DrawOceanContent(effects::OceanSettings& settings, float& seaLevel);
+
+    void DrawAtmosphereContent(effects::AtmosphereSettings& settings);
+    void DrawDebugContent(const planets::core::Camera& camera, float& moveSpeed);
+
+    struct PanelVisibility {
+        bool scene = true;
+        bool terrain = true;
+        bool surface = true;
+        bool atmosphere = true;
+        bool debug = true;
+    };
+
     bool _initialized;
+    bool _resetLayout;
+    PanelVisibility _visibility;
 };
 
 } // namespace planets::render
