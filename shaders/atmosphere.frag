@@ -7,6 +7,11 @@ out vec4 outColor;
 // Scene textures
 uniform sampler2D uSceneTexture;
 uniform sampler2D uDepthTexture;
+uniform sampler2D uBlueNoise;
+
+// Dithering parameters
+uniform float uDitherStrength;  // Default: 0.8
+uniform float uDitherScale;     // Default: 4.0
 
 // Camera
 uniform mat4 uInvView;
@@ -34,6 +39,12 @@ uniform float uNearPlane;
 uniform float uFarPlane;
 
 const float MAX_FLOAT = 3.402823466e+38;
+
+// Convert UV to square-scaled coordinates for blue noise tiling
+vec2 squareUV(vec2 uv, vec2 screenSize) {
+    const float scale = 1000.0;
+    return vec2(uv.x * screenSize.x / scale, uv.y * screenSize.y / scale);
+}
 
 // Ray-sphere intersection
 // Returns (distanceToSphere, distanceThroughSphere)
@@ -89,8 +100,13 @@ float opticalDepth(vec3 rayOrigin, vec3 rayDir, float rayLength)
 }
 
 // Calculate in-scattered light along the view ray (based on Unity reference)
-vec3 calculateLight(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 originalColor)
+vec3 calculateLight(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 originalColor, vec2 uv)
 {
+    // Blue noise dithering setup
+    vec2 screenSize = vec2(textureSize(uSceneTexture, 0));
+    float blueNoise = texture(uBlueNoise, squareUV(uv, screenSize) * uDitherScale).r;
+    blueNoise = (blueNoise - 0.5) * uDitherStrength;
+
     vec3 inScatterPoint = rayOrigin;
     float stepSize = rayLength / float(uNumInScatteringPoints - 1);
     vec3 inScatteredLight = vec3(0.0);
@@ -120,22 +136,24 @@ vec3 calculateLight(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 originalC
     // Apply scattering coefficients and intensity (matching Unity reference)
     inScatteredLight *= uScatteringCoefficients * uIntensity * stepSize / uPlanetRadius;
 
-    // Attenuate original scene color (gentle attenuation to preserve surface visibility)
-    const float brightnessAdaptionStrength = 0.05;
-    const float reflectedLightOutScatterStrength = 0.8;
+    // Add dither to reduce banding
+    inScatteredLight += blueNoise * 0.01;
+
+    // Attenuate original scene color (moderate values)
+    const float brightnessAdaptionStrength = 0.10;
+    const float reflectedLightOutScatterStrength = 1.5;
     float brightnessAdaption = dot(inScatteredLight, vec3(1.0)) * brightnessAdaptionStrength;
     float brightnessSum = viewRayOpticalDepth * uIntensity * reflectedLightOutScatterStrength + brightnessAdaption;
     float reflectedLightStrength = exp(-brightnessSum);
 
-    // Preserve surface colors - stronger preservation
-    reflectedLightStrength = max(reflectedLightStrength, 0.4);
+    // Preserve minimum surface visibility
+    reflectedLightStrength = max(reflectedLightStrength, 0.15);
 
-    // Preserve HDR content
+    // HDR preservation
     float hdrStrength = clamp(dot(originalColor, vec3(1.0)) / 3.0 - 0.5, 0.0, 1.0);
-    reflectedLightStrength = mix(reflectedLightStrength, 1.0, hdrStrength * 0.5);
+    reflectedLightStrength = mix(reflectedLightStrength, 1.0, hdrStrength * 0.7);
 
     vec3 reflectedLight = originalColor * reflectedLightStrength;
-
     return reflectedLight + inScatteredLight;
 }
 
@@ -189,7 +207,7 @@ void main()
     {
         const float epsilon = 0.0001;
         vec3 pointInAtmosphere = rayOrigin + rayDir * (dstToAtmosphere + epsilon);
-        vec3 light = calculateLight(pointInAtmosphere, rayDir, dstThroughAtmosphere - epsilon * 2.0, originalColor);
+        vec3 light = calculateLight(pointInAtmosphere, rayDir, dstThroughAtmosphere - epsilon * 2.0, originalColor, vUv);
         outColor = vec4(light, 1.0);
     }
     else

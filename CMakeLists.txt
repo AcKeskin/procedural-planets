@@ -61,6 +61,16 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(gl3w)
 
+# stb (single-header libraries)
+message(STATUS "Fetching stb...")
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG master
+)
+FetchContent_MakeAvailable(stb)
+set(STB_INCLUDE_DIR ${stb_SOURCE_DIR})
+
 # gl3w generates files in build dir, not source dir
 set(GL3W_INCLUDE_DIR ${gl3w_BINARY_DIR}/include)
 set(GL3W_SRC ${gl3w_BINARY_DIR}/src/gl3w.c)

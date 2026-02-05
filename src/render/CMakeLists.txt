@@ -31,6 +31,7 @@ target_include_directories(render PUBLIC
     ${IMGUI_DIR}
     ${IMGUI_DIR}/backends
     ${GL3W_INCLUDE_DIR}
+    ${STB_INCLUDE_DIR}
 )
 
 target_link_libraries(render PUBLIC

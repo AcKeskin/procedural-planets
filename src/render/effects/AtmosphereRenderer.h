@@ -27,6 +27,10 @@ struct AtmosphereSettings
 
     // Visual parameters
     float intensity = 1.0f;             // Overall brightness multiplier
+
+    // Dithering parameters (reduces banding)
+    float ditherStrength = 0.8f;
+    float ditherScale = 4.0f;
 };
 
 // Post-process atmosphere renderer using raymarching
@@ -64,10 +68,12 @@ public:
 
 private:
     void CreateFullscreenQuad();
+    bool LoadBlueNoiseTexture();
 
     Shader _atmosphereShader;
     unsigned int _quadVAO = 0;
     unsigned int _quadVBO = 0;
+    unsigned int _blueNoiseTexture = 0;
     bool _initialized = false;
 };
 

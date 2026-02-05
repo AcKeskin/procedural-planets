@@ -4,6 +4,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
 #include <iostream>
+#include <vector>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 namespace planets::render::effects {
 
@@ -24,8 +28,59 @@ bool AtmosphereRenderer::Initialize()
 
     CreateFullscreenQuad();
 
+    if (!LoadBlueNoiseTexture())
+    {
+        std::cerr << "[AtmosphereRenderer] Failed to load blue noise texture" << std::endl;
+        return false;
+    }
+
     _initialized = true;
     std::cout << "[AtmosphereRenderer] Initialized with raymarching scattering" << std::endl;
+    return true;
+}
+
+bool AtmosphereRenderer::LoadBlueNoiseTexture()
+{
+    constexpr int size = 64;
+    std::vector<unsigned char> data(size * size);
+
+    int width, height, channels;
+    unsigned char* fileData = stbi_load("textures/blue_noise_64.png", &width, &height, &channels, 1);
+
+    if (fileData)
+    {
+        // Use file data
+        glGenTextures(1, &_blueNoiseTexture);
+        glBindTexture(GL_TEXTURE_2D, _blueNoiseTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, fileData);
+        stbi_image_free(fileData);
+        std::cout << "[AtmosphereRenderer] Loaded blue noise texture (" << width << "x" << height << ")" << std::endl;
+    }
+    else
+    {
+        // Generate procedural blue noise using interleaved gradient noise
+        std::cout << "[AtmosphereRenderer] Generating procedural blue noise texture" << std::endl;
+        for (int y = 0; y < size; ++y)
+        {
+            for (int x = 0; x < size; ++x)
+            {
+                // Interleaved gradient noise - good approximation of blue noise
+                float noise = std::fmod(52.9829189f * std::fmod(0.06711056f * x + 0.00583715f * y, 1.0f), 1.0f);
+                data[y * size + x] = static_cast<unsigned char>(noise * 255.0f);
+            }
+        }
+
+        glGenTextures(1, &_blueNoiseTexture);
+        glBindTexture(GL_TEXTURE_2D, _blueNoiseTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, size, size, 0, GL_RED, GL_UNSIGNED_BYTE, data.data());
+    }
+
+    // Tiling requires repeat wrap mode, nearest filter preserves noise quality
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
     return true;
 }
 
@@ -40,6 +95,11 @@ void AtmosphereRenderer::Shutdown()
     {
         glDeleteBuffers(1, &_quadVBO);
         _quadVBO = 0;
+    }
+    if (_blueNoiseTexture != 0)
+    {
+        glDeleteTextures(1, &_blueNoiseTexture);
+        _blueNoiseTexture = 0;
     }
     _initialized = false;
 }
@@ -129,6 +189,10 @@ void AtmosphereRenderer::Render(
     _atmosphereShader.SetFloat("uDensityFalloff", settings.densityFalloff);
     _atmosphereShader.SetFloat("uIntensity", settings.intensity);
 
+    // Dithering parameters
+    _atmosphereShader.SetFloat("uDitherStrength", settings.ditherStrength);
+    _atmosphereShader.SetFloat("uDitherScale", settings.ditherScale);
+
     // Bind textures
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, sceneTexture);
@@ -137,6 +201,10 @@ void AtmosphereRenderer::Render(
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, depthTexture);
     _atmosphereShader.SetInt("uDepthTexture", 1);
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, _blueNoiseTexture);
+    _atmosphereShader.SetInt("uBlueNoise", 2);
 
     // Draw fullscreen triangle
     glBindVertexArray(_quadVAO);

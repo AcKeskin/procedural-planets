@@ -470,6 +470,13 @@ void Gui::DrawAtmospherePanel(effects::AtmosphereSettings& settings)
         ImGui::SliderFloat("Intensity", &settings.intensity, 0.1f, 3.0f);
 
         ImGui::Separator();
+        ImGui::Text("Dithering");
+        ImGui::SliderFloat("Dither Strength", &settings.ditherStrength, 0.0f, 2.0f);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Blue noise dithering to reduce banding");
+        ImGui::SliderFloat("Dither Scale", &settings.ditherScale, 1.0f, 10.0f);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Scale of the noise pattern");
+
+        ImGui::Separator();
         if (ImGui::Button("Earth Preset"))
         {
             settings.wavelengths = glm::vec3(700.0f, 530.0f, 460.0f);
@@ -477,6 +484,8 @@ void Gui::DrawAtmospherePanel(effects::AtmosphereSettings& settings)
             settings.densityFalloff = 4.3f;
             settings.atmosphereScale = 0.322f;
             settings.intensity = 1.0f;
+            settings.ditherStrength = 0.8f;
+            settings.ditherScale = 4.0f;
         }
         ImGui::SameLine();
         if (ImGui::Button("Mars Preset"))
@@ -486,6 +495,8 @@ void Gui::DrawAtmospherePanel(effects::AtmosphereSettings& settings)
             settings.densityFalloff = 4.0f;
             settings.atmosphereScale = 0.05f;
             settings.intensity = 0.6f;
+            settings.ditherStrength = 0.8f;
+            settings.ditherScale = 4.0f;
         }
     }
 

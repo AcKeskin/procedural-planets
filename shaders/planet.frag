@@ -202,7 +202,7 @@ void main()
     // Guard against degenerate normals
     float normalLen = length(vNormal);
     vec3 normal = normalLen > 0.001 ? vNormal / normalLen : normalize(vWorldPos);
-    vec3 lightDir = normalize(uLightDir);
+    vec3 lightDir = -normalize(uLightDir);
 
     // Diffuse lighting with intensity control
     float diff = max(dot(normal, lightDir), 0.0);
