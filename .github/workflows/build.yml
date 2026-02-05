@@ -1,0 +1,30 @@
+name: Build
+
+on:
+  push:
+    branches: [main, develop]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Verify artifacts
+        run: |
+          if (!(Test-Path "build/bin/Release/procedural-planets.exe")) {
+            Write-Error "Executable not found"
+            exit 1
+          }
+          if (!(Test-Path "build/bin/Release/shaders")) {
+            Write-Error "Shaders directory not found"
+            exit 1
+          }
+        shell: pwsh
