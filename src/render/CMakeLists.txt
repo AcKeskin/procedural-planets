@@ -8,6 +8,10 @@ add_library(render STATIC
     Mesh.cpp
     MeshGenerator.cpp
     TerrainGenerator.cpp
+    CelestialBody.cpp
+    Earth.cpp
+    Framebuffer.cpp
+    PostProcessor.cpp
     lod/SpherePatch.cpp
     lod/PatchLodSystem.cpp
     effects/OceanRenderer.cpp
@@ -27,6 +31,7 @@ target_include_directories(render PUBLIC
     ${IMGUI_DIR}
     ${IMGUI_DIR}/backends
     ${GL3W_INCLUDE_DIR}
+    ${STB_INCLUDE_DIR}
 )
 
 target_link_libraries(render PUBLIC

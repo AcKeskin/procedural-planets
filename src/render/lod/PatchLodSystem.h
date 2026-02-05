@@ -24,7 +24,8 @@ public:
         float planetRadius,
         int patchSubdivisions,
         TerrainGenerator& terrainGen,
-        const EarthTerrainSettings& settings,
+        const EarthTerrainSettings& terrainSettings,
+        const EarthShadingSettings& shadingSettings,
         uint32_t seed);
 
     // Update LOD levels based on camera position
@@ -43,7 +44,8 @@ private:
     void GenerateTerrainForPatch(
         SpherePatch& patch,
         TerrainGenerator& terrainGen,
-        const EarthTerrainSettings& settings,
+        const EarthTerrainSettings& terrainSettings,
+        const EarthShadingSettings& shadingSettings,
         uint32_t seed);
 
     std::vector<SpherePatch> _patches;

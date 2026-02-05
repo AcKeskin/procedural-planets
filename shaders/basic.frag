@@ -11,7 +11,7 @@ uniform vec3 uBaseColor = vec3(0.4, 0.6, 0.8);
 void main()
 {
     vec3 normal = normalize(vNormal);
-    vec3 lightDir = normalize(uLightDir);
+    vec3 lightDir = -normalize(uLightDir);
 
     float diff = max(dot(normal, lightDir), 0.0);
     float ambient = 0.2;

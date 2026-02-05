@@ -49,7 +49,7 @@ public:
         float planetRadius);
 
     // Generate mesh data for a specific LOD level
-    void GenerateLod(int lod, const std::vector<float>& heights);
+    void GenerateLod(int lod, const std::vector<float>& heights, const std::vector<glm::vec4>& shadingData);
 
     // Upload all LOD meshes to GPU
     void Upload();

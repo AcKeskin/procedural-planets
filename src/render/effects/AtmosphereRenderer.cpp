@@ -3,36 +3,13 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
-#include <array>
-#include <map>
 #include <iostream>
+#include <vector>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 namespace planets::render::effects {
-
-// Icosahedron base geometry
-static const float PHI = (1.0f + std::sqrt(5.0f)) / 2.0f;
-
-static const glm::vec3 IcosahedronVertices[12] = {
-    glm::normalize(glm::vec3(-1,  PHI,  0)),
-    glm::normalize(glm::vec3( 1,  PHI,  0)),
-    glm::normalize(glm::vec3(-1, -PHI,  0)),
-    glm::normalize(glm::vec3( 1, -PHI,  0)),
-    glm::normalize(glm::vec3( 0, -1,  PHI)),
-    glm::normalize(glm::vec3( 0,  1,  PHI)),
-    glm::normalize(glm::vec3( 0, -1, -PHI)),
-    glm::normalize(glm::vec3( 0,  1, -PHI)),
-    glm::normalize(glm::vec3( PHI,  0, -1)),
-    glm::normalize(glm::vec3( PHI,  0,  1)),
-    glm::normalize(glm::vec3(-PHI,  0, -1)),
-    glm::normalize(glm::vec3(-PHI,  0,  1))
-};
-
-static const int IcosahedronFaces[20][3] = {
-    {0, 11, 5}, {0, 5, 1}, {0, 1, 7}, {0, 7, 10}, {0, 10, 11},
-    {1, 5, 9}, {5, 11, 4}, {11, 10, 2}, {10, 7, 6}, {7, 1, 8},
-    {3, 9, 4}, {3, 4, 2}, {3, 2, 6}, {3, 6, 8}, {3, 8, 9},
-    {4, 9, 5}, {2, 4, 11}, {6, 2, 10}, {8, 6, 7}, {9, 8, 1}
-};
 
 AtmosphereRenderer::AtmosphereRenderer() = default;
 
@@ -41,7 +18,7 @@ AtmosphereRenderer::~AtmosphereRenderer()
     Shutdown();
 }
 
-bool AtmosphereRenderer::Initialize(float planetRadius, int subdivisions)
+bool AtmosphereRenderer::Initialize()
 {
     if (!_atmosphereShader.LoadFromFiles("shaders/atmosphere.vert", "shaders/atmosphere.frag"))
     {
@@ -49,145 +26,194 @@ bool AtmosphereRenderer::Initialize(float planetRadius, int subdivisions)
         return false;
     }
 
-    // Generate unit sphere (will be scaled in render)
-    GenerateAtmosphereSphere(1.0f, subdivisions);
+    CreateFullscreenQuad();
+
+    if (!LoadBlueNoiseTexture())
+    {
+        std::cerr << "[AtmosphereRenderer] Failed to load blue noise texture" << std::endl;
+        return false;
+    }
 
     _initialized = true;
-    std::cout << "[AtmosphereRenderer] Initialized" << std::endl;
+    std::cout << "[AtmosphereRenderer] Initialized with raymarching scattering" << std::endl;
+    return true;
+}
+
+bool AtmosphereRenderer::LoadBlueNoiseTexture()
+{
+    constexpr int size = 64;
+    std::vector<unsigned char> data(size * size);
+
+    int width, height, channels;
+    unsigned char* fileData = stbi_load("textures/blue_noise_64.png", &width, &height, &channels, 1);
+
+    if (fileData)
+    {
+        // Use file data
+        glGenTextures(1, &_blueNoiseTexture);
+        glBindTexture(GL_TEXTURE_2D, _blueNoiseTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, fileData);
+        stbi_image_free(fileData);
+        std::cout << "[AtmosphereRenderer] Loaded blue noise texture (" << width << "x" << height << ")" << std::endl;
+    }
+    else
+    {
+        // Generate procedural blue noise using interleaved gradient noise
+        std::cout << "[AtmosphereRenderer] Generating procedural blue noise texture" << std::endl;
+        for (int y = 0; y < size; ++y)
+        {
+            for (int x = 0; x < size; ++x)
+            {
+                // Interleaved gradient noise - good approximation of blue noise
+                float noise = std::fmod(52.9829189f * std::fmod(0.06711056f * x + 0.00583715f * y, 1.0f), 1.0f);
+                data[y * size + x] = static_cast<unsigned char>(noise * 255.0f);
+            }
+        }
+
+        glGenTextures(1, &_blueNoiseTexture);
+        glBindTexture(GL_TEXTURE_2D, _blueNoiseTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, size, size, 0, GL_RED, GL_UNSIGNED_BYTE, data.data());
+    }
+
+    // Tiling requires repeat wrap mode, nearest filter preserves noise quality
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
     return true;
 }
 
 void AtmosphereRenderer::Shutdown()
 {
+    if (_quadVAO != 0)
+    {
+        glDeleteVertexArrays(1, &_quadVAO);
+        _quadVAO = 0;
+    }
+    if (_quadVBO != 0)
+    {
+        glDeleteBuffers(1, &_quadVBO);
+        _quadVBO = 0;
+    }
+    if (_blueNoiseTexture != 0)
+    {
+        glDeleteTextures(1, &_blueNoiseTexture);
+        _blueNoiseTexture = 0;
+    }
     _initialized = false;
 }
 
-void AtmosphereRenderer::GenerateAtmosphereSphere(float radius, int subdivisions)
+void AtmosphereRenderer::CreateFullscreenQuad()
 {
-    MeshData meshData;
-
-    using EdgeKey = std::pair<uint32_t, uint32_t>;
-    std::map<EdgeKey, uint32_t> edgeCache;
-
-    auto getMidpoint = [&](uint32_t i1, uint32_t i2) -> uint32_t {
-        EdgeKey key = (i1 < i2) ? EdgeKey{i1, i2} : EdgeKey{i2, i1};
-        auto it = edgeCache.find(key);
-        if (it != edgeCache.end())
-        {
-            return it->second;
-        }
-
-        const auto& v1 = meshData.vertices[i1].position;
-        const auto& v2 = meshData.vertices[i2].position;
-        glm::vec3 mid = glm::normalize((v1 + v2) * 0.5f) * radius;
-
-        uint32_t idx = static_cast<uint32_t>(meshData.vertices.size());
-        Vertex vert;
-        vert.position = mid;
-        vert.normal = glm::normalize(mid);
-        vert.uv = glm::vec2(0.0f);
-        meshData.vertices.push_back(vert);
-
-        edgeCache[key] = idx;
-        return idx;
+    // Fullscreen triangle (more efficient than quad)
+    float vertices[] = {
+        // positions   // uvs
+        -1.0f, -1.0f,  0.0f, 0.0f,
+         3.0f, -1.0f,  2.0f, 0.0f,
+        -1.0f,  3.0f,  0.0f, 2.0f,
     };
 
-    // Create initial icosahedron vertices
-    for (const auto& v : IcosahedronVertices)
-    {
-        glm::vec3 pos = v * radius;
-        Vertex vert;
-        vert.position = pos;
-        vert.normal = v;
-        vert.uv = glm::vec2(0.0f);
-        meshData.vertices.push_back(vert);
-    }
+    glGenVertexArrays(1, &_quadVAO);
+    glGenBuffers(1, &_quadVBO);
 
-    // Create initial faces
-    std::vector<std::array<uint32_t, 3>> faces;
-    for (const auto& f : IcosahedronFaces)
-    {
-        faces.push_back({static_cast<uint32_t>(f[0]),
-                         static_cast<uint32_t>(f[1]),
-                         static_cast<uint32_t>(f[2])});
-    }
+    glBindVertexArray(_quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, _quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    // Subdivide
-    for (int s = 0; s < subdivisions; ++s)
-    {
-        std::vector<std::array<uint32_t, 3>> newFaces;
-        edgeCache.clear();
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
 
-        for (const auto& face : faces)
-        {
-            uint32_t a = getMidpoint(face[0], face[1]);
-            uint32_t b = getMidpoint(face[1], face[2]);
-            uint32_t c = getMidpoint(face[2], face[0]);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 
-            newFaces.push_back({face[0], a, c});
-            newFaces.push_back({a, face[1], b});
-            newFaces.push_back({c, b, face[2]});
-            newFaces.push_back({a, b, c});
-        }
-
-        faces = std::move(newFaces);
-    }
-
-    // Convert faces to indices
-    for (const auto& face : faces)
-    {
-        meshData.indices.push_back(face[0]);
-        meshData.indices.push_back(face[1]);
-        meshData.indices.push_back(face[2]);
-    }
-
-    _atmosphereMesh.Upload(meshData);
+    glBindVertexArray(0);
 }
 
 void AtmosphereRenderer::Render(
     const glm::mat4& view,
     const glm::mat4& projection,
+    const glm::mat4& invView,
+    const glm::mat4& invProjection,
     const glm::vec3& cameraPos,
     const glm::vec3& lightDir,
+    const glm::vec3& planetCenter,
     float planetRadius,
-    const AtmosphereSettings& settings)
+    float oceanRadius,
+    float nearPlane,
+    float farPlane,
+    const AtmosphereSettings& settings,
+    unsigned int sceneTexture,
+    unsigned int depthTexture)
 {
     if (!_initialized || !settings.enabled)
     {
         return;
     }
 
-    // Enable additive blending
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-
-    // Disable depth write so atmosphere doesn't occlude terrain
+    // No depth test/write for post-process
+    glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
-
-    // Cull front faces so we render the inside of the sphere
-    glCullFace(GL_FRONT);
 
     _atmosphereShader.Use();
 
-    // Scale model to atmosphere size
-    float atmosphereRadius = planetRadius * (1.0f + settings.height);
-    glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(atmosphereRadius));
-
-    _atmosphereShader.SetMat4("uModel", model);
-    _atmosphereShader.SetMat4("uView", view);
-    _atmosphereShader.SetMat4("uProjection", projection);
+    // Camera matrices for ray reconstruction
+    _atmosphereShader.SetMat4("uInvView", invView);
+    _atmosphereShader.SetMat4("uInvProjection", invProjection);
     _atmosphereShader.SetVec3("uCameraPos", cameraPos);
-    _atmosphereShader.SetVec3("uLightDir", lightDir);
-    _atmosphereShader.SetVec3("uAtmosphereColor", settings.color);
+
+    // Light direction
+    _atmosphereShader.SetVec3("uLightDir", glm::normalize(lightDir));
+
+    // Planet parameters
+    _atmosphereShader.SetVec3("uPlanetCenter", planetCenter);
+    _atmosphereShader.SetFloat("uPlanetRadius", planetRadius);
+    _atmosphereShader.SetFloat("uAtmosphereRadius", planetRadius * (1.0f + settings.atmosphereScale));
+    _atmosphereShader.SetFloat("uOceanRadius", oceanRadius);
+
+    // Camera near/far for depth reconstruction
+    _atmosphereShader.SetFloat("uNearPlane", nearPlane);
+    _atmosphereShader.SetFloat("uFarPlane", farPlane);
+
+    // Rayleigh scattering coefficients
+    // Scattering is inversely proportional to wavelength^4
+    float scatterX = std::pow(400.0f / settings.wavelengths.x, 4.0f);
+    float scatterY = std::pow(400.0f / settings.wavelengths.y, 4.0f);
+    float scatterZ = std::pow(400.0f / settings.wavelengths.z, 4.0f);
+    glm::vec3 scatterCoeffs = glm::vec3(scatterX, scatterY, scatterZ) * settings.scatteringStrength;
+    _atmosphereShader.SetVec3("uScatteringCoefficients", scatterCoeffs);
+
+    // Quality and density
+    _atmosphereShader.SetInt("uNumInScatteringPoints", settings.numInScatteringPoints);
+    _atmosphereShader.SetInt("uNumOpticalDepthPoints", settings.numOpticalDepthPoints);
     _atmosphereShader.SetFloat("uDensityFalloff", settings.densityFalloff);
     _atmosphereShader.SetFloat("uIntensity", settings.intensity);
 
-    _atmosphereMesh.Draw();
+    // Dithering parameters
+    _atmosphereShader.SetFloat("uDitherStrength", settings.ditherStrength);
+    _atmosphereShader.SetFloat("uDitherScale", settings.ditherScale);
+
+    // Bind textures
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, sceneTexture);
+    _atmosphereShader.SetInt("uSceneTexture", 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, depthTexture);
+    _atmosphereShader.SetInt("uDepthTexture", 1);
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, _blueNoiseTexture);
+    _atmosphereShader.SetInt("uBlueNoise", 2);
+
+    // Draw fullscreen triangle
+    glBindVertexArray(_quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
 
     // Restore state
-    glCullFace(GL_BACK);
+    glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
-    glDisable(GL_BLEND);
 }
 
 } // namespace planets::render::effects

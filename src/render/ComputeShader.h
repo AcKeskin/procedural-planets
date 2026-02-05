@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_set>
 #include <glm/glm.hpp>
 
 namespace planets::render {
@@ -39,6 +40,7 @@ public:
 
 private:
     std::string LoadFile(const std::string& path);
+    std::string PreprocessIncludes(const std::string& source, const std::string& sourcePath, std::unordered_set<std::string>& includedFiles);
 
     unsigned int _program;
 };

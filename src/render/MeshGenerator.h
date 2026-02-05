@@ -25,6 +25,13 @@ public:
         float baseRadius,
         const std::vector<float>& heights);
 
+    // Generate planet mesh with pre-computed heights and shading data (GPU)
+    static MeshData GeneratePlanetMesh(
+        int subdivisions,
+        float baseRadius,
+        const std::vector<float>& heights,
+        const std::vector<glm::vec4>& shadingData);
+
     // Extract vertex positions from icosphere (for GPU compute input)
     static std::vector<glm::vec3> GetIcosphereVertices(int subdivisions);
 

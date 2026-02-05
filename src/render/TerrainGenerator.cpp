@@ -16,6 +16,25 @@ bool TerrainGenerator::Initialize(const std::string& shaderPath)
     return true;
 }
 
+bool TerrainGenerator::Initialize(const std::string& heightShaderPath, const std::string& shadingShaderPath)
+{
+    bool success = true;
+
+    if (!_computeShader.LoadFromFile(heightShaderPath))
+    {
+        std::cerr << "[TerrainGenerator] Failed to load height compute shader: " << heightShaderPath << std::endl;
+        success = false;
+    }
+
+    if (!_shadingShader.LoadFromFile(shadingShaderPath))
+    {
+        std::cerr << "[TerrainGenerator] Failed to load shading compute shader: " << shadingShaderPath << std::endl;
+        success = false;
+    }
+
+    return success;
+}
+
 std::vector<float> TerrainGenerator::GenerateHeights(
     const std::vector<glm::vec3>& vertices,
     uint32_t seed,
@@ -118,6 +137,14 @@ std::vector<float> TerrainGenerator::GenerateHeights(
     _computeShader.SetFloat("oceanFloorSmoothing", settings.oceanFloorSmoothing);
     _computeShader.SetFloat("mountainBlend", settings.mountainBlend);
     _computeShader.SetFloat("heightScale", settings.heightScale);
+    _computeShader.SetFloat("continentBaseLevel", settings.continentBaseLevel);
+
+    // Perturbation (micro-detail)
+    _computeShader.SetFloat("perturbStrength", settings.perturbStrength);
+    _computeShader.SetFloat("perturbScale", settings.perturbScale);
+
+    // Global frequency multiplier for scale perception
+    _computeShader.SetFloat("globalFrequency", settings.globalFrequency);
 
     // Dispatch compute shader
     unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + 511) / 512;
@@ -226,6 +253,76 @@ std::vector<float> TerrainGenerator::GenerateHeights(
     _heightBuffer.Download(heights);
 
     return heights;
+}
+
+std::vector<glm::vec4> TerrainGenerator::GenerateShadingData(
+    const std::vector<glm::vec3>& vertices,
+    uint32_t seed,
+    const EarthShadingSettings& settings)
+{
+    if (!_shadingShader.IsValid())
+    {
+        std::cerr << "[TerrainGenerator] Shading compute shader not initialized" << std::endl;
+        return {};
+    }
+
+    size_t vertexCount = vertices.size();
+    if (vertexCount == 0)
+    {
+        return {};
+    }
+
+    // Pack vertices as flat float array to avoid SSBO alignment issues
+    std::vector<float> packedVertices;
+    packedVertices.reserve(vertexCount * 3);
+    for (const auto& v : vertices)
+    {
+        packedVertices.push_back(v.x);
+        packedVertices.push_back(v.y);
+        packedVertices.push_back(v.z);
+    }
+
+    // Upload vertices to GPU
+    _vertexBuffer.Upload(packedVertices);
+
+    // Allocate output buffer
+    _shadingBuffer.Allocate(vertexCount);
+
+    // Bind buffers
+    _vertexBuffer.Bind(0);
+    _shadingBuffer.Bind(1);
+
+    // Set uniforms
+    _shadingShader.Use();
+    _shadingShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
+    _shadingShader.SetUint("seed", seed);
+
+    // Large-scale noise (climate zones)
+    _shadingShader.SetFloat("largeNoiseScale", settings.largeNoiseScale);
+    _shadingShader.SetInt("largeNoiseOctaves", settings.largeNoiseOctaves);
+
+    // Detail noise (terrain texture)
+    _shadingShader.SetFloat("detailNoiseScale", settings.detailNoiseScale);
+
+    // Small-scale noise (micro-detail)
+    _shadingShader.SetFloat("smallNoiseScale", settings.smallNoiseScale);
+    _shadingShader.SetInt("smallNoiseOctaves", settings.smallNoiseOctaves);
+
+    // Domain warping
+    _shadingShader.SetFloat("warpStrength", settings.warpStrength);
+
+    // Dispatch compute shader
+    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + 255) / 256;
+    _shadingShader.Dispatch(groupCount);
+
+    // Wait for completion
+    ComputeShader::WaitForCompletion();
+
+    // Download results
+    std::vector<glm::vec4> shadingData;
+    _shadingBuffer.Download(shadingData);
+
+    return shadingData;
 }
 
 } // namespace planets::render
