@@ -123,11 +123,12 @@ void Gui::SetupDockspace()
         ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
 
         ImGuiID dockMain = dockspaceId;
-        ImGuiID dockRight = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.25f, nullptr, &dockMain);
-        ImGuiID dockBottom = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Down, 0.25f, nullptr, &dockMain);
+        ImGuiID dockRight = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.20f, nullptr, &dockMain);
+        ImGuiID dockLeft = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Left, 0.20f, nullptr, &dockMain);
+        ImGuiID dockBottom = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Down, 0.15f, nullptr, &dockMain);
 
-        ImGui::DockBuilderDockWindow("Scene", dockRight);
-        ImGui::DockBuilderDockWindow("Terrain", dockRight);
+        ImGui::DockBuilderDockWindow("Scene", dockLeft);
+        ImGui::DockBuilderDockWindow("Terrain", dockLeft);
         ImGui::DockBuilderDockWindow("Surface", dockRight);
         ImGui::DockBuilderDockWindow("Atmosphere", dockRight);
         ImGui::DockBuilderDockWindow("Debug", dockBottom);
