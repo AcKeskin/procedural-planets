@@ -73,13 +73,12 @@ vec2 raySphere(vec3 sphereCenter, float sphereRadius, vec3 rayOrigin, vec3 rayDi
 }
 
 // Atmospheric density at a given point
-// Density decreases exponentially with altitude
+// Pure exponential falloff matching real atmospheric scale height model
 float densityAtPoint(vec3 point)
 {
     float heightAboveSurface = length(point - uPlanetCenter) - uPlanetRadius;
-    float height01 = heightAboveSurface / (uAtmosphereRadius - uPlanetRadius);
-    float localDensity = exp(-height01 * uDensityFalloff) * (1.0 - height01);
-    return localDensity;
+    float scaleHeight = (uAtmosphereRadius - uPlanetRadius) / uDensityFalloff;
+    return exp(-heightAboveSurface / scaleHeight);
 }
 
 // Calculate optical depth along a ray
@@ -99,13 +98,25 @@ float opticalDepth(vec3 rayOrigin, vec3 rayDir, float rayLength)
     return depth;
 }
 
-// Calculate in-scattered light along the view ray (based on Unity reference)
+// Rayleigh phase function: P(theta) = 3/4 * (1 + cos^2(theta))
+// Normalized so average over sphere equals 1
+float rayleighPhase(float cosTheta)
+{
+    return 0.75 * (1.0 + cosTheta * cosTheta);
+}
+
+// Calculate in-scattered light along the view ray
+// Compositing follows physical transmittance: result = scene * T + scattered
 vec3 calculateLight(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 originalColor, vec2 uv)
 {
-    // Blue noise dithering setup
+    // Blue noise dithering
     vec2 screenSize = vec2(textureSize(uSceneTexture, 0));
     float blueNoise = texture(uBlueNoise, squareUV(uv, screenSize) * uDitherScale).r;
     blueNoise = (blueNoise - 0.5) * uDitherStrength;
+
+    // Rayleigh phase — brighter toward and away from the sun
+    float cosTheta = dot(rayDir, uLightDir);
+    float phase = rayleighPhase(cosTheta);
 
     vec3 inScatterPoint = rayOrigin;
     float stepSize = rayLength / float(uNumInScatteringPoints - 1);
@@ -124,37 +135,24 @@ vec3 calculateLight(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 originalC
         float localDensity = densityAtPoint(inScatterPoint);
         viewRayOpticalDepth += localDensity * stepSize;
 
-        // Transmittance based on total optical depth
+        // Transmittance: how much light survives from sun → sample → camera
         vec3 transmittance = exp(-(sunRayOpticalDepth + viewRayOpticalDepth) * uScatteringCoefficients);
 
-        // Add contribution from this sample point
-        inScatteredLight += localDensity * transmittance;
+        // Accumulate scattered light weighted by density and step size
+        inScatteredLight += localDensity * transmittance * stepSize;
 
         inScatterPoint += rayDir * stepSize;
     }
 
-    // Apply scattering coefficients and intensity (matching Unity reference)
-    inScatteredLight *= uScatteringCoefficients * uIntensity * stepSize / uPlanetRadius;
+    // Apply phase function, scattering coefficients, and light intensity
+    inScatteredLight *= phase * uScatteringCoefficients * uIntensity;
 
-    // Add dither to reduce banding
+    // Dither to reduce banding
     inScatteredLight += blueNoise * 0.01;
 
-    // Attenuate original scene color (moderate values)
-    const float brightnessAdaptionStrength = 0.10;
-    const float reflectedLightOutScatterStrength = 1.5;
-    float brightnessAdaption = dot(inScatteredLight, vec3(1.0)) * brightnessAdaptionStrength;
-    float brightnessSum = viewRayOpticalDepth * uIntensity * reflectedLightOutScatterStrength + brightnessAdaption;
-    float reflectedLightStrength = exp(-brightnessSum);
-
-    // Preserve minimum surface visibility
-    reflectedLightStrength = max(reflectedLightStrength, 0.15);
-
-    // HDR preservation
-    float hdrStrength = clamp(dot(originalColor, vec3(1.0)) / 3.0 - 0.5, 0.0, 1.0);
-    reflectedLightStrength = mix(reflectedLightStrength, 1.0, hdrStrength * 0.7);
-
-    vec3 reflectedLight = originalColor * reflectedLightStrength;
-    return reflectedLight + inScatteredLight;
+    // Physically-based compositing: transmittance along view ray attenuates surface
+    vec3 viewTransmittance = exp(-viewRayOpticalDepth * uScatteringCoefficients);
+    return originalColor * viewTransmittance + inScatteredLight;
 }
 
 // Reconstruct world-space ray from screen UV
