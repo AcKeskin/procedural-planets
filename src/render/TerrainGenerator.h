@@ -5,6 +5,8 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <cstdint>
+#include "settings/TerrainSettings.h"
+#include "settings/SurfaceSettings.h"
 
 namespace planets::render {
 
@@ -20,93 +22,6 @@ struct ComputeNoiseParams
     float power = 1.0f;        // For ridge noise
     float gain = 1.0f;         // For ridge noise
     float smoothOffset = 1.0f; // For smoothed ridge noise
-};
-
-// Earth terrain settings (balanced defaults for Earth-like appearance)
-struct EarthTerrainSettings
-{
-    // Continental noise (large-scale landmass shapes)
-    int continentOctaves = 6;
-    float continentScale = 0.8f;       // Lower = larger continents
-    float continentPersistence = 0.5f;
-    float continentLacunarity = 2.0f;
-    float continentStrength = 2.0f;    // Moderate elevation variation
-    float continentBaseLevel = -0.35f; // Less negative = more land (Earth ~30% land)
-
-    // Mountain ridge noise (sharp peaks)
-    int mountainOctaves = 5;
-    float mountainScale = 1.5f;
-    float mountainPersistence = 0.5f;
-    float mountainLacunarity = 4.0f;
-    float mountainStrength = 0.87f;    // Unity elevation 8.7 / 10 (scaled)
-    float mountainPower = 2.18f;
-    float mountainGain = 0.8f;
-    float mountainSmoothing = 1.0f;    // Unity: peakSmoothing
-
-    // Mask noise (controls where mountains appear)
-    int maskOctaves = 3;
-    float maskScale = 1.09f;
-    float maskPersistence = 0.55f;
-    float maskLacunarity = 1.66f;
-
-    // Ocean parameters
-    float oceanDepthMultiplier = 5.0f;
-    float oceanFloorDepth = 1.36f;
-    float oceanFloorSmoothing = 0.5f;
-    float mountainBlend = 1.16f;
-
-    // Overall scaling
-    float heightScale = 0.04f;         // Final height displacement scale
-    float globalFrequency = 1.0f;      // Multiplier for all noise frequencies (higher = more detail = bigger feeling planet)
-
-    // Vertex perturbation (micro-detail roughness)
-    float perturbStrength = 0.002f;    // Strength of high-freq displacement
-    float perturbScale = 20.0f;        // Frequency of perturbation noise
-};
-
-// Shading noise settings for Earth-like surface detail
-struct EarthShadingSettings
-{
-    // Existing noise scales
-    float biomeNoiseScale = 0.5f;   // Large-scale climate zones
-    float detailNoiseScale = 2.0f;  // Medium-scale terrain variation
-    float fineNoiseScale = 8.0f;    // Fine-scale surface detail
-    float warpStrength = 0.3f;      // Domain warping for natural variation
-
-    // Large-scale noise for climate zones
-    float largeNoiseScale = 0.3f;
-    int largeNoiseOctaves = 3;
-
-    // Small-scale noise (high-frequency detail)
-    float smallNoiseScale = 15.0f;
-    int smallNoiseOctaves = 5;
-
-    // Color blending parameters
-    float flatColBlend = 1.5f;      // Height threshold for low/high gradient blend
-    float flatColBlendNoise = 0.3f; // Noise influence on gradient blend
-};
-
-// Earth terrain color palette with gradient pairs (matches Unity reference)
-struct EarthColors
-{
-    // Shore (beach) gradient
-    glm::vec3 shoreLow = glm::vec3(0.76f, 0.70f, 0.50f);
-    glm::vec3 shoreHigh = glm::vec3(0.65f, 0.58f, 0.42f);
-
-    // Flat terrain variant A (plains/grassland)
-    glm::vec3 flatLowA = glm::vec3(0.45f, 0.55f, 0.30f);
-    glm::vec3 flatHighA = glm::vec3(0.20f, 0.40f, 0.18f);
-
-    // Flat terrain variant B (forest/taiga)
-    glm::vec3 flatLowB = glm::vec3(0.15f, 0.40f, 0.15f);
-    glm::vec3 flatHighB = glm::vec3(0.10f, 0.28f, 0.12f);
-
-    // Steep terrain (rock/cliff)
-    glm::vec3 steepLow = glm::vec3(0.40f, 0.38f, 0.35f);
-    glm::vec3 steepHigh = glm::vec3(0.30f, 0.28f, 0.26f);
-
-    // Snow
-    glm::vec3 snow = glm::vec3(0.95f, 0.95f, 0.98f);
 };
 
 // GPU-accelerated terrain height generation

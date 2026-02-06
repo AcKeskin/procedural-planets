@@ -3,35 +3,9 @@
 #include "../Mesh.h"
 #include "../Shader.h"
 #include <glm/glm.hpp>
+#include "../settings/AtmosphereSettings.h"
 
 namespace planets::render::effects {
-
-// Physically-based atmosphere settings (defaults from Unity Earth "Humble Abode")
-struct AtmosphereSettings
-{
-    bool enabled = true;
-
-    // Atmosphere geometry
-    float atmosphereScale = 0.322f;     // Height as fraction of planet radius
-
-    // Rayleigh scattering wavelengths (nm) - determines sky color
-    glm::vec3 wavelengths = glm::vec3(700.0f, 530.0f, 460.0f);  // R, G, B
-    float scatteringStrength = 21.23f;  // Overall scattering intensity
-
-    // Density parameters
-    float densityFalloff = 4.3f;        // How quickly density decreases with altitude
-
-    // Rendering quality
-    int numInScatteringPoints = 10;     // Ray samples for in-scattering
-    int numOpticalDepthPoints = 10;     // Ray samples for optical depth (Unity uses 100, but costly)
-
-    // Visual parameters
-    float intensity = 1.0f;             // Overall brightness multiplier
-
-    // Dithering parameters (reduces banding)
-    float ditherStrength = 0.8f;
-    float ditherScale = 4.0f;
-};
 
 // Post-process atmosphere renderer using raymarching
 class AtmosphereRenderer
