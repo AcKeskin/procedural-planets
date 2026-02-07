@@ -1,0 +1,110 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Cache FetchContent downloads (GLFW, GLM, ImGui, gl3w, stb).
+      # Keyed on CMakeLists.txt since all dependency declarations live there.
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: fetchcontent-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            fetchcontent-${{ runner.os }}-
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Verify build artifacts
+        shell: pwsh
+        run: |
+          $exe = "build/bin/Release/procedural-planets.exe"
+          $shaders = "build/bin/Release/shaders"
+
+          if (!(Test-Path $exe)) {
+            Write-Error "Executable not found at $exe"
+            exit 1
+          }
+          if (!(Test-Path $shaders)) {
+            Write-Error "Shaders directory not found at $shaders"
+            exit 1
+          }
+
+          $size = '{0:N2} MB' -f ((Get-Item $exe).Length / 1MB)
+          $count = (Get-ChildItem $shaders -Recurse -File).Count
+          Write-Host "Build verified: $exe ($size), $count shader files"
+
+      # Stage a clean release package (exe + shaders + textures).
+      - name: Stage release package
+        shell: pwsh
+        run: |
+          $dir = "release-package/procedural-planets"
+          New-Item -ItemType Directory -Path $dir -Force | Out-Null
+
+          Copy-Item "build/bin/Release/procedural-planets.exe" $dir
+          Copy-Item "build/bin/Release/shaders" "$dir/shaders" -Recurse
+
+          # Remove non-runtime files from shaders
+          Get-ChildItem "$dir/shaders" -Filter "CLAUDE.md" -Recurse |
+            Remove-Item -Force
+
+          # Include textures if present in source tree
+          if (Test-Path "textures") {
+            Copy-Item "textures" "$dir/textures" -Recurse
+          }
+
+      - name: Create zip archive
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "release-package/procedural-planets" `
+                           -DestinationPath "release-package/procedural-planets-windows-x64.zip"
+
+      - name: Upload build artifact (PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: procedural-planets-windows-x64
+          path: release-package/procedural-planets-windows-x64.zip
+          retention-days: 14
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0-build.${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          body: |
+            Automated build from [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
+
+            ### Contents
+            - `procedural-planets.exe` — Windows x64 Release build
+            - `shaders/` — GLSL shader files (required at runtime)
+            - `textures/` — Runtime texture assets (if available)
+
+            ### Requirements
+            - Windows 10+ with OpenGL 4.x capable GPU
+          files: release-package/procedural-planets-windows-x64.zip
+          draft: false
+          prerelease: true
