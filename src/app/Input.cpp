@@ -1,5 +1,6 @@
 #include "Input.h"
 #include <GLFW/glfw3.h>
+#include <cstring>
 
 namespace planets::app {
 
@@ -24,6 +25,11 @@ void Input::Initialize(GLFWwindow* window)
 
 void Input::Update()
 {
+    // Track key state transitions for edge detection
+    std::memcpy(_prevKeyState, _keyState, sizeof(_keyState));
+    for (int i = 0; i < KeyStateSize; ++i)
+        _keyState[i] = (glfwGetKey(_window, i) == GLFW_PRESS);
+
     double xpos, ypos;
     glfwGetCursorPos(_window, &xpos, &ypos);
 
@@ -47,6 +53,13 @@ void Input::Update()
 bool Input::IsKeyDown(Key key) const
 {
     return glfwGetKey(_window, static_cast<int>(key)) == GLFW_PRESS;
+}
+
+bool Input::IsKeyPressed(Key key) const
+{
+    int k = static_cast<int>(key);
+    if (k < 0 || k >= KeyStateSize) return false;
+    return _keyState[k] && !_prevKeyState[k];
 }
 
 bool Input::IsMouseButtonDown(MouseButton button) const

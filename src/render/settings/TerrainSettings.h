@@ -78,7 +78,7 @@ struct LodConfig
 {
     bool enabled = true;
     int patchSubdivisions = 2;
-    float planetRadius = 10.0f;
+    float planetRadius = 50.0f;
 
     // Quadtree parameters
     int meshResolution = 32;

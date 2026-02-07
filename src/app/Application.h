@@ -49,6 +49,7 @@ private:
     void RegeneratePlanetCpu();
     void RegeneratePlanetGpu();
     void RegenerateLodSystem();
+    void ShuffleTerrain();
 
     // Core systems
     render::Window _window;
@@ -93,6 +94,8 @@ private:
     // Camera
     core::Camera _camera;
     float _moveSpeed;
+    bool _autoOrbit = false;
+    float _autoOrbitSpeed = 5.0f;
 
     // CPU fallback
     core::Planet _planet;
