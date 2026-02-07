@@ -246,8 +246,8 @@ void Application::Render()
 
     if (_lodConfig.enabled && _genConfig.useGpu)
     {
-        _lodSystem.UpdateLods(_camera.GetPosition(), viewProjection);
-        _lodSystem.Render(_planetShader);
+        _quadTree.Update(_camera.GetPosition(), viewProjection);
+        _quadTree.Render(_planetShader);
         _oceanRenderer.Render(view, projection, _camera.GetPosition(),
                               _sceneSettings.lightDir, _oceanSettings);
     }
@@ -296,9 +296,9 @@ void Application::RenderGui()
     _scenePanel.Draw(_sceneSettings, visibility.scene);
 
     // Update terrain stats before drawing panel
-    _terrainStats.patchCount = _lodSystem.GetPatchCount();
-    _terrainStats.visiblePatchCount = _lodSystem.GetVisiblePatchCount();
-    _terrainStats.vertexCount = _lodSystem.GetTotalVertexCount();
+    _terrainStats.patchCount = _quadTree.GetActiveLeafCount();
+    _terrainStats.visiblePatchCount = _quadTree.GetVisiblePatchCount();
+    _terrainStats.vertexCount = 0; // Will be added to PlanetQuadTree later if needed
 
     bool needsRegen = _terrainPanel.Draw(
         _genConfig, _terrainSettings, _lodConfig, _terrainStats,
@@ -395,16 +395,25 @@ void Application::RegenerateLodSystem()
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    _lodSystem.Initialize(_lodConfig.planetRadius, _lodConfig.patchSubdivisions,
-                          _terrainGenerator, _terrainSettings, _shadingSettings,
-                          _genConfig.seed);
+    render::lod::QuadTreeConfig qtConfig;
+    qtConfig.planetRadius     = _lodConfig.planetRadius;
+    qtConfig.baseSubdivisions = _lodConfig.patchSubdivisions;
+    qtConfig.meshResolution   = _lodConfig.meshResolution;
+    qtConfig.maxDepth         = _lodConfig.maxDepth;
+    qtConfig.splitThreshold   = _lodConfig.splitThreshold;
+    qtConfig.hysteresis       = _lodConfig.hysteresis;
+    qtConfig.maxActivePatches = _lodConfig.maxActivePatches;
+    qtConfig.skirtFraction    = _lodConfig.skirtFraction;
+
+    _quadTree.Initialize(qtConfig, _terrainGenerator,
+                         _terrainSettings, _shadingSettings, _genConfig.seed);
     _oceanRenderer.Initialize(_lodConfig.planetRadius, _seaLevel, 5);
     _atmosphereRenderer.Initialize();
 
     auto end = std::chrono::high_resolution_clock::now();
     _terrainStats.gpuTimeMs = std::chrono::duration<float, std::milli>(end - start).count();
 
-    std::cout << "[LOD] Generated " << _lodSystem.GetPatchCount()
+    std::cout << "[QuadTree] Generated " << _quadTree.GetActiveLeafCount()
               << " patches in " << _terrainStats.gpuTimeMs << " ms" << std::endl;
 }
 

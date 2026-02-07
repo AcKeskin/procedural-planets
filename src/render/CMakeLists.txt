@@ -18,7 +18,9 @@ add_library(render STATIC
     Framebuffer.cpp
     PostProcessor.cpp
     lod/SpherePatch.cpp
-    lod/PatchLodSystem.cpp
+    lod/QuadTreeNode.cpp
+    lod/PlanetQuadTree.cpp
+    lod/PatchPool.cpp
     effects/OceanRenderer.cpp
     effects/AtmosphereRenderer.cpp
     ${IMGUI_DIR}/imgui.cpp
