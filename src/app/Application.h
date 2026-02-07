@@ -8,7 +8,7 @@
 #include "TerrainGenerator.h"
 #include "Framebuffer.h"
 #include "PostProcessor.h"
-#include "lod/PatchLodSystem.h"
+#include "lod/PlanetQuadTree.h"
 #include "effects/OceanRenderer.h"
 #include "effects/AtmosphereRenderer.h"
 #include "gui/GuiManager.h"
@@ -65,7 +65,7 @@ private:
     render::PostProcessor _postProcessor;
     render::Mesh _planetMesh;
     render::TerrainGenerator _terrainGenerator;
-    render::lod::PatchLodSystem _lodSystem;
+    render::lod::PlanetQuadTree _quadTree;
     render::effects::OceanRenderer _oceanRenderer;
     render::effects::AtmosphereRenderer _atmosphereRenderer;
 

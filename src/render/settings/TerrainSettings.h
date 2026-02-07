@@ -79,6 +79,14 @@ struct LodConfig
     bool enabled = true;
     int patchSubdivisions = 2;
     float planetRadius = 10.0f;
+
+    // Quadtree parameters
+    int meshResolution = 32;
+    int maxDepth = 8;
+    float splitThreshold = 2.0f;
+    float hysteresis = 1.3f;
+    int maxActivePatches = 400;
+    float skirtFraction = 0.02f;
 };
 
 // Read-only terrain statistics for display

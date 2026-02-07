@@ -7,12 +7,6 @@ namespace planets::render::lod {
 using planets::render::MeshData;
 using planets::render::Vertex;
 
-// Resolution per LOD level (vertices per edge)
-static constexpr int LodResolutions[SpherePatch::MaxLodLevels] = { 64, 32, 16, 8 };
-
-// Distance thresholds for LOD selection (in planet radii)
-static constexpr float LodThresholds[SpherePatch::MaxLodLevels] = { 2.0f, 4.0f, 8.0f, 16.0f };
-
 bool AABB::Contains(const glm::vec3& point) const
 {
     return point.x >= min.x && point.x <= max.x &&
@@ -101,12 +95,16 @@ void SpherePatch::Initialize(
     const glm::vec3& v0,
     const glm::vec3& v1,
     const glm::vec3& v2,
-    float planetRadius)
+    float planetRadius,
+    int resolution,
+    float skirtFraction)
 {
     _v0 = glm::normalize(v0);
     _v1 = glm::normalize(v1);
     _v2 = glm::normalize(v2);
     _planetRadius = planetRadius;
+    _resolution = resolution;
+    _skirtFraction = skirtFraction;
 
     // Calculate center
     _center = glm::normalize(_v0 + _v1 + _v2);
@@ -117,11 +115,8 @@ void SpherePatch::Initialize(
     float angle2 = std::acos(std::clamp(glm::dot(_center, _v2), -1.0f, 1.0f));
     _angularSize = std::max({ angle0, angle1, angle2 });
 
-    // Pre-generate vertices for all LOD levels
-    for (int lod = 0; lod < MaxLodLevels; ++lod)
-    {
-        GenerateGridVertices(LodResolutions[lod], _lodVertices[lod]);
-    }
+    // Pre-generate unit sphere vertices
+    GenerateGridVertices(_resolution, _vertices);
 }
 
 void SpherePatch::GenerateGridVertices(int resolution, std::vector<glm::vec3>& vertices)
@@ -177,21 +172,16 @@ void SpherePatch::GenerateGridIndices(int resolution, std::vector<uint32_t>& ind
     }
 }
 
-void SpherePatch::GenerateLod(int lod, const std::vector<float>& heights, const std::vector<glm::vec4>& shadingData)
+void SpherePatch::GenerateMesh(const std::vector<float>& heights, const std::vector<glm::vec4>& shadingData)
 {
-    if (lod < 0 || lod >= MaxLodLevels) return;
-
-    const auto& unitVertices = _lodVertices[lod];
-    int resolution = LodResolutions[lod];
-
     // Apply heights and scale to planet radius
     MeshData meshData;
-    meshData.vertices.resize(unitVertices.size());
+    meshData.vertices.resize(_vertices.size());
 
-    for (size_t i = 0; i < unitVertices.size(); ++i)
+    for (size_t i = 0; i < _vertices.size(); ++i)
     {
         float h = (i < heights.size()) ? heights[i] : 1.0f;
-        glm::vec3 pos = unitVertices[i] * _planetRadius * h;
+        glm::vec3 pos = _vertices[i] * _planetRadius * h;
 
         meshData.vertices[i].position = pos;
         meshData.vertices[i].normal = glm::vec3(0.0f); // Will be calculated below
@@ -200,10 +190,13 @@ void SpherePatch::GenerateLod(int lod, const std::vector<float>& heights, const 
     }
 
     // Generate indices
-    GenerateGridIndices(resolution, meshData.indices);
+    GenerateGridIndices(_resolution, meshData.indices);
 
     // Calculate normals using MeshData's built-in method
     meshData.RecalculateNormals();
+
+    // Append skirt geometry to hide cracks between LOD levels
+    AppendSkirtGeometry(meshData, heights, shadingData);
 
     // Update bounding box
     _boundingBox.min = glm::vec3(std::numeric_limits<float>::max());
@@ -216,29 +209,8 @@ void SpherePatch::GenerateLod(int lod, const std::vector<float>& heights, const 
     }
 
     // Upload mesh
-    _lodMeshes[lod].Upload(meshData);
-    _lodGenerated[lod] = true;
-}
-
-void SpherePatch::Upload()
-{
-    // Meshes are uploaded in GenerateLod
-}
-
-int SpherePatch::SelectLod(const glm::vec3& cameraPos) const
-{
-    float dist = glm::length(cameraPos - _center * _planetRadius);
-    float distInRadii = dist / _planetRadius;
-
-    for (int lod = 0; lod < MaxLodLevels; ++lod)
-    {
-        if (distInRadii < LodThresholds[lod])
-        {
-            return lod;
-        }
-    }
-
-    return MaxLodLevels - 1;
+    _mesh.Upload(meshData);
+    _generated = true;
 }
 
 bool SpherePatch::IsVisible(const Frustum& frustum) const
@@ -246,21 +218,94 @@ bool SpherePatch::IsVisible(const Frustum& frustum) const
     return frustum.Intersects(_boundingBox);
 }
 
-void SpherePatch::Render(int lod) const
+void SpherePatch::Render() const
 {
-    if (lod >= 0 && lod < MaxLodLevels && _lodGenerated[lod])
+    if (_generated)
     {
-        _lodMeshes[lod].Draw();
+        _mesh.Draw();
     }
 }
 
-int SpherePatch::GetVertexCount(int lod) const
+void SpherePatch::AppendSkirtGeometry(MeshData& meshData, const std::vector<float>& heights,
+                                       const std::vector<glm::vec4>& shadingData)
 {
-    if (lod >= 0 && lod < MaxLodLevels)
+    // Skirt depth proportional to patch angular size
+    const float skirtDepth = _skirtFraction * _angularSize * _planetRadius;
+    const int res = _resolution;
+    const uint32_t baseVertexCount = static_cast<uint32_t>(meshData.vertices.size());
+
+    // Helper to add skirt edge
+    auto AddSkirtEdge = [&](const std::vector<uint32_t>& edgeIndices)
     {
-        return LodResolutions[lod] * LodResolutions[lod];
+        const uint32_t skirtStartIndex = static_cast<uint32_t>(meshData.vertices.size());
+
+        // Create skirt vertices by duplicating edge vertices and pushing them toward planet center
+        for (uint32_t edgeIdx : edgeIndices)
+        {
+            const Vertex& originalVert = meshData.vertices[edgeIdx];
+            Vertex skirtVert = originalVert;
+
+            // Offset toward planet center
+            glm::vec3 radialDir = glm::normalize(originalVert.position);
+            skirtVert.position = originalVert.position - radialDir * skirtDepth;
+
+            meshData.vertices.push_back(skirtVert);
+        }
+
+        // Create triangles connecting edge to skirt
+        for (size_t i = 0; i < edgeIndices.size() - 1; ++i)
+        {
+            uint32_t edge0 = edgeIndices[i];
+            uint32_t edge1 = edgeIndices[i + 1];
+            uint32_t skirt0 = skirtStartIndex + static_cast<uint32_t>(i);
+            uint32_t skirt1 = skirt0 + 1;
+
+            // Two triangles per quad segment
+            meshData.indices.push_back(edge0);
+            meshData.indices.push_back(skirt0);
+            meshData.indices.push_back(edge1);
+
+            meshData.indices.push_back(edge1);
+            meshData.indices.push_back(skirt0);
+            meshData.indices.push_back(skirt1);
+        }
+    };
+
+    // Bottom edge: row 0
+    std::vector<uint32_t> bottomEdge;
+    bottomEdge.reserve(res);
+    for (int i = 0; i < res; ++i)
+    {
+        bottomEdge.push_back(i);
     }
-    return 0;
+    AddSkirtEdge(bottomEdge);
+
+    // Top edge: row (res-1)
+    std::vector<uint32_t> topEdge;
+    topEdge.reserve(res);
+    for (int i = 0; i < res; ++i)
+    {
+        topEdge.push_back((res - 1) * res + i);
+    }
+    AddSkirtEdge(topEdge);
+
+    // Left edge: column 0
+    std::vector<uint32_t> leftEdge;
+    leftEdge.reserve(res);
+    for (int j = 0; j < res; ++j)
+    {
+        leftEdge.push_back(j * res);
+    }
+    AddSkirtEdge(leftEdge);
+
+    // Right edge: column (res-1)
+    std::vector<uint32_t> rightEdge;
+    rightEdge.reserve(res);
+    for (int j = 0; j < res; ++j)
+    {
+        rightEdge.push_back(j * res + (res - 1));
+    }
+    AddSkirtEdge(rightEdge);
 }
 
 } // namespace planets::render::lod
