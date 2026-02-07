@@ -13,6 +13,9 @@ enum class Key
     D = 68,
     Q = 81,
     E = 69,
+    G = 71,
+    H = 72,
+    R = 82,
     Space = 32,
     LeftShift = 340,
     LeftControl = 341,
@@ -35,6 +38,7 @@ public:
     void Update();
 
     bool IsKeyDown(Key key) const;
+    bool IsKeyPressed(Key key) const;
     bool IsMouseButtonDown(MouseButton button) const;
 
     float GetMouseX() const { return _mouseX; }
@@ -46,7 +50,11 @@ public:
     bool IsCursorEnabled() const { return _cursorEnabled; }
 
 private:
+    static constexpr int KeyStateSize = 512;
+
     GLFWwindow* _window;
+    bool _keyState[KeyStateSize] = {};
+    bool _prevKeyState[KeyStateSize] = {};
     float _mouseX;
     float _mouseY;
     float _lastMouseX;

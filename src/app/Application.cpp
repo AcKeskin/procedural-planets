@@ -3,14 +3,16 @@
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <imgui.h>
 #include <iostream>
 #include <chrono>
+#include <random>
 
 namespace planets::app {
 
 Application::Application()
     : _seaLevel(0.995f)
-    , _moveSpeed(15.0f)
+    , _moveSpeed(75.0f)
     , _lastTime(0.0f)
     , _previousWidth(0)
     , _previousHeight(0)
@@ -90,7 +92,7 @@ bool Application::Initialize()
     else
         RegeneratePlanetCpu();
 
-    _camera.SetPosition(glm::vec3(0.0f, 0.0f, 25.0f));
+    _camera.SetPosition(glm::vec3(0.0f, 0.0f, 125.0f));
 
     _lastTime = static_cast<float>(glfwGetTime());
     _previousWidth = _window.GetWidth();
@@ -142,6 +144,37 @@ void Application::ProcessInput(float deltaTime)
     if (_input.IsKeyDown(Key::Escape))
         _window.SetShouldClose(true);
 
+    // Suppress keybinds only while an ImGui text input is active
+    bool guiWantsKeyboard = ImGui::GetIO().WantTextInput;
+
+    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::G))
+    {
+        _autoOrbit = !_autoOrbit;
+        if (_autoOrbit)
+        {
+            _camera.SetOrbitTarget(glm::vec3(0.0f));
+            _camera.SetMode(core::CameraMode::Orbit);
+        }
+        else
+        {
+            _camera.SetMode(core::CameraMode::FreeFly);
+        }
+    }
+
+    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::H))
+        _atmosphereSettings.enabled = !_atmosphereSettings.enabled;
+
+    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::R))
+        ShuffleTerrain();
+
+    // Auto-orbit: rotate around planet, skip manual controls
+    if (_autoOrbit)
+    {
+        _camera.OrbitRotate(_autoOrbitSpeed * deltaTime, 0.0f);
+        return;
+    }
+
+    // Manual camera controls
     if (_input.IsMouseButtonDown(MouseButton::Right))
     {
         if (_input.IsCursorEnabled())
@@ -314,7 +347,7 @@ void Application::RenderGui()
     _surfacePanel.Draw(_biomeSettings, _earthColors, _shadingSettings,
                        _oceanSettings, _seaLevel, visibility.surface);
     _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
-    _debugPanel.Draw(_camera, _moveSpeed, visibility.debug);
+    _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
 
     if (needsRegen)
     {
@@ -327,6 +360,65 @@ void Application::RenderGui()
     }
 
     _guiManager.EndFrame();
+}
+
+void Application::ShuffleTerrain()
+{
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    auto randFloat = [&gen](float min, float max) {
+        return std::uniform_real_distribution<float>(min, max)(gen);
+    };
+    auto randInt = [&gen](int min, int max) {
+        return std::uniform_int_distribution<int>(min, max)(gen);
+    };
+
+    _genConfig.seed = static_cast<uint32_t>(gen());
+
+    // Continental shape
+    _terrainSettings.continentOctaves     = randInt(4, 7);
+    _terrainSettings.continentScale       = randFloat(0.5f, 2.0f);
+    _terrainSettings.continentStrength    = randFloat(1.0f, 2.5f);
+    _terrainSettings.continentPersistence = randFloat(0.35f, 0.65f);
+    _terrainSettings.continentLacunarity  = randFloat(1.8f, 2.5f);
+    _terrainSettings.continentBaseLevel   = randFloat(-0.8f, 0.0f);
+
+    // Mountain ridges
+    _terrainSettings.mountainOctaves   = randInt(4, 7);
+    _terrainSettings.mountainScale     = randFloat(0.8f, 3.0f);
+    _terrainSettings.mountainStrength  = randFloat(0.4f, 1.5f);
+    _terrainSettings.mountainPower     = randFloat(1.5f, 4.0f);
+    _terrainSettings.mountainGain      = randFloat(0.5f, 1.5f);
+    _terrainSettings.mountainSmoothing = randFloat(0.5f, 1.5f);
+    _terrainSettings.mountainBlend     = randFloat(0.5f, 2.0f);
+
+    // Mountain mask
+    _terrainSettings.maskOctaves     = randInt(2, 5);
+    _terrainSettings.maskScale       = randFloat(0.5f, 1.8f);
+    _terrainSettings.maskPersistence = randFloat(0.3f, 0.7f);
+    _terrainSettings.maskLacunarity  = randFloat(1.5f, 2.5f);
+
+    // Ocean
+    _terrainSettings.oceanDepthMultiplier = randFloat(2.0f, 8.0f);
+    _terrainSettings.oceanFloorDepth      = randFloat(0.8f, 2.0f);
+    _terrainSettings.oceanFloorSmoothing  = randFloat(0.2f, 1.0f);
+
+    // Overall scaling
+    _terrainSettings.heightScale     = randFloat(0.02f, 0.08f);
+    _terrainSettings.globalFrequency = randFloat(0.7f, 2.0f);
+
+    // Surface detail
+    _terrainSettings.perturbStrength = randFloat(0.001f, 0.005f);
+    _terrainSettings.perturbScale    = randFloat(10.0f, 35.0f);
+
+    // Trigger regeneration
+    if (_lodConfig.enabled && _genConfig.useGpu)
+        RegenerateLodSystem();
+    else if (_genConfig.useGpu)
+        RegeneratePlanetGpu();
+    else
+        RegeneratePlanetCpu();
 }
 
 void Application::RegeneratePlanetCpu()

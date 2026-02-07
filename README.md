@@ -1,19 +1,28 @@
 # Procedural Planets
 
-A GPU-accelerated procedural planet renderer built with C++17 and OpenGL. The goal is to generate realistic, Earth-like planets with terrain, atmosphere, oceans, and biomes — all driven by compute shaders and procedural noise.
+A GPU-accelerated procedural planet renderer built with C++17 and OpenGL. Generates realistic, Earth-like planets with terrain, atmosphere, oceans, and biomes — all driven by compute shaders and procedural noise.
 
-This project was inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-System) and his incredible work on procedural generation. While the architecture and implementation are built from scratch in C++/OpenGL, studying his approach helped shape the direction of this project.
+<p align="center">
+  <img src="docs/videos/spedup_cinematic.gif" alt="Procedural planet cinematic" width="600">
+</p>
 
-## What It Does
+Inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-System). The architecture and implementation are built from scratch in C++/OpenGL, but studying his approach helped shape the direction of this project.
 
-- **GPU Compute Terrain** — Terrain height and surface shading are generated in two compute shader passes, running entirely on the GPU
-- **Icosahedron LOD** — The planet starts as an icosahedron that gets subdivided into patches with 4 detail levels, switching based on camera distance
-- **Atmospheric Scattering** — Rayleigh scattering gives the planet a realistic atmospheric glow that changes with viewing angle
-- **Ocean Rendering** — A separate ocean pass with configurable sea level
-- **Biome System** — Biomes are classified by temperature, moisture, and height, with triplanar texturing for seamless surface detail
-- **Multi-Layer Noise** — Simplex and fractal noise with full control over octaves, lacunarity, persistence, and ridge noise
-- **Camera Modes** — FreeFly and Orbit cameras to explore the planet from any angle
-- **Live Tweaking** — ImGui panels let you adjust terrain, atmosphere, ocean, surface, and scene parameters in real time
+## Features
+
+- **GPU Compute Terrain** — Height and shading generated in two compute shader passes, entirely on the GPU
+- **Icosahedron LOD** — Subdivided into patches with 4 detail levels, switching based on camera distance
+- **Atmospheric Scattering** — Rayleigh scattering with angle-dependent glow
+- **Ocean Rendering** — Separate pass with configurable sea level
+- **Biome System** — Classification by temperature, moisture, and height with triplanar texturing
+- **Multi-Layer Noise** — Simplex and fractal noise with octaves, lacunarity, persistence, and ridge noise
+- **Camera Modes** — FreeFly and Orbit cameras
+- **Live Tweaking** — ImGui debug panels for all parameters
+
+<p align="center">
+  <img src="docs/images/with_atmosphere.png" alt="Planet with atmospheric scattering" width="400">
+  <img src="docs/images/without_atmosphere.png" alt="Planet terrain without atmosphere" width="400">
+</p>
 
 ## Building
 

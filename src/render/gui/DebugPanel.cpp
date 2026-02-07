@@ -4,7 +4,8 @@
 
 namespace planets::render {
 
-void DebugPanel::Draw(const planets::core::Camera& camera, float& moveSpeed, bool& visible)
+void DebugPanel::Draw(const planets::core::Camera& camera, float& moveSpeed,
+                      bool autoOrbit, float& autoOrbitSpeed, bool& visible)
 {
     if (!visible) return;
 
@@ -17,9 +18,13 @@ void DebugPanel::Draw(const planets::core::Camera& camera, float& moveSpeed, boo
     const char* modeStr = camera.GetMode() == planets::core::CameraMode::FreeFly ? "Free-Fly" : "Orbit";
     ImGui::Text("Mode: %s", modeStr);
 
+    ImGui::Text("Auto-Orbit: %s", autoOrbit ? "ON" : "OFF");
+    if (autoOrbit)
+        ImGui::SliderFloat("Orbit Speed", &autoOrbitSpeed, 1.0f, 30.0f, "%.1f deg/s");
+
     ImGui::Separator();
     ImGui::Text("Movement");
-    ImGui::SliderFloat("Speed", &moveSpeed, 1.0f, 100.0f, "%.1f");
+    ImGui::SliderFloat("Speed", &moveSpeed, 1.0f, 500.0f, "%.1f");
 
     ImGui::Separator();
     ImGui::Text("Controls:");
@@ -27,6 +32,9 @@ void DebugPanel::Draw(const planets::core::Camera& camera, float& moveSpeed, boo
     ImGui::BulletText("Mouse (RMB) - Look");
     ImGui::BulletText("Q/E - Up/Down");
     ImGui::BulletText("Shift - Boost");
+    ImGui::BulletText("G - Toggle Auto-Orbit");
+    ImGui::BulletText("H - Toggle Atmosphere");
+    ImGui::BulletText("R - Shuffle Terrain");
     ImGui::BulletText("ESC - Exit");
 
     ImGui::End();
