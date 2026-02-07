@@ -1,0 +1,106 @@
+#pragma once
+
+#include "Input.h"
+#include "Window.h"
+#include "Renderer.h"
+#include "Shader.h"
+#include "Mesh.h"
+#include "TerrainGenerator.h"
+#include "Framebuffer.h"
+#include "PostProcessor.h"
+#include "lod/PatchLodSystem.h"
+#include "effects/OceanRenderer.h"
+#include "effects/AtmosphereRenderer.h"
+#include "gui/GuiManager.h"
+#include "gui/ScenePanel.h"
+#include "gui/TerrainPanel.h"
+#include "gui/SurfacePanel.h"
+#include "gui/AtmospherePanel.h"
+#include "gui/DebugPanel.h"
+#include "settings/SceneSettings.h"
+#include "settings/TerrainSettings.h"
+#include "settings/SurfaceSettings.h"
+#include "settings/OceanSettings.h"
+#include "settings/AtmosphereSettings.h"
+#include "math/Camera.h"
+#include "generation/Planet.h"
+
+namespace planets::app {
+
+// Owns all state, systems, and the frame loop
+class Application
+{
+public:
+    Application();
+    ~Application();
+
+    Application(const Application&) = delete;
+    Application& operator=(const Application&) = delete;
+
+    bool Initialize();
+    void Run();
+    void Shutdown();
+
+private:
+    void ProcessInput(float deltaTime);
+    void Render();
+    void RenderGui();
+
+    void RegeneratePlanetCpu();
+    void RegeneratePlanetGpu();
+    void RegenerateLodSystem();
+
+    // Core systems
+    render::Window _window;
+    Input _input;
+    render::Renderer _renderer;
+
+    // Shaders
+    render::Shader _planetShader;
+    render::Shader _spaceShader;
+    render::Shader _passthroughShader;
+
+    // Rendering pipeline
+    render::Framebuffer _sceneFbo;
+    render::PostProcessor _postProcessor;
+    render::Mesh _planetMesh;
+    render::TerrainGenerator _terrainGenerator;
+    render::lod::PatchLodSystem _lodSystem;
+    render::effects::OceanRenderer _oceanRenderer;
+    render::effects::AtmosphereRenderer _atmosphereRenderer;
+
+    // GUI
+    render::GuiManager _guiManager;
+    render::ScenePanel _scenePanel;
+    render::TerrainPanel _terrainPanel;
+    render::SurfacePanel _surfacePanel;
+    render::AtmospherePanel _atmospherePanel;
+    render::DebugPanel _debugPanel;
+
+    // Settings (Application owns all)
+    render::SceneSettings _sceneSettings;
+    render::EarthTerrainSettings _terrainSettings;
+    render::EarthShadingSettings _shadingSettings;
+    render::GenerationConfig _genConfig;
+    render::LodConfig _lodConfig;
+    render::TerrainStats _terrainStats;
+    render::BiomeSettings _biomeSettings;
+    render::EarthColors _earthColors;
+    render::effects::OceanSettings _oceanSettings;
+    render::effects::AtmosphereSettings _atmosphereSettings;
+    float _seaLevel;
+
+    // Camera
+    core::Camera _camera;
+    float _moveSpeed;
+
+    // CPU fallback
+    core::Planet _planet;
+
+    // Frame state
+    float _lastTime;
+    int _previousWidth;
+    int _previousHeight;
+};
+
+} // namespace planets::app

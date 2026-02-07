@@ -3,7 +3,12 @@ add_library(render STATIC
     Window.cpp
     Shader.cpp
     ComputeShader.cpp
-    Gui.cpp
+    gui/GuiManager.cpp
+    gui/ScenePanel.cpp
+    gui/TerrainPanel.cpp
+    gui/SurfacePanel.cpp
+    gui/AtmospherePanel.cpp
+    gui/DebugPanel.cpp
     Renderer.cpp
     Mesh.cpp
     MeshGenerator.cpp

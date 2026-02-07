@@ -1,6 +1,7 @@
 # App: camera, UI, orchestration, entry point
 add_executable(procedural-planets
     Main.cpp
+    Application.cpp
     Input.cpp
 )
 
