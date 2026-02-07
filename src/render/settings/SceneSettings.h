@@ -17,7 +17,7 @@ struct LightingSettings
 struct SceneSettings
 {
     glm::vec3 lightDir = glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f));
-    float sunSize = 0.03f;
+    float sunSize = 0.05f;
     glm::vec3 sunColor = glm::vec3(1.0f, 0.95f, 0.8f);
     float starDensity = 1.0f;
     LightingSettings lighting;
