@@ -26,12 +26,10 @@ struct Frustum
     bool Intersects(const AABB& box) const;
 };
 
-// Single terrain patch with multiple LOD levels
+// Single terrain patch at fixed resolution
 class SpherePatch
 {
 public:
-    static constexpr int MaxLodLevels = 4;
-
     SpherePatch() = default;
     ~SpherePatch() = default;
 
@@ -46,22 +44,18 @@ public:
         const glm::vec3& v0,
         const glm::vec3& v1,
         const glm::vec3& v2,
-        float planetRadius);
+        float planetRadius,
+        int resolution = 32,
+        float skirtFraction = 0.02f);
 
-    // Generate mesh data for a specific LOD level
-    void GenerateLod(int lod, const std::vector<float>& heights, const std::vector<glm::vec4>& shadingData);
-
-    // Upload all LOD meshes to GPU
-    void Upload();
-
-    // Select appropriate LOD based on camera distance
-    int SelectLod(const glm::vec3& cameraPos) const;
+    // Generate mesh data from heights and shading
+    void GenerateMesh(const std::vector<float>& heights, const std::vector<glm::vec4>& shadingData);
 
     // Check if patch is visible in frustum
     bool IsVisible(const Frustum& frustum) const;
 
-    // Render the patch at specified LOD
-    void Render(int lod) const;
+    // Render the patch
+    void Render() const;
 
     // Accessors
     const glm::vec3& GetCenter() const { return _center; }
@@ -69,23 +63,26 @@ public:
     const AABB& GetBoundingBox() const { return _boundingBox; }
 
     // Get vertices for height generation (unit sphere positions)
-    const std::vector<glm::vec3>& GetVertices(int lod) const { return _lodVertices[lod]; }
-    int GetVertexCount(int lod) const;
+    const std::vector<glm::vec3>& GetUnitSphereVertices() const { return _vertices; }
+    int GetVertexCount() const { return static_cast<int>(_vertices.size()); }
 
 private:
     void GenerateGridVertices(int resolution, std::vector<glm::vec3>& vertices);
     void GenerateGridIndices(int resolution, std::vector<uint32_t>& indices);
-    void AddSkirt(std::vector<glm::vec3>& vertices, std::vector<uint32_t>& indices, int resolution);
+    void AppendSkirtGeometry(MeshData& meshData, const std::vector<float>& heights,
+                             const std::vector<glm::vec4>& shadingData);
 
     glm::vec3 _v0, _v1, _v2;        // Base triangle vertices (unit sphere)
     glm::vec3 _center;              // Patch center on unit sphere
     float _angularSize = 0.0f;      // Angular extent in radians
     float _planetRadius = 1.0f;
+    int _resolution = 32;           // Vertices per edge
+    float _skirtFraction = 0.02f;   // Fraction of patch size for skirt depth
     AABB _boundingBox;
 
-    std::array<std::vector<glm::vec3>, MaxLodLevels> _lodVertices;
-    std::array<Mesh, MaxLodLevels> _lodMeshes;
-    std::array<bool, MaxLodLevels> _lodGenerated = {};
+    std::vector<glm::vec3> _vertices;  // Unit sphere positions
+    Mesh _mesh;
+    bool _generated = false;
 };
 
 } // namespace planets::render::lod

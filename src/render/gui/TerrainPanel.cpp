@@ -288,7 +288,7 @@ bool TerrainPanel::DrawLodContent(LodConfig& lod, const TerrainStats& stats)
         ImGui::Separator();
         ImGui::Text("Settings");
 
-        ImGui::SliderFloat("Planet Radius", &lod.planetRadius, 1.0f, 50.0f);
+        ImGui::SliderFloat("Planet Radius", &lod.planetRadius, 1.0f, 1000.0f);
         if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
 
         const char* subdivLabels[] = { "20 patches", "80 patches", "320 patches", "1280 patches" };
@@ -296,6 +296,28 @@ bool TerrainPanel::DrawLodContent(LodConfig& lod, const TerrainStats& stats)
         {
             needsRegeneration = true;
         }
+
+        // Quadtree parameters
+        ImGui::Separator();
+        ImGui::Text("Quadtree");
+
+        ImGui::SliderInt("Mesh Resolution", &lod.meshResolution, 8, 64);
+        if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+
+        ImGui::SliderInt("Max Depth", &lod.maxDepth, 2, 10);
+        if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+
+        ImGui::SliderFloat("Split Threshold", &lod.splitThreshold, 0.5f, 5.0f);
+        if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+
+        ImGui::SliderFloat("Hysteresis", &lod.hysteresis, 1.0f, 2.0f);
+        if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+
+        ImGui::SliderInt("Max Active Patches", &lod.maxActivePatches, 50, 800);
+        if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+
+        ImGui::SliderFloat("Skirt Fraction", &lod.skirtFraction, 0.0f, 0.1f);
+        if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
 
         ImGui::Separator();
         ImGui::Text("Statistics");
