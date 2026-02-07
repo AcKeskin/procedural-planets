@@ -270,7 +270,7 @@ void Application::Render()
             view, projection, invView, invProjection,
             _camera.GetPosition(), _sceneSettings.lightDir,
             planetCenter, _lodConfig.planetRadius, oceanRadius,
-            0.1f, 1000.0f,
+            _camera.GetNearPlane(), _camera.GetFarPlane(),
             _atmosphereSettings,
             _sceneFbo.GetColorTexture(),
             _sceneFbo.GetDepthTexture());
@@ -409,6 +409,10 @@ void Application::RegenerateLodSystem()
                          _terrainSettings, _shadingSettings, _genConfig.seed);
     _oceanRenderer.Initialize(_lodConfig.planetRadius, _seaLevel, 5);
     _atmosphereRenderer.Initialize();
+
+    // Scale far plane to ensure planet is always visible from orbit
+    float farPlane = (std::max)(1000.0f, _lodConfig.planetRadius * 20.0f);
+    _camera.SetFarPlane(farPlane);
 
     auto end = std::chrono::high_resolution_clock::now();
     _terrainStats.gpuTimeMs = std::chrono::duration<float, std::milli>(end - start).count();

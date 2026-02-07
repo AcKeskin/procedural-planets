@@ -43,6 +43,8 @@ public:
     void SetFov(float fov) { _fov = fov; }
     void SetNearPlane(float nearDist) { _nearPlane = nearDist; }
     void SetFarPlane(float farDist) { _farPlane = farDist; }
+    float GetNearPlane() const { return _nearPlane; }
+    float GetFarPlane() const { return _farPlane; }
 
     float GetYaw() const { return _yaw; }
     float GetPitch() const { return _pitch; }

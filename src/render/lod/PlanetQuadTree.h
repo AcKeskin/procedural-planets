@@ -11,6 +11,10 @@
 #include <memory>
 #include <cstdint>
 
+namespace planets::render {
+class Shader;
+}
+
 namespace planets::render::lod {
 
 // Configuration for planet-wide quadtree LOD
