@@ -1,10 +1,12 @@
 #pragma once
 
-namespace planets::render::effects {
+namespace planets::render::effects
+{
 struct AtmosphereSettings;
 }
 
-namespace planets::render {
+namespace planets::render
+{
 
 class AtmospherePanel
 {

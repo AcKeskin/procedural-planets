@@ -1,7 +1,8 @@
 #include "Planet.h"
 #include <algorithm>
 
-namespace planets::core {
+namespace planets::core
+{
 
 Planet::Planet()
 {

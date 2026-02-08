@@ -2,7 +2,8 @@
 
 #include <cstdint>
 
-namespace planets::render {
+namespace planets::render
+{
 
 // Framebuffer with color and depth texture attachments for post-processing
 class Framebuffer

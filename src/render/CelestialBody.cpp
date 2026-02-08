@@ -1,6 +1,7 @@
 #include "CelestialBody.h"
 
-namespace planets::render {
+namespace planets::render
+{
 
 void CelestialBody::SetRadius(float radius)
 {

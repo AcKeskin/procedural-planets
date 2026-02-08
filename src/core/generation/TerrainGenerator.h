@@ -7,7 +7,8 @@
 #include <vector>
 #include <cstdint>
 
-namespace planets::core {
+namespace planets::core
+{
 
 // Noise layer configuration for compute shader
 struct ComputeNoiseParams
@@ -37,16 +38,15 @@ public:
     bool Initialize(const std::string& shaderPath);
 
     // Generate heights on GPU
-    std::vector<float> GenerateHeights(
-        const std::vector<glm::vec3>& vertices,
-        uint32_t seed,
-        const ComputeNoiseParams& continentParams,
-        const ComputeNoiseParams& mountainParams,
-        const ComputeNoiseParams& maskParams,
-        float oceanDepthMultiplier,
-        float oceanFloorDepth,
-        float oceanFloorSmoothing,
-        float mountainBlend);
+    std::vector<float> GenerateHeights(const std::vector<glm::vec3>& vertices,
+                                       uint32_t seed,
+                                       const ComputeNoiseParams& continentParams,
+                                       const ComputeNoiseParams& mountainParams,
+                                       const ComputeNoiseParams& maskParams,
+                                       float oceanDepthMultiplier,
+                                       float oceanFloorDepth,
+                                       float oceanFloorSmoothing,
+                                       float mountainBlend);
 
     // Check if compute shader is available
     bool IsReady() const { return _computeShader.IsValid(); }

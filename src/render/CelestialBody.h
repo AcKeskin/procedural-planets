@@ -2,7 +2,8 @@
 
 #include <cstdint>
 
-namespace planets::render {
+namespace planets::render
+{
 
 class ComputeShader; // Forward declaration
 

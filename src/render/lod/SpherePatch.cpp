@@ -2,16 +2,16 @@
 #include <cmath>
 #include <algorithm>
 
-namespace planets::render::lod {
+namespace planets::render::lod
+{
 
 using planets::render::MeshData;
 using planets::render::Vertex;
 
 bool AABB::Contains(const glm::vec3& point) const
 {
-    return point.x >= min.x && point.x <= max.x &&
-           point.y >= min.y && point.y <= max.y &&
-           point.z >= min.z && point.z <= max.z;
+    return point.x >= min.x && point.x <= max.x && point.y >= min.y && point.y <= max.y && point.z >= min.z &&
+           point.z <= max.z;
 }
 
 Frustum Frustum::FromViewProjection(const glm::mat4& vp)
@@ -20,46 +20,22 @@ Frustum Frustum::FromViewProjection(const glm::mat4& vp)
 
     // Extract planes from view-projection matrix
     // Left plane
-    f.planes[0] = glm::vec4(
-        vp[0][3] + vp[0][0],
-        vp[1][3] + vp[1][0],
-        vp[2][3] + vp[2][0],
-        vp[3][3] + vp[3][0]);
+    f.planes[0] = glm::vec4(vp[0][3] + vp[0][0], vp[1][3] + vp[1][0], vp[2][3] + vp[2][0], vp[3][3] + vp[3][0]);
 
     // Right plane
-    f.planes[1] = glm::vec4(
-        vp[0][3] - vp[0][0],
-        vp[1][3] - vp[1][0],
-        vp[2][3] - vp[2][0],
-        vp[3][3] - vp[3][0]);
+    f.planes[1] = glm::vec4(vp[0][3] - vp[0][0], vp[1][3] - vp[1][0], vp[2][3] - vp[2][0], vp[3][3] - vp[3][0]);
 
     // Bottom plane
-    f.planes[2] = glm::vec4(
-        vp[0][3] + vp[0][1],
-        vp[1][3] + vp[1][1],
-        vp[2][3] + vp[2][1],
-        vp[3][3] + vp[3][1]);
+    f.planes[2] = glm::vec4(vp[0][3] + vp[0][1], vp[1][3] + vp[1][1], vp[2][3] + vp[2][1], vp[3][3] + vp[3][1]);
 
     // Top plane
-    f.planes[3] = glm::vec4(
-        vp[0][3] - vp[0][1],
-        vp[1][3] - vp[1][1],
-        vp[2][3] - vp[2][1],
-        vp[3][3] - vp[3][1]);
+    f.planes[3] = glm::vec4(vp[0][3] - vp[0][1], vp[1][3] - vp[1][1], vp[2][3] - vp[2][1], vp[3][3] - vp[3][1]);
 
     // Near plane
-    f.planes[4] = glm::vec4(
-        vp[0][3] + vp[0][2],
-        vp[1][3] + vp[1][2],
-        vp[2][3] + vp[2][2],
-        vp[3][3] + vp[3][2]);
+    f.planes[4] = glm::vec4(vp[0][3] + vp[0][2], vp[1][3] + vp[1][2], vp[2][3] + vp[2][2], vp[3][3] + vp[3][2]);
 
     // Far plane
-    f.planes[5] = glm::vec4(
-        vp[0][3] - vp[0][2],
-        vp[1][3] - vp[1][2],
-        vp[2][3] - vp[2][2],
-        vp[3][3] - vp[3][2]);
+    f.planes[5] = glm::vec4(vp[0][3] - vp[0][2], vp[1][3] - vp[1][2], vp[2][3] - vp[2][2], vp[3][3] - vp[3][2]);
 
     // Normalize planes
     for (auto& plane : f.planes)
@@ -79,9 +55,12 @@ bool Frustum::Intersects(const AABB& box) const
     for (const auto& plane : planes)
     {
         glm::vec3 positive = box.min;
-        if (plane.x >= 0) positive.x = box.max.x;
-        if (plane.y >= 0) positive.y = box.max.y;
-        if (plane.z >= 0) positive.z = box.max.z;
+        if (plane.x >= 0)
+            positive.x = box.max.x;
+        if (plane.y >= 0)
+            positive.y = box.max.y;
+        if (plane.z >= 0)
+            positive.z = box.max.z;
 
         if (glm::dot(glm::vec3(plane), positive) + plane.w < 0)
         {
@@ -91,13 +70,12 @@ bool Frustum::Intersects(const AABB& box) const
     return true;
 }
 
-void SpherePatch::Initialize(
-    const glm::vec3& v0,
-    const glm::vec3& v1,
-    const glm::vec3& v2,
-    float planetRadius,
-    int resolution,
-    float skirtFraction)
+void SpherePatch::Initialize(const glm::vec3& v0,
+                             const glm::vec3& v1,
+                             const glm::vec3& v2,
+                             float planetRadius,
+                             int resolution,
+                             float skirtFraction)
 {
     _v0 = glm::normalize(v0);
     _v1 = glm::normalize(v1);
@@ -113,7 +91,7 @@ void SpherePatch::Initialize(
     float angle0 = std::acos(std::clamp(glm::dot(_center, _v0), -1.0f, 1.0f));
     float angle1 = std::acos(std::clamp(glm::dot(_center, _v1), -1.0f, 1.0f));
     float angle2 = std::acos(std::clamp(glm::dot(_center, _v2), -1.0f, 1.0f));
-    _angularSize = std::max({ angle0, angle1, angle2 });
+    _angularSize = std::max({angle0, angle1, angle2});
 
     // Pre-generate unit sphere vertices
     GenerateGridVertices(_resolution, _vertices);
@@ -135,9 +113,7 @@ void SpherePatch::GenerateGridVertices(int resolution, std::vector<glm::vec3>& v
 
             // Clamp to stay within triangle (u + v <= 1)
             // We use a square grid mapped to the triangle
-            glm::vec3 pos = _v0 * (1.0f - u) * (1.0f - v) +
-                           _v1 * u * (1.0f - v) +
-                           _v2 * v;
+            glm::vec3 pos = _v0 * (1.0f - u) * (1.0f - v) + _v1 * u * (1.0f - v) + _v2 * v;
 
             // Project onto unit sphere
             vertices.push_back(glm::normalize(pos));
@@ -226,8 +202,9 @@ void SpherePatch::Render() const
     }
 }
 
-void SpherePatch::AppendSkirtGeometry(MeshData& meshData, const std::vector<float>& heights,
-                                       const std::vector<glm::vec4>& shadingData)
+void SpherePatch::AppendSkirtGeometry(MeshData& meshData,
+                                      const std::vector<float>& heights,
+                                      const std::vector<glm::vec4>& shadingData)
 {
     // Skirt depth proportional to patch angular size
     const float skirtDepth = _skirtFraction * _angularSize * _planetRadius;

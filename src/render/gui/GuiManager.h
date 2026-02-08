@@ -2,7 +2,8 @@
 
 struct GLFWwindow;
 
-namespace planets::render {
+namespace planets::render
+{
 
 class GuiManager
 {

@@ -1,7 +1,8 @@
 #include "TerrainGenerator.h"
 #include <iostream>
 
-namespace planets::core {
+namespace planets::core
+{
 
 TerrainGenerator::TerrainGenerator() = default;
 TerrainGenerator::~TerrainGenerator() = default;
@@ -16,16 +17,15 @@ bool TerrainGenerator::Initialize(const std::string& shaderPath)
     return true;
 }
 
-std::vector<float> TerrainGenerator::GenerateHeights(
-    const std::vector<glm::vec3>& vertices,
-    uint32_t seed,
-    const ComputeNoiseParams& continentParams,
-    const ComputeNoiseParams& mountainParams,
-    const ComputeNoiseParams& maskParams,
-    float oceanDepthMultiplier,
-    float oceanFloorDepth,
-    float oceanFloorSmoothing,
-    float mountainBlend)
+std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3>& vertices,
+                                                     uint32_t seed,
+                                                     const ComputeNoiseParams& continentParams,
+                                                     const ComputeNoiseParams& mountainParams,
+                                                     const ComputeNoiseParams& maskParams,
+                                                     float oceanDepthMultiplier,
+                                                     float oceanFloorDepth,
+                                                     float oceanFloorSmoothing,
+                                                     float mountainBlend)
 {
     if (!_computeShader.IsValid())
     {

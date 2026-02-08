@@ -2,7 +2,8 @@
 
 #include <glm/glm.hpp>
 
-namespace planets::render::effects {
+namespace planets::render::effects
+{
 
 // Ocean rendering settings
 struct OceanSettings

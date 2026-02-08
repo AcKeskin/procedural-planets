@@ -3,7 +3,8 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 
-namespace planets::render {
+namespace planets::render
+{
 
 Window::Window()
     : _window(nullptr)
@@ -102,7 +103,8 @@ void Window::SetShouldClose(bool value)
 
 float Window::GetAspectRatio() const
 {
-    if (_height == 0) return 1.0f;
+    if (_height == 0)
+        return 1.0f;
     return static_cast<float>(_width) / static_cast<float>(_height);
 }
 

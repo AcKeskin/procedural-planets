@@ -2,7 +2,8 @@
 #include <GL/gl3w.h>
 #include <iostream>
 
-namespace planets::render {
+namespace planets::render
+{
 
 Framebuffer::Framebuffer()
     : _fbo(0)
@@ -88,7 +89,7 @@ bool Framebuffer::Create(uint32_t width, uint32_t height)
     glNamedFramebufferTexture(_fbo, GL_DEPTH_ATTACHMENT, _depthTexture, 0);
 
     // Specify draw buffers
-    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0 };
+    GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0};
     glNamedFramebufferDrawBuffers(_fbo, 1, drawBuffers);
 
     // Check completeness

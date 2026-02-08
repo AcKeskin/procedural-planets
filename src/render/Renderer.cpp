@@ -1,7 +1,8 @@
 #include "Renderer.h"
 #include <GL/gl3w.h>
 
-namespace planets::render {
+namespace planets::render
+{
 
 Renderer::Renderer()
     : _clearColor(0.1f, 0.1f, 0.2f, 1.0f)
@@ -19,9 +20,7 @@ bool Renderer::Initialize()
     return true;
 }
 
-void Renderer::Shutdown()
-{
-}
+void Renderer::Shutdown() {}
 
 void Renderer::BeginFrame()
 {
@@ -29,9 +28,7 @@ void Renderer::BeginFrame()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void Renderer::EndFrame()
-{
-}
+void Renderer::EndFrame() {}
 
 void Renderer::SetClearColor(const glm::vec4& color)
 {

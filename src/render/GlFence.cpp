@@ -1,6 +1,7 @@
 #include "GlFence.h"
 
-namespace planets::render {
+namespace planets::render
+{
 
 GlFence::~GlFence()
 {

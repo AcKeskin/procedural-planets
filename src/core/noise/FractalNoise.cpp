@@ -1,13 +1,10 @@
 #include "FractalNoise.h"
 #include "SimplexNoise.h"
 
-namespace planets::core {
+namespace planets::core
+{
 
-FractalNoise::FractalNoise(
-    uint32_t seed,
-    int octaves,
-    float persistence,
-    float lacunarity)
+FractalNoise::FractalNoise(uint32_t seed, int octaves, float persistence, float lacunarity)
     : _octaves(octaves)
     , _persistence(persistence)
     , _lacunarity(lacunarity)
@@ -24,11 +21,7 @@ float FractalNoise::Sample(float x, float y, float z) const
 
     for (int i = 0; i < _octaves; ++i)
     {
-        float noiseValue = _baseNoise->Sample(
-            x * frequency,
-            y * frequency,
-            z * frequency
-        );
+        float noiseValue = _baseNoise->Sample(x * frequency, y * frequency, z * frequency);
 
         // Convert from [0,1] to [-1,1] for proper FBM
         noiseValue = noiseValue * 2.0f - 1.0f;

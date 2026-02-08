@@ -4,7 +4,8 @@
 #include <memory>
 #include <cstdint>
 
-namespace planets::core {
+namespace planets::core
+{
 
 enum class NoiseType
 {

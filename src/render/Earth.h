@@ -4,7 +4,8 @@
 #include "TerrainGenerator.h"
 #include <cstdint>
 
-namespace planets::render {
+namespace planets::render
+{
 
 class ComputeShader;
 

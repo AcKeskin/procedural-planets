@@ -4,7 +4,8 @@
 #include <vector>
 #include <cstdint>
 
-namespace planets::render {
+namespace planets::render
+{
 
 struct Vertex
 {
