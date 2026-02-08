@@ -11,7 +11,6 @@ struct OceanSettings
     glm::vec3 deepColor = glm::vec3(0.01f, 0.03f, 0.1f);
     glm::vec3 shallowColor = glm::vec3(0.1f, 0.4f, 0.6f);
     float fresnelPower = 2.0f;
-    float specularPower = 64.0f;
     float depthMultiplier = 10.0f;
     float alphaMultiplier = 70.0f;
     float smoothness = 0.92f;

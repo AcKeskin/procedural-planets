@@ -182,7 +182,6 @@ void OceanRenderer::Render(
     _oceanShader.SetVec3("uDeepColor", settings.deepColor);
     _oceanShader.SetVec3("uShallowColor", settings.shallowColor);
     _oceanShader.SetFloat("uFresnelPower", settings.fresnelPower);
-    _oceanShader.SetFloat("uSpecularPower", settings.specularPower);
     _oceanShader.SetFloat("uDepthMultiplier", settings.depthMultiplier);
     _oceanShader.SetFloat("uAlphaMultiplier", settings.alphaMultiplier);
     _oceanShader.SetFloat("uSmoothness", settings.smoothness);

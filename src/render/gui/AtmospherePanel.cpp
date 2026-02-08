@@ -33,9 +33,7 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
         ImGui::Separator();
         ImGui::Text("Mie Scattering");
         ImGui::SliderFloat("Mie Coefficient", &settings.mieCoefficient, 0.0f, 0.03f, "%.4f");
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Haze and sun glow amount");
-        ImGui::SliderFloat("Mie Anisotropy", &settings.mieAnisotropy, 0.0f, 0.99f, "%.2f");
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Higher = tighter sun glow");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Haze extinction amount");
         ImGui::SliderFloat("Mie Density Falloff", &settings.mieDensityFalloff, 1.0f, 10.0f);
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("How quickly Mie density decreases with altitude");
 
@@ -68,7 +66,6 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
             settings.densityFalloff = 4.5f;
             settings.atmosphereScale = 0.25f;
             settings.mieCoefficient = 0.005f;
-            settings.mieAnisotropy = 0.76f;
             settings.mieDensityFalloff = 4.0f;
             settings.intensity = 1.0f;
             settings.ditherStrength = 0.8f;
@@ -82,7 +79,6 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
             settings.densityFalloff = 3.0f;
             settings.atmosphereScale = 0.08f;
             settings.mieCoefficient = 0.015f;
-            settings.mieAnisotropy = 0.65f;
             settings.mieDensityFalloff = 2.5f;
             settings.intensity = 1.2f;
             settings.ditherStrength = 0.8f;

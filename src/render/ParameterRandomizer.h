@@ -70,6 +70,7 @@ inline void RandomizeEarthParameters(
     // Correlation: mountain scale proportional to continent scale (+-30%)
     float mScaleMin = (std::max)(0.8f, terrain.continentScale * 0.7f);
     float mScaleMax = (std::min)(2.5f, terrain.continentScale * 1.3f);
+    if (mScaleMin > mScaleMax) mScaleMin = mScaleMax;
     terrain.mountainScale = randFloat(mScaleMin, mScaleMax);
 
     // --- Atmosphere ---
@@ -81,10 +82,8 @@ inline void RandomizeEarthParameters(
     atmosphere.wavelengths.z      = randFloat(440.0f, 470.0f);
 
     atmosphere.mieCoefficient     = randFloat(0.002f, 0.015f);
-    atmosphere.mieAnisotropy      = randFloat(0.6f, 0.9f);
     atmosphere.mieDensityFalloff  = randFloat(2.0f, 6.0f);
 
-    // Correlation: intensity stays moderate with new scattering model
     atmosphere.intensity = randFloat(0.8f, 1.5f);
 
     // --- Lighting ---
@@ -119,8 +118,6 @@ inline void RandomizeEarthParameters(
     shading.flatColBlend      = randFloat(0.8f, 2.5f);
     shading.flatColBlendNoise = randFloat(0.1f, 0.5f);
 
-    // --- Ocean depth (already covered in terrain) ---
-    // Ocean colors, fresnel, specular stay fixed per plan
 }
 
 } // namespace planets::render

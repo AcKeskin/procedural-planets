@@ -1,7 +1,6 @@
 #include "AtmosphereRenderer.h"
 #include <GL/gl3w.h>
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
 #include <iostream>
 #include <vector>
@@ -35,7 +34,7 @@ bool AtmosphereRenderer::Initialize()
     }
 
     _initialized = true;
-    std::cout << "[AtmosphereRenderer] Initialized with raymarching scattering" << std::endl;
+    std::cout << "[AtmosphereRenderer] Initialized" << std::endl;
     return true;
 }
 
@@ -49,7 +48,6 @@ bool AtmosphereRenderer::LoadBlueNoiseTexture()
 
     if (fileData)
     {
-        // Use file data
         glGenTextures(1, &_blueNoiseTexture);
         glBindTexture(GL_TEXTURE_2D, _blueNoiseTexture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, fileData);
@@ -58,13 +56,12 @@ bool AtmosphereRenderer::LoadBlueNoiseTexture()
     }
     else
     {
-        // Generate procedural blue noise using interleaved gradient noise
+        // Interleaved gradient noise as fallback
         std::cout << "[AtmosphereRenderer] Generating procedural blue noise texture" << std::endl;
         for (int y = 0; y < size; ++y)
         {
             for (int x = 0; x < size; ++x)
             {
-                // Interleaved gradient noise - good approximation of blue noise
                 float noise = std::fmod(52.9829189f * std::fmod(0.06711056f * x + 0.00583715f * y, 1.0f), 1.0f);
                 data[y * size + x] = static_cast<unsigned char>(noise * 255.0f);
             }
@@ -75,7 +72,6 @@ bool AtmosphereRenderer::LoadBlueNoiseTexture()
         glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, size, size, 0, GL_RED, GL_UNSIGNED_BYTE, data.data());
     }
 
-    // Tiling requires repeat wrap mode, nearest filter preserves noise quality
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -106,9 +102,8 @@ void AtmosphereRenderer::Shutdown()
 
 void AtmosphereRenderer::CreateFullscreenQuad()
 {
-    // Fullscreen triangle (more efficient than quad)
+    // Fullscreen triangle (more efficient than quad, covers screen in one primitive)
     float vertices[] = {
-        // positions   // uvs
         -1.0f, -1.0f,  0.0f, 0.0f,
          3.0f, -1.0f,  2.0f, 0.0f,
         -1.0f,  3.0f,  0.0f, 2.0f,
@@ -147,43 +142,33 @@ void AtmosphereRenderer::Render(
     unsigned int depthTexture)
 {
     if (!_initialized || !settings.enabled)
-    {
         return;
-    }
 
-    // No depth test/write for post-process
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
 
     _atmosphereShader.Use();
 
-    // Camera matrices for ray reconstruction
     _atmosphereShader.SetMat4("uInvView", invView);
     _atmosphereShader.SetMat4("uInvProjection", invProjection);
     _atmosphereShader.SetVec3("uCameraPos", cameraPos);
-
-    // Light direction
     _atmosphereShader.SetVec3("uLightDir", glm::normalize(lightDir));
 
-    // Planet parameters
     _atmosphereShader.SetVec3("uPlanetCenter", planetCenter);
     _atmosphereShader.SetFloat("uPlanetRadius", planetRadius);
     _atmosphereShader.SetFloat("uAtmosphereRadius", planetRadius * (1.0f + settings.atmosphereScale));
     _atmosphereShader.SetFloat("uOceanRadius", oceanRadius);
 
-    // Camera near/far for depth reconstruction
     _atmosphereShader.SetFloat("uNearPlane", nearPlane);
     _atmosphereShader.SetFloat("uFarPlane", farPlane);
 
-    // Rayleigh scattering coefficients (inverse 4th power of wavelength)
-    // Divided by planet radius to make strength scale-independent
+    // Rayleigh coefficients: inverse 4th power of wavelength, normalized by planet radius
     float scatterX = std::pow(400.0f / settings.wavelengths.x, 4.0f);
     float scatterY = std::pow(400.0f / settings.wavelengths.y, 4.0f);
     float scatterZ = std::pow(400.0f / settings.wavelengths.z, 4.0f);
     glm::vec3 scatterCoeffs = glm::vec3(scatterX, scatterY, scatterZ) * settings.scatteringStrength / planetRadius;
     _atmosphereShader.SetVec3("uScatteringCoefficients", scatterCoeffs);
 
-    // Quality and density
     _atmosphereShader.SetInt("uNumInScatteringPoints", settings.numInScatteringPoints);
     _atmosphereShader.SetInt("uNumOpticalDepthPoints", settings.numOpticalDepthPoints);
     _atmosphereShader.SetFloat("uDensityFalloff", settings.densityFalloff);
@@ -191,11 +176,9 @@ void AtmosphereRenderer::Render(
     _atmosphereShader.SetFloat("uMieCoefficient", settings.mieCoefficient);
     _atmosphereShader.SetFloat("uMieDensityFalloff", settings.mieDensityFalloff);
 
-    // Dithering parameters
     _atmosphereShader.SetFloat("uDitherStrength", settings.ditherStrength);
     _atmosphereShader.SetFloat("uDitherScale", settings.ditherScale);
 
-    // Bind textures
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, sceneTexture);
     _atmosphereShader.SetInt("uSceneTexture", 0);
@@ -208,12 +191,10 @@ void AtmosphereRenderer::Render(
     glBindTexture(GL_TEXTURE_2D, _blueNoiseTexture);
     _atmosphereShader.SetInt("uBlueNoise", 2);
 
-    // Draw fullscreen triangle
     glBindVertexArray(_quadVAO);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
 
-    // Restore state
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
 }

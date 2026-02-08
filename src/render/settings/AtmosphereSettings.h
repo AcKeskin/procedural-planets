@@ -16,9 +16,8 @@ struct AtmosphereSettings
     float scatteringStrength = 20.0f;
     float densityFalloff = 4.5f;
 
-    // Mie scattering
+    // Mie scattering (contributes to extinction, not in-scattering color)
     float mieCoefficient = 0.005f;
-    float mieAnisotropy = 0.76f;
     float mieDensityFalloff = 4.0f;
 
     int numInScatteringPoints = 10;
