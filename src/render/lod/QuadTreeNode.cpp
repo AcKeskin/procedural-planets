@@ -75,8 +75,7 @@ void QuadTreeNode::Split()
     _children[2] = std::make_unique<QuadTreeNode>(m20, m12, _v2, _depth + 1, this);
     _children[3] = std::make_unique<QuadTreeNode>(m01, m12, m20, _depth + 1, this);
 
-    // Release patch ownership since this node is no longer a leaf
-    _patch.reset();
+    // Parent patch is preserved as fallback while children generate asynchronously
 }
 
 void QuadTreeNode::Merge()
