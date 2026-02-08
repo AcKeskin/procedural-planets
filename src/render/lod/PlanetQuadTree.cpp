@@ -37,37 +37,32 @@ static const int IcosahedronFaces[20][3] = {
 
 void PlanetQuadTree::Initialize(
     const QuadTreeConfig& config,
-    TerrainGenerator& terrainGen,
-    const EarthTerrainSettings& terrainSettings,
-    const EarthShadingSettings& shadingSettings,
+    GenerationScheduler& scheduler,
     uint32_t seed)
 {
     _config = config;
-    _terrainGen = &terrainGen;
-    _terrainSettings = &terrainSettings;
-    _shadingSettings = &shadingSettings;
+    _scheduler = &scheduler;
     _seed = seed;
 
-    // Clear pool to avoid stale patches from previous generation
     _patchPool.Clear();
+    _pendingNodes.clear();
+    _roots.clear();
 
-    // Build root nodes from subdivided icosahedron
     BuildRootNodes(_config.baseSubdivisions);
 
     std::cout << "[PlanetQuadTree] Created " << _roots.size() << " root nodes" << std::endl;
 
-    // Generate patches for all root nodes (they start as leaves)
+    // Enqueue all root patches for async generation (non-blocking)
     for (auto& root : _roots)
     {
-        GeneratePatchForNode(*root);
+        EnqueueGeneration(*root, GenerationType::Initial);
     }
 
-    std::cout << "[PlanetQuadTree] Initial patch generation complete" << std::endl;
+    std::cout << "[PlanetQuadTree] Enqueued " << _roots.size() << " initial patches" << std::endl;
 }
 
 void PlanetQuadTree::BuildRootNodes(int subdivisions)
 {
-    // Start with base icosahedron faces
     struct Face { glm::vec3 v0, v1, v2; };
     std::vector<Face> faces;
 
@@ -80,7 +75,6 @@ void PlanetQuadTree::BuildRootNodes(int subdivisions)
         });
     }
 
-    // Subdivide faces
     for (int s = 0; s < subdivisions; ++s)
     {
         std::vector<Face> newFaces;
@@ -88,12 +82,10 @@ void PlanetQuadTree::BuildRootNodes(int subdivisions)
 
         for (const auto& face : faces)
         {
-            // Calculate midpoints on unit sphere
             glm::vec3 m01 = glm::normalize((face.v0 + face.v1) * 0.5f);
             glm::vec3 m12 = glm::normalize((face.v1 + face.v2) * 0.5f);
             glm::vec3 m20 = glm::normalize((face.v2 + face.v0) * 0.5f);
 
-            // Create 4 new faces
             newFaces.push_back({ face.v0, m01, m20 });
             newFaces.push_back({ m01, face.v1, m12 });
             newFaces.push_back({ m20, m12, face.v2 });
@@ -103,7 +95,6 @@ void PlanetQuadTree::BuildRootNodes(int subdivisions)
         faces = std::move(newFaces);
     }
 
-    // Create root nodes from faces (depth 0, no parent)
     _roots.reserve(faces.size());
     for (const auto& face : faces)
     {
@@ -112,13 +103,43 @@ void PlanetQuadTree::BuildRootNodes(int subdivisions)
     }
 }
 
+void PlanetQuadTree::ApplyCompletedPatches()
+{
+    if (!_scheduler)
+        return;
+
+    auto completed = _scheduler->TakeCompleted();
+    for (auto& result : completed)
+    {
+        _pendingNodes.erase(result.targetNode);
+
+        if (result.type == GenerationType::Merge)
+        {
+            // Release children's patches before merging
+            for (int i = 0; i < 4; ++i)
+            {
+                QuadTreeNode* child = result.targetNode->GetChild(i);
+                if (child && child->HasPatch())
+                    _patchPool.Release(child->ReleasePatch());
+            }
+            result.targetNode->Merge();
+        }
+
+        // Release existing patch (parent fallback for splits, or stale patch) to pool
+        if (result.targetNode->HasPatch())
+            _patchPool.Release(result.targetNode->ReleasePatch());
+
+        result.targetNode->SetPatch(std::move(result.patch));
+    }
+}
+
 void PlanetQuadTree::Update(const glm::vec3& cameraPos, const glm::mat4& viewProjection)
 {
     _currentFrustum = Frustum::FromViewProjection(viewProjection);
     _activeLeafCount = 0;
     _totalNodeCount = 0;
+    _lastCameraPos = cameraPos;
 
-    // Traverse each root tree
     for (auto& root : _roots)
     {
         TraverseAndUpdate(*root, cameraPos);
@@ -129,7 +150,6 @@ void PlanetQuadTree::TraverseAndUpdate(QuadTreeNode& node, const glm::vec3& came
 {
     ++_totalNodeCount;
 
-    // Scale center to planet surface
     glm::vec3 scaledCenter = node.GetCenter() * _config.planetRadius;
     float distance = glm::length(cameraPos - scaledCenter);
     float arcLength = node.GetArcLength();
@@ -137,24 +157,21 @@ void PlanetQuadTree::TraverseAndUpdate(QuadTreeNode& node, const glm::vec3& came
 
     if (node.IsLeaf())
     {
-        // Check if leaf should split
         bool shouldSplit = distance < splitDistance &&
                           node.CanSplit() &&
                           _activeLeafCount < _config.maxActivePatches;
 
-        if (shouldSplit)
+        if (shouldSplit && !IsPending(&node))
         {
-            // Split node into 4 children
+            // Split creates children but preserves parent patch as fallback
             node.Split();
 
-            // Generate patches for all children
+            // Enqueue async generation for all children
             for (int i = 0; i < 4; ++i)
             {
                 QuadTreeNode* child = node.GetChild(i);
                 if (child)
-                {
-                    GeneratePatchForNode(*child);
-                }
+                    EnqueueGeneration(*child, GenerationType::Split);
             }
 
             // Recurse into children
@@ -162,14 +179,11 @@ void PlanetQuadTree::TraverseAndUpdate(QuadTreeNode& node, const glm::vec3& came
             {
                 QuadTreeNode* child = node.GetChild(i);
                 if (child)
-                {
                     TraverseAndUpdate(*child, cameraPos);
-                }
             }
         }
         else
         {
-            // Leaf stays as leaf
             ++_activeLeafCount;
         }
     }
@@ -190,25 +204,18 @@ void PlanetQuadTree::TraverseAndUpdate(QuadTreeNode& node, const glm::vec3& came
         float mergeDistance = splitDistance * _config.hysteresis;
         bool shouldMerge = allChildrenAreLeaves && distance > mergeDistance;
 
-        if (shouldMerge)
+        if (shouldMerge && !IsPending(&node))
         {
-            // Return children's patches to pool before destroying them
+            // Enqueue parent patch generation; children stay alive until patch arrives
+            EnqueueGeneration(node, GenerationType::Merge);
+
+            // Count children as active while merge is pending
             for (int i = 0; i < 4; ++i)
             {
                 QuadTreeNode* child = node.GetChild(i);
-                if (child && child->HasPatch())
-                {
-                    _patchPool.Release(child->ReleasePatch());
-                }
+                if (child)
+                    ++_activeLeafCount;
             }
-
-            // Merge children back into this node
-            node.Merge();
-
-            // Generate patch for this node (now a leaf)
-            GeneratePatchForNode(node);
-
-            ++_activeLeafCount;
         }
         else
         {
@@ -217,16 +224,17 @@ void PlanetQuadTree::TraverseAndUpdate(QuadTreeNode& node, const glm::vec3& came
             {
                 QuadTreeNode* child = node.GetChild(i);
                 if (child)
-                {
                     TraverseAndUpdate(*child, cameraPos);
-                }
             }
         }
     }
 }
 
-void PlanetQuadTree::GeneratePatchForNode(QuadTreeNode& node)
+void PlanetQuadTree::EnqueueGeneration(QuadTreeNode& node, GenerationType type)
 {
+    if (IsPending(&node))
+        return;
+
     auto patch = _patchPool.Acquire();
     patch->Initialize(
         node.GetVertex(0),
@@ -236,39 +244,38 @@ void PlanetQuadTree::GeneratePatchForNode(QuadTreeNode& node)
         _config.meshResolution,
         _config.skirtFraction);
 
-    const auto& unitVertices = patch->GetUnitSphereVertices();
-    auto heights = _terrainGen->GenerateHeights(unitVertices, _seed, *_terrainSettings);
+    float distance = glm::length(_lastCameraPos - node.GetCenter() * _config.planetRadius);
 
-    std::vector<glm::vec4> shadingData;
-    if (_terrainGen->IsShadingReady())
-    {
-        shadingData = _terrainGen->GenerateShadingData(unitVertices, _seed, *_shadingSettings);
-    }
-    else
-    {
-        shadingData.resize(unitVertices.size(), glm::vec4(0.0f));
-    }
+    _pendingNodes.insert(&node);
 
-    patch->GenerateMesh(heights, shadingData);
-    node.SetPatch(std::move(patch));
+    GenerationRequest request;
+    request.targetNode = &node;
+    request.type = type;
+    request.patch = std::move(patch);
+    request.priority = distance;
+
+    _scheduler->Enqueue(std::move(request));
+}
+
+bool PlanetQuadTree::IsPending(const QuadTreeNode* node) const
+{
+    return _pendingNodes.find(node) != _pendingNodes.end();
 }
 
 void PlanetQuadTree::Render(const Shader& shader) const
 {
-    // Collect all leaf nodes
-    std::vector<QuadTreeNode*> leaves;
-    leaves.reserve(_activeLeafCount);
+    std::vector<const QuadTreeNode*> renderableNodes;
+    renderableNodes.reserve(_activeLeafCount);
 
     for (const auto& root : _roots)
     {
-        CollectLeaves(*root, leaves);
+        CollectRenderableNodes(*root, renderableNodes);
     }
 
-    // Render visible patches
     int visibleCount = 0;
-    for (QuadTreeNode* leaf : leaves)
+    for (const QuadTreeNode* node : renderableNodes)
     {
-        const SpherePatch* patch = leaf->GetPatch();
+        const SpherePatch* patch = node->GetPatch();
         if (patch && patch->IsVisible(_currentFrustum))
         {
             patch->Render();
@@ -279,23 +286,46 @@ void PlanetQuadTree::Render(const Shader& shader) const
     _visiblePatchCount = visibleCount;
 }
 
-void PlanetQuadTree::CollectLeaves(QuadTreeNode& node, std::vector<QuadTreeNode*>& leaves) const
+void PlanetQuadTree::CollectRenderableNodes(
+    const QuadTreeNode& node,
+    std::vector<const QuadTreeNode*>& nodes) const
 {
     if (node.IsLeaf())
     {
-        leaves.push_back(&node);
+        if (node.HasPatch())
+            nodes.push_back(&node);
+        return;
     }
-    else
+
+    // If all leaves in subtree have patches, recurse for finer LOD
+    if (IsSubtreeReady(node))
     {
         for (int i = 0; i < 4; ++i)
         {
-            QuadTreeNode* child = node.GetChild(i);
+            const QuadTreeNode* child = node.GetChild(i);
             if (child)
-            {
-                CollectLeaves(*child, leaves);
-            }
+                CollectRenderableNodes(*child, nodes);
         }
     }
+    else if (node.HasPatch())
+    {
+        // Fallback: render parent patch at coarser LOD while children generate
+        nodes.push_back(&node);
+    }
+}
+
+bool PlanetQuadTree::IsSubtreeReady(const QuadTreeNode& node) const
+{
+    if (node.IsLeaf())
+        return node.HasPatch();
+
+    for (int i = 0; i < 4; ++i)
+    {
+        const QuadTreeNode* child = node.GetChild(i);
+        if (!child || !IsSubtreeReady(*child))
+            return false;
+    }
+    return true;
 }
 
 } // namespace planets::render::lod

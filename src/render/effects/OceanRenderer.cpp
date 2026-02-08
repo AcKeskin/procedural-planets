@@ -159,6 +159,7 @@ void OceanRenderer::Render(
     const glm::mat4& projection,
     const glm::vec3& cameraPos,
     const glm::vec3& lightDir,
+    float elapsedTime,
     const OceanSettings& settings)
 {
     if (!_initialized || !settings.enabled)
@@ -181,7 +182,13 @@ void OceanRenderer::Render(
     _oceanShader.SetVec3("uDeepColor", settings.deepColor);
     _oceanShader.SetVec3("uShallowColor", settings.shallowColor);
     _oceanShader.SetFloat("uFresnelPower", settings.fresnelPower);
-    _oceanShader.SetFloat("uSpecularPower", settings.specularPower);
+    _oceanShader.SetFloat("uDepthMultiplier", settings.depthMultiplier);
+    _oceanShader.SetFloat("uAlphaMultiplier", settings.alphaMultiplier);
+    _oceanShader.SetFloat("uSmoothness", settings.smoothness);
+    _oceanShader.SetFloat("uWaveStrength", settings.waveStrength);
+    _oceanShader.SetFloat("uWaveScale", settings.waveScale);
+    _oceanShader.SetFloat("uWaveSpeed", settings.waveSpeed);
+    _oceanShader.SetFloat("uTime", elapsedTime);
 
     _oceanMesh.Draw();
 

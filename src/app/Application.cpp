@@ -76,6 +76,13 @@ bool Application::Initialize()
     else
         std::cout << "[TerrainGenerator] GPU compute shaders not available, using CPU" << std::endl;
 
+    // Initialize async generation scheduler
+    if (_genConfig.useGpu)
+    {
+        _generationScheduler.Initialize(
+            _terrainGenerator, _terrainSettings, _shadingSettings, _genConfig.seed);
+    }
+
     // CPU fallback planet
     core::PlanetSettings planetSettings;
     planetSettings.radius = _lodConfig.planetRadius;
@@ -133,6 +140,7 @@ void Application::Run()
 
 void Application::Shutdown()
 {
+    _generationScheduler.CancelAll();
     _postProcessor.Shutdown();
     _guiManager.Shutdown();
     _renderer.Shutdown();
@@ -257,18 +265,9 @@ void Application::Render()
     _planetShader.SetFloat("uFlatColBlend", _shadingSettings.flatColBlend);
     _planetShader.SetFloat("uFlatColBlendNoise", _shadingSettings.flatColBlendNoise);
 
-    // Height range
-    float heightMin, heightMax;
-    if (_biomeSettings.autoHeightRange)
-    {
-        heightMin = 1.0f - _terrainSettings.heightScale * 1.5f;
-        heightMax = 1.0f + _terrainSettings.heightScale * 1.5f;
-    }
-    else
-    {
-        heightMin = _biomeSettings.heightRangeMin;
-        heightMax = _biomeSettings.heightRangeMax;
-    }
+    // Height range (auto-computed from terrain scale)
+    float heightMin = 1.0f - _terrainSettings.heightScale * 1.5f;
+    float heightMax = 1.0f + _terrainSettings.heightScale * 1.5f;
     _planetShader.SetVec2("uHeightMinMax", glm::vec2(heightMin, heightMax));
 
     // Lighting
@@ -277,12 +276,21 @@ void Application::Render()
     _planetShader.SetFloat("uSpecularStrength", _sceneSettings.lighting.specularStrength);
     _planetShader.SetFloat("uSpecularPower", _sceneSettings.lighting.specularPower);
 
+    // Fresnel rim for sense of scale
+    _planetShader.SetFloat("uPlanetScale", _lodConfig.planetRadius);
+    _planetShader.SetFloat("uFresnelStrengthNear", 0.5f);
+    _planetShader.SetFloat("uFresnelStrengthFar", 2.0f);
+    _planetShader.SetFloat("uFresnelPow", 3.0f);
+
     if (_lodConfig.enabled && _genConfig.useGpu)
     {
+        // Async pipeline: process scheduler, apply results, then update + render
+        _generationScheduler.ProcessFrame(4, 4);
+        _quadTree.ApplyCompletedPatches();
         _quadTree.Update(_camera.GetPosition(), viewProjection);
         _quadTree.Render(_planetShader);
         _oceanRenderer.Render(view, projection, _camera.GetPosition(),
-                              _sceneSettings.lightDir, _oceanSettings);
+                              _sceneSettings.lightDir, _lastTime, _oceanSettings);
     }
     else
     {
@@ -331,11 +339,21 @@ void Application::RenderGui()
     // Update terrain stats before drawing panel
     _terrainStats.patchCount = _quadTree.GetActiveLeafCount();
     _terrainStats.visiblePatchCount = _quadTree.GetVisiblePatchCount();
-    _terrainStats.vertexCount = 0; // Will be added to PlanetQuadTree later if needed
+    _terrainStats.vertexCount = 0;
 
+    bool randomize = false;
     bool needsRegen = _terrainPanel.Draw(
         _genConfig, _terrainSettings, _lodConfig, _terrainStats,
-        _planet, visibility.terrain);
+        _planet, visibility.terrain, randomize);
+
+    if (randomize)
+    {
+        render::RandomizeEarthParameters(
+            _terrainSettings, _shadingSettings, _biomeSettings,
+            _sceneSettings, _atmosphereSettings, _oceanSettings,
+            _genConfig.seed);
+        needsRegen = true;
+    }
 
     // Sync CPU planet settings back to generation config
     if (!_genConfig.useGpu)
@@ -364,55 +382,11 @@ void Application::RenderGui()
 
 void Application::ShuffleTerrain()
 {
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    render::RandomizeEarthParameters(
+        _terrainSettings, _shadingSettings, _biomeSettings,
+        _sceneSettings, _atmosphereSettings, _oceanSettings,
+        _genConfig.seed);
 
-    auto randFloat = [&gen](float min, float max) {
-        return std::uniform_real_distribution<float>(min, max)(gen);
-    };
-    auto randInt = [&gen](int min, int max) {
-        return std::uniform_int_distribution<int>(min, max)(gen);
-    };
-
-    _genConfig.seed = static_cast<uint32_t>(gen());
-
-    // Continental shape
-    _terrainSettings.continentOctaves     = randInt(4, 7);
-    _terrainSettings.continentScale       = randFloat(0.5f, 2.0f);
-    _terrainSettings.continentStrength    = randFloat(1.0f, 2.5f);
-    _terrainSettings.continentPersistence = randFloat(0.35f, 0.65f);
-    _terrainSettings.continentLacunarity  = randFloat(1.8f, 2.5f);
-    _terrainSettings.continentBaseLevel   = randFloat(-0.8f, 0.0f);
-
-    // Mountain ridges
-    _terrainSettings.mountainOctaves   = randInt(4, 7);
-    _terrainSettings.mountainScale     = randFloat(0.8f, 3.0f);
-    _terrainSettings.mountainStrength  = randFloat(0.4f, 1.5f);
-    _terrainSettings.mountainPower     = randFloat(1.5f, 4.0f);
-    _terrainSettings.mountainGain      = randFloat(0.5f, 1.5f);
-    _terrainSettings.mountainSmoothing = randFloat(0.5f, 1.5f);
-    _terrainSettings.mountainBlend     = randFloat(0.5f, 2.0f);
-
-    // Mountain mask
-    _terrainSettings.maskOctaves     = randInt(2, 5);
-    _terrainSettings.maskScale       = randFloat(0.5f, 1.8f);
-    _terrainSettings.maskPersistence = randFloat(0.3f, 0.7f);
-    _terrainSettings.maskLacunarity  = randFloat(1.5f, 2.5f);
-
-    // Ocean
-    _terrainSettings.oceanDepthMultiplier = randFloat(2.0f, 8.0f);
-    _terrainSettings.oceanFloorDepth      = randFloat(0.8f, 2.0f);
-    _terrainSettings.oceanFloorSmoothing  = randFloat(0.2f, 1.0f);
-
-    // Overall scaling
-    _terrainSettings.heightScale     = randFloat(0.02f, 0.08f);
-    _terrainSettings.globalFrequency = randFloat(0.7f, 2.0f);
-
-    // Surface detail
-    _terrainSettings.perturbStrength = randFloat(0.001f, 0.005f);
-    _terrainSettings.perturbScale    = randFloat(10.0f, 35.0f);
-
-    // Trigger regeneration
     if (_lodConfig.enabled && _genConfig.useGpu)
         RegenerateLodSystem();
     else if (_genConfig.useGpu)
@@ -485,32 +459,36 @@ void Application::RegenerateLodSystem()
         return;
     }
 
-    auto start = std::chrono::high_resolution_clock::now();
+    // Cancel all in-flight async work before rebuilding
+    _generationScheduler.CancelAll();
+    _generationScheduler.SetSettings(_terrainSettings, _shadingSettings, _genConfig.seed);
 
-    render::lod::QuadTreeConfig qtConfig;
-    qtConfig.planetRadius     = _lodConfig.planetRadius;
-    qtConfig.baseSubdivisions = _lodConfig.patchSubdivisions;
-    qtConfig.meshResolution   = _lodConfig.meshResolution;
-    qtConfig.maxDepth         = _lodConfig.maxDepth;
-    qtConfig.splitThreshold   = _lodConfig.splitThreshold;
-    qtConfig.hysteresis       = _lodConfig.hysteresis;
-    qtConfig.maxActivePatches = _lodConfig.maxActivePatches;
-    qtConfig.skirtFraction    = _lodConfig.skirtFraction;
+    auto qtConfig = BuildQuadTreeConfig();
 
-    _quadTree.Initialize(qtConfig, _terrainGenerator,
-                         _terrainSettings, _shadingSettings, _genConfig.seed);
+    // Build tree structure and enqueue patches (non-blocking)
+    _quadTree.Initialize(qtConfig, _generationScheduler, _genConfig.seed);
     _oceanRenderer.Initialize(_lodConfig.planetRadius, _seaLevel, 5);
     _atmosphereRenderer.Initialize();
 
-    // Scale far plane to ensure planet is always visible from orbit
     float farPlane = (std::max)(1000.0f, _lodConfig.planetRadius * 20.0f);
     _camera.SetFarPlane(farPlane);
 
-    auto end = std::chrono::high_resolution_clock::now();
-    _terrainStats.gpuTimeMs = std::chrono::duration<float, std::milli>(end - start).count();
+    std::cout << "[QuadTree] Enqueued " << _generationScheduler.GetPendingCount()
+              << " patches for async generation" << std::endl;
+}
 
-    std::cout << "[QuadTree] Generated " << _quadTree.GetActiveLeafCount()
-              << " patches in " << _terrainStats.gpuTimeMs << " ms" << std::endl;
+render::lod::QuadTreeConfig Application::BuildQuadTreeConfig() const
+{
+    render::lod::QuadTreeConfig config;
+    config.planetRadius     = _lodConfig.planetRadius;
+    config.baseSubdivisions = _lodConfig.patchSubdivisions;
+    config.meshResolution   = _lodConfig.meshResolution;
+    config.maxDepth         = _lodConfig.maxDepth;
+    config.splitThreshold   = _lodConfig.splitThreshold;
+    config.hysteresis       = _lodConfig.hysteresis;
+    config.maxActivePatches = _lodConfig.maxActivePatches;
+    config.skirtFraction    = _lodConfig.skirtFraction;
+    return config;
 }
 
 } // namespace planets::app

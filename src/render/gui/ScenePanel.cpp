@@ -62,17 +62,17 @@ void ScenePanel::DrawLightingContent(LightingSettings& settings)
     ImGui::Text("Sun Lighting");
     ImGui::Separator();
 
-    ImGui::SliderFloat("Sun Intensity", &settings.sunIntensity, 0.1f, 5.0f, "%.2f");
+    ImGui::SliderFloat("Sun Intensity", &settings.sunIntensity, 0.6f, 1.8f, "%.2f");
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Overall brightness of sunlight on terrain");
 
-    ImGui::SliderFloat("Ambient Light", &settings.ambientLight, 0.0f, 0.5f, "%.3f");
+    ImGui::SliderFloat("Ambient Light", &settings.ambientLight, 0.05f, 0.25f, "%.3f");
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Base illumination in shadows");
 
     ImGui::Separator();
     ImGui::Text("Specular");
 
-    ImGui::SliderFloat("Specular Strength", &settings.specularStrength, 0.0f, 1.0f, "%.2f");
-    ImGui::SliderFloat("Specular Power", &settings.specularPower, 4.0f, 128.0f, "%.0f");
+    ImGui::SliderFloat("Specular Strength", &settings.specularStrength, 0.0f, 0.5f, "%.2f");
+    ImGui::SliderFloat("Specular Power", &settings.specularPower, 16.0f, 64.0f, "%.0f");
 
     ImGui::Separator();
     if (ImGui::Button("Reset"))

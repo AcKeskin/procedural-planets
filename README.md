@@ -3,7 +3,7 @@
 A GPU-accelerated procedural planet renderer built with C++17 and OpenGL. Generates realistic, Earth-like planets with terrain, atmosphere, oceans, and biomes — all driven by compute shaders and procedural noise.
 
 <p align="center">
-  <img src="docs/videos/spedup_cinematic.gif" alt="Procedural planet cinematic" width="600">
+  <img src="docs/videos/spedup_cinematic_updated.gif" alt="Procedural planet cinematic" width="600">
 </p>
 
 Inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-System). The architecture and implementation are built from scratch in C++/OpenGL, but studying his approach helped shape the direction of this project.
@@ -20,8 +20,8 @@ Inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-S
 - **Live Tweaking** — ImGui debug panels for all parameters
 
 <p align="center">
-  <img src="docs/images/with_atmosphere.png" alt="Planet with atmospheric scattering" width="400">
-  <img src="docs/images/without_atmosphere.png" alt="Planet terrain without atmosphere" width="400">
+  <img src="docs/images/with_atmosphere_0.png" alt="Planet with atmospheric scattering" width="400">
+  <img src="docs/images/without_atmosphere_0.png" alt="Planet terrain without atmosphere" width="400">
 </p>
 
 ## Building

@@ -18,10 +18,6 @@ struct BiomeSettings
     float snowLine = 0.85f;
 
     float shoreHeight = 0.08f;
-
-    bool autoHeightRange = true;
-    float heightRangeMin = 0.96f;
-    float heightRangeMax = 1.04f;
 };
 
 // Earth terrain color palette with gradient pairs
