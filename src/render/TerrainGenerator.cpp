@@ -7,12 +7,12 @@ namespace planets::render
 
 namespace
 {
-    const glm::vec3 ContinentNoiseOffset(0.0f);
-    const glm::vec3 MountainNoiseOffset(1000.0f);
-    const glm::vec3 MaskNoiseOffset(2000.0f);
-    constexpr float DefaultMaskMultiplier = 1.0f;
-    constexpr float FallbackHeightScale = 0.04f;
-}
+const glm::vec3 ContinentNoiseOffset(0.0f);
+const glm::vec3 MountainNoiseOffset(1000.0f);
+const glm::vec3 MaskNoiseOffset(2000.0f);
+constexpr float DefaultMaskMultiplier = 1.0f;
+constexpr float FallbackHeightScale = 0.04f;
+} // namespace
 
 TerrainGenerator::TerrainGenerator() = default;
 TerrainGenerator::~TerrainGenerator() = default;
@@ -326,7 +326,8 @@ std::vector<glm::vec4> TerrainGenerator::GenerateShadingData(const std::vector<g
 
     SetShadingUniforms(seed, vertexCount, settings, FallbackHeightScale);
 
-    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + ShadingWorkgroupSize - 1) / ShadingWorkgroupSize;
+    unsigned int groupCount =
+        (static_cast<unsigned int>(vertexCount) + ShadingWorkgroupSize - 1) / ShadingWorkgroupSize;
     _shadingShader.Dispatch(groupCount);
     ComputeShader::WaitForCompletion();
 
@@ -364,7 +365,8 @@ void TerrainGenerator::DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
 
     SetShadingUniforms(seed, vertexCount, settings, heightScale);
 
-    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + ShadingWorkgroupSize - 1) / ShadingWorkgroupSize;
+    unsigned int groupCount =
+        (static_cast<unsigned int>(vertexCount) + ShadingWorkgroupSize - 1) / ShadingWorkgroupSize;
     _shadingShader.Dispatch(groupCount);
 }
 
@@ -388,7 +390,8 @@ void TerrainGenerator::DispatchErosionAsync(GpuBuffer<float>& heightBuffer,
     heightBuffer.Bind(1);
     SetErosionUniforms(vertexCount, gridResolution, settings);
 
-    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + ErosionWorkgroupSize - 1) / ErosionWorkgroupSize;
+    unsigned int groupCount =
+        (static_cast<unsigned int>(vertexCount) + ErosionWorkgroupSize - 1) / ErosionWorkgroupSize;
     _erosionShader.Dispatch(groupCount);
 }
 

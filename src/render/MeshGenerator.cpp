@@ -9,9 +9,9 @@ namespace planets::render
 
 namespace
 {
-    constexpr float HeightNormalizationScale = 10.0f;
-    constexpr float HeightNormalizationOffset = 0.5f;
-}
+constexpr float HeightNormalizationScale = 10.0f;
+constexpr float HeightNormalizationOffset = 0.5f;
+} // namespace
 
 MeshData MeshGenerator::GenerateIcosphere(int subdivisions)
 {

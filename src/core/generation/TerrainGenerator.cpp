@@ -89,7 +89,8 @@ std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3
     _computeShader.SetFloat("mountainBlend", mountainBlend);
 
     // Dispatch compute shader
-    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + render::HeightWorkgroupSize - 1) / render::HeightWorkgroupSize;
+    unsigned int groupCount =
+        (static_cast<unsigned int>(vertexCount) + render::HeightWorkgroupSize - 1) / render::HeightWorkgroupSize;
     _computeShader.Dispatch(groupCount);
 
     // Wait for completion

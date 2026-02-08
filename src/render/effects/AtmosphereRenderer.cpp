@@ -14,16 +14,16 @@ namespace planets::render::effects
 
 namespace
 {
-    constexpr int BlueNoiseTextureSize = 64;
-    // Interleaved gradient noise coefficients (Jimenez 2014)
-    constexpr float IgnCoefficientA = 52.9829189f;
-    constexpr float IgnCoefficientB = 0.06711056f;
-    constexpr float IgnCoefficientC = 0.00583715f;
-    constexpr float ByteMaxFloat = 255.0f;
-    // Rayleigh scattering: inverse 4th power law
-    constexpr float RayleighReferenceWavelength = 400.0f;
-    constexpr float RayleighPower = 4.0f;
-}
+constexpr int BlueNoiseTextureSize = 64;
+// Interleaved gradient noise coefficients (Jimenez 2014)
+constexpr float IgnCoefficientA = 52.9829189f;
+constexpr float IgnCoefficientB = 0.06711056f;
+constexpr float IgnCoefficientC = 0.00583715f;
+constexpr float ByteMaxFloat = 255.0f;
+// Rayleigh scattering: inverse 4th power law
+constexpr float RayleighReferenceWavelength = 400.0f;
+constexpr float RayleighPower = 4.0f;
+} // namespace
 
 AtmosphereRenderer::AtmosphereRenderer() = default;
 
@@ -77,7 +77,8 @@ bool AtmosphereRenderer::LoadBlueNoiseTexture()
         {
             for (int x = 0; x < size; ++x)
             {
-                float noise = std::fmod(IgnCoefficientA * std::fmod(IgnCoefficientB * x + IgnCoefficientC * y, 1.0f), 1.0f);
+                float noise =
+                    std::fmod(IgnCoefficientA * std::fmod(IgnCoefficientB * x + IgnCoefficientC * y, 1.0f), 1.0f);
                 data[y * size + x] = static_cast<unsigned char>(noise * ByteMaxFloat);
             }
         }

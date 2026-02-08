@@ -32,21 +32,21 @@ namespace planets::app
 
 namespace AppDefaults
 {
-    inline constexpr float SeaLevel = 0.995f;
-    inline constexpr float MoveSpeed = 75.0f;
-    inline constexpr float InitialCameraDistanceMultiplier = 2.5f;
-    inline constexpr float MouseRotationSensitivity = 0.1f;
-    inline constexpr float SprintSpeedMultiplier = 5.0f;
-    inline constexpr float AutoOrbitSpeed = 5.0f;
-    inline constexpr float FresnelStrengthNear = 0.5f;
-    inline constexpr float FresnelStrengthFar = 2.0f;
-    inline constexpr float FresnelPower = 3.0f;
-    inline constexpr int SchedulerPatchesPerFrame = 4;
-    inline constexpr float MinFarPlane = 1000.0f;
-    inline constexpr float FarPlaneRadiusMultiplier = 20.0f;
-    inline constexpr int OceanSubdivisions = 5;
-    inline constexpr float HeightRangeMultiplier = 1.5f;
-}
+inline constexpr float SeaLevel = 0.995f;
+inline constexpr float MoveSpeed = 75.0f;
+inline constexpr float InitialCameraDistanceMultiplier = 2.5f;
+inline constexpr float MouseRotationSensitivity = 0.1f;
+inline constexpr float SprintSpeedMultiplier = 5.0f;
+inline constexpr float AutoOrbitSpeed = 5.0f;
+inline constexpr float FresnelStrengthNear = 0.5f;
+inline constexpr float FresnelStrengthFar = 2.0f;
+inline constexpr float FresnelPower = 3.0f;
+inline constexpr int SchedulerPatchesPerFrame = 4;
+inline constexpr float MinFarPlane = 1000.0f;
+inline constexpr float FarPlaneRadiusMultiplier = 20.0f;
+inline constexpr int OceanSubdivisions = 5;
+inline constexpr float HeightRangeMultiplier = 1.5f;
+} // namespace AppDefaults
 
 // Owns all state, systems, and the frame loop
 class Application

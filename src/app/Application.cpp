@@ -188,7 +188,8 @@ void Application::ProcessInput(float deltaTime)
         if (_input.IsCursorEnabled())
             _input.SetCursorEnabled(false);
 
-        _camera.Rotate(_input.GetMouseDeltaX() * AppDefaults::MouseRotationSensitivity, _input.GetMouseDeltaY() * AppDefaults::MouseRotationSensitivity);
+        _camera.Rotate(_input.GetMouseDeltaX() * AppDefaults::MouseRotationSensitivity,
+                       _input.GetMouseDeltaY() * AppDefaults::MouseRotationSensitivity);
     }
     else
     {
@@ -486,7 +487,8 @@ void Application::RegenerateLodSystem()
     _oceanRenderer.Initialize(_lodConfig.planetRadius, _seaLevel, AppDefaults::OceanSubdivisions);
     _atmosphereRenderer.Initialize();
 
-    float farPlane = (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
+    float farPlane =
+        (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
     _camera.SetFarPlane(farPlane);
 
     std::cout << "[QuadTree] Enqueued " << _generationScheduler.GetPendingCount() << " patches for async generation"
