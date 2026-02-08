@@ -27,7 +27,9 @@ bool TerrainGenerator::Initialize(const std::string& shaderPath)
     return true;
 }
 
-bool TerrainGenerator::Initialize(const std::string& heightShaderPath, const std::string& shadingShaderPath, const std::string& erosionShaderPath)
+bool TerrainGenerator::Initialize(const std::string& heightShaderPath,
+                                  const std::string& shadingShaderPath,
+                                  const std::string& erosionShaderPath)
 {
     bool success = true;
 
@@ -153,7 +155,10 @@ void TerrainGenerator::SetHeightUniforms(uint32_t seed, size_t vertexCount, cons
     _computeShader.SetFloat("abyssalStrength", settings.abyssalStrength);
 }
 
-void TerrainGenerator::SetShadingUniforms(uint32_t seed, size_t vertexCount, const EarthShadingSettings& settings, float heightScale)
+void TerrainGenerator::SetShadingUniforms(uint32_t seed,
+                                          size_t vertexCount,
+                                          const EarthShadingSettings& settings,
+                                          float heightScale)
 {
     _shadingShader.Use();
     _shadingShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));

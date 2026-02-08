@@ -39,7 +39,9 @@ public:
     bool Initialize(const std::string& shaderPath);
 
     // Initialize height, shading, and erosion compute shaders
-    bool Initialize(const std::string& heightShaderPath, const std::string& shadingShaderPath, const std::string& erosionShaderPath);
+    bool Initialize(const std::string& heightShaderPath,
+                    const std::string& shadingShaderPath,
+                    const std::string& erosionShaderPath);
 
     // Generate heights using EarthTerrainSettings
     std::vector<float>

@@ -109,8 +109,13 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
     if (_terrainGen->IsShadingReady())
     {
         task.shadingBuffer.Allocate(task.vertexCount);
-        _terrainGen->DispatchShadingAsync(
-            task.vertexBuffer, task.shadingBuffer, task.heightBuffer, task.vertexCount, _seed, *_shadingSettings, _terrainSettings->heightScale);
+        _terrainGen->DispatchShadingAsync(task.vertexBuffer,
+                                          task.shadingBuffer,
+                                          task.heightBuffer,
+                                          task.vertexCount,
+                                          _seed,
+                                          *_shadingSettings,
+                                          _terrainSettings->heightScale);
     }
 
     // Single fence covers all dispatches
