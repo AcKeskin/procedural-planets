@@ -1,0 +1,39 @@
+name: Format
+
+on:
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format-18
+
+      - name: Run clang-format
+        run: |
+          find src -name '*.h' -o -name '*.cpp' | xargs clang-format-18 -i --style=file
+
+      - name: Check for changes
+        id: diff
+        run: |
+          git diff --exit-code || echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit formatting fixes
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "style: auto-format with clang-format"
+          git push
