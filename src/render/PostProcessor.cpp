@@ -2,7 +2,8 @@
 #include <GL/gl3w.h>
 #include <iostream>
 
-namespace planets::render {
+namespace planets::render
+{
 
 PostProcessor::PostProcessor()
     : _vao(0)

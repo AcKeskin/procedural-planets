@@ -12,23 +12,25 @@
 #include <memory>
 #include <cstdint>
 
-namespace planets::render {
+namespace planets::render
+{
 class Shader;
 }
 
-namespace planets::render::lod {
+namespace planets::render::lod
+{
 
 // Configuration for planet-wide quadtree LOD
 struct QuadTreeConfig
 {
-    float planetRadius      = 10.0f;
-    int   baseSubdivisions  = 2;       // Icosahedron subdivisions for root patches
-    int   meshResolution    = 32;      // Vertices per edge for all patches
-    int   maxDepth          = 8;       // Maximum tree depth
-    float splitThreshold    = 2.0f;    // Split when distance < threshold * arcLength * radius
-    float hysteresis        = 1.3f;    // Merge threshold multiplier to prevent flickering
-    int   maxActivePatches  = 400;     // Budget limit for active leaf patches
-    float skirtFraction     = 0.02f;   // Skirt depth as fraction of patch arc length
+    float planetRadius = 10.0f;
+    int baseSubdivisions = 2;    // Icosahedron subdivisions for root patches
+    int meshResolution = 32;     // Vertices per edge for all patches
+    int maxDepth = 8;            // Maximum tree depth
+    float splitThreshold = 2.0f; // Split when distance < threshold * arcLength * radius
+    float hysteresis = 1.3f;     // Merge threshold multiplier to prevent flickering
+    int maxActivePatches = 400;  // Budget limit for active leaf patches
+    float skirtFraction = 0.02f; // Skirt depth as fraction of patch arc length
 };
 
 // Adaptive planet LOD using quadtree hierarchy with async patch generation.
@@ -44,10 +46,7 @@ public:
     PlanetQuadTree& operator=(const PlanetQuadTree&) = delete;
 
     // Build tree structure and enqueue initial patches (non-blocking)
-    void Initialize(
-        const QuadTreeConfig& config,
-        GenerationScheduler& scheduler,
-        uint32_t seed);
+    void Initialize(const QuadTreeConfig& config, GenerationScheduler& scheduler, uint32_t seed);
 
     // Apply completed patches from scheduler into the tree
     void ApplyCompletedPatches();
@@ -69,8 +68,7 @@ private:
     bool IsPending(const QuadTreeNode* node) const;
 
     // Collect nodes to render, falling back to parent when children lack patches
-    void CollectRenderableNodes(const QuadTreeNode& node,
-                                std::vector<const QuadTreeNode*>& nodes) const;
+    void CollectRenderableNodes(const QuadTreeNode& node, std::vector<const QuadTreeNode*>& nodes) const;
 
     // Check if every leaf in subtree has a patch
     bool IsSubtreeReady(const QuadTreeNode& node) const;

@@ -2,7 +2,8 @@
 
 #include <cstdint>
 
-namespace planets::render {
+namespace planets::render
+{
 
 // Manages fullscreen rendering for post-process effects
 // Uses efficient fullscreen triangle technique (3 vertices, no buffers needed)

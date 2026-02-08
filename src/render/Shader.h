@@ -4,7 +4,8 @@
 #include <unordered_set>
 #include <glm/glm.hpp>
 
-namespace planets::render {
+namespace planets::render
+{
 
 class Shader
 {
@@ -32,7 +33,9 @@ private:
     std::string LoadFile(const std::string& path);
 
     // Process #include directives recursively with cycle detection
-    std::string PreprocessIncludes(const std::string& source, const std::string& sourcePath, std::unordered_set<std::string>& includedFiles);
+    std::string PreprocessIncludes(const std::string& source,
+                                   const std::string& sourcePath,
+                                   std::unordered_set<std::string>& includedFiles);
 
     unsigned int _program;
 };

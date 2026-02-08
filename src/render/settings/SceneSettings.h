@@ -2,7 +2,8 @@
 
 #include <glm/glm.hpp>
 
-namespace planets::render {
+namespace planets::render
+{
 
 // Sun lighting parameters for terrain shading
 struct LightingSettings

@@ -1,21 +1,26 @@
 #pragma once
 
-namespace planets::render {
+namespace planets::render
+{
 
 struct BiomeSettings;
 struct EarthColors;
 struct EarthShadingSettings;
 
-namespace effects {
+namespace effects
+{
 struct OceanSettings;
 }
 
 class SurfacePanel
 {
 public:
-    void Draw(BiomeSettings& biomes, EarthColors& colors,
+    void Draw(BiomeSettings& biomes,
+              EarthColors& colors,
               EarthShadingSettings& shading,
-              effects::OceanSettings& ocean, float& seaLevel, bool& visible);
+              effects::OceanSettings& ocean,
+              float& seaLevel,
+              bool& visible);
 
 private:
     void DrawBiomeContent(BiomeSettings& settings);

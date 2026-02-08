@@ -3,7 +3,8 @@
 #include <glm/glm.hpp>
 #include <cstdint>
 
-namespace planets::render {
+namespace planets::render
+{
 
 // Earth terrain settings (balanced defaults for Earth-like appearance)
 struct EarthTerrainSettings

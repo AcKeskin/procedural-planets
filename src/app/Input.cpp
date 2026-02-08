@@ -2,7 +2,8 @@
 #include <GLFW/glfw3.h>
 #include <cstring>
 
-namespace planets::app {
+namespace planets::app
+{
 
 Input::Input()
     : _window(nullptr)
@@ -58,7 +59,8 @@ bool Input::IsKeyDown(Key key) const
 bool Input::IsKeyPressed(Key key) const
 {
     int k = static_cast<int>(key);
-    if (k < 0 || k >= KeyStateSize) return false;
+    if (k < 0 || k >= KeyStateSize)
+        return false;
     return _keyState[k] && !_prevKeyState[k];
 }
 

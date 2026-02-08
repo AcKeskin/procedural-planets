@@ -8,7 +8,8 @@
 #include <chrono>
 #include <random>
 
-namespace planets::app {
+namespace planets::app
+{
 
 Application::Application()
     : _seaLevel(0.995f)
@@ -66,9 +67,8 @@ bool Application::Initialize()
     }
 
     // GPU terrain generator
-    _genConfig.useGpu = _terrainGenerator.Initialize(
-        "shaders/compute/height_earth.comp",
-        "shaders/compute/shading_earth.comp");
+    _genConfig.useGpu =
+        _terrainGenerator.Initialize("shaders/compute/height_earth.comp", "shaders/compute/shading_earth.comp");
     _terrainStats.gpuAvailable = _genConfig.useGpu;
 
     if (_genConfig.useGpu)
@@ -79,8 +79,7 @@ bool Application::Initialize()
     // Initialize async generation scheduler
     if (_genConfig.useGpu)
     {
-        _generationScheduler.Initialize(
-            _terrainGenerator, _terrainSettings, _shadingSettings, _genConfig.seed);
+        _generationScheduler.Initialize(_terrainGenerator, _terrainSettings, _shadingSettings, _genConfig.seed);
     }
 
     // CPU fallback planet
@@ -199,12 +198,18 @@ void Application::ProcessInput(float deltaTime)
     float speedMultiplier = _input.IsKeyDown(Key::LeftShift) ? 5.0f : 1.0f;
     float speed = _moveSpeed * deltaTime * speedMultiplier;
 
-    if (_input.IsKeyDown(Key::W)) _camera.MoveForward(speed);
-    if (_input.IsKeyDown(Key::S)) _camera.MoveForward(-speed);
-    if (_input.IsKeyDown(Key::A)) _camera.MoveRight(-speed);
-    if (_input.IsKeyDown(Key::D)) _camera.MoveRight(speed);
-    if (_input.IsKeyDown(Key::E)) _camera.MoveUp(speed);
-    if (_input.IsKeyDown(Key::Q)) _camera.MoveUp(-speed);
+    if (_input.IsKeyDown(Key::W))
+        _camera.MoveForward(speed);
+    if (_input.IsKeyDown(Key::S))
+        _camera.MoveForward(-speed);
+    if (_input.IsKeyDown(Key::A))
+        _camera.MoveRight(-speed);
+    if (_input.IsKeyDown(Key::D))
+        _camera.MoveRight(speed);
+    if (_input.IsKeyDown(Key::E))
+        _camera.MoveUp(speed);
+    if (_input.IsKeyDown(Key::Q))
+        _camera.MoveUp(-speed);
 }
 
 void Application::Render()
@@ -289,8 +294,8 @@ void Application::Render()
         _quadTree.ApplyCompletedPatches();
         _quadTree.Update(_camera.GetPosition(), viewProjection);
         _quadTree.Render(_planetShader);
-        _oceanRenderer.Render(view, projection, _camera.GetPosition(),
-                              _sceneSettings.lightDir, _lastTime, _oceanSettings);
+        _oceanRenderer.Render(
+            view, projection, _camera.GetPosition(), _sceneSettings.lightDir, _lastTime, _oceanSettings);
     }
     else
     {
@@ -307,14 +312,20 @@ void Application::Render()
 
     if (_atmosphereSettings.enabled)
     {
-        _atmosphereRenderer.Render(
-            view, projection, invView, invProjection,
-            _camera.GetPosition(), _sceneSettings.lightDir,
-            planetCenter, _lodConfig.planetRadius, oceanRadius,
-            _camera.GetNearPlane(), _camera.GetFarPlane(),
-            _atmosphereSettings,
-            _sceneFbo.GetColorTexture(),
-            _sceneFbo.GetDepthTexture());
+        _atmosphereRenderer.Render(view,
+                                   projection,
+                                   invView,
+                                   invProjection,
+                                   _camera.GetPosition(),
+                                   _sceneSettings.lightDir,
+                                   planetCenter,
+                                   _lodConfig.planetRadius,
+                                   oceanRadius,
+                                   _camera.GetNearPlane(),
+                                   _camera.GetFarPlane(),
+                                   _atmosphereSettings,
+                                   _sceneFbo.GetColorTexture(),
+                                   _sceneFbo.GetDepthTexture());
     }
     else
     {
@@ -343,15 +354,17 @@ void Application::RenderGui()
 
     bool randomize = false;
     bool needsRegen = _terrainPanel.Draw(
-        _genConfig, _terrainSettings, _lodConfig, _terrainStats,
-        _planet, visibility.terrain, randomize);
+        _genConfig, _terrainSettings, _lodConfig, _terrainStats, _planet, visibility.terrain, randomize);
 
     if (randomize)
     {
-        render::RandomizeEarthParameters(
-            _terrainSettings, _shadingSettings, _biomeSettings,
-            _sceneSettings, _atmosphereSettings, _oceanSettings,
-            _genConfig.seed);
+        render::RandomizeEarthParameters(_terrainSettings,
+                                         _shadingSettings,
+                                         _biomeSettings,
+                                         _sceneSettings,
+                                         _atmosphereSettings,
+                                         _oceanSettings,
+                                         _genConfig.seed);
         needsRegen = true;
     }
 
@@ -362,8 +375,7 @@ void Application::RenderGui()
         _genConfig.seed = _planet.GetSettings().seed;
     }
 
-    _surfacePanel.Draw(_biomeSettings, _earthColors, _shadingSettings,
-                       _oceanSettings, _seaLevel, visibility.surface);
+    _surfacePanel.Draw(_biomeSettings, _earthColors, _shadingSettings, _oceanSettings, _seaLevel, visibility.surface);
     _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
     _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
 
@@ -382,10 +394,13 @@ void Application::RenderGui()
 
 void Application::ShuffleTerrain()
 {
-    render::RandomizeEarthParameters(
-        _terrainSettings, _shadingSettings, _biomeSettings,
-        _sceneSettings, _atmosphereSettings, _oceanSettings,
-        _genConfig.seed);
+    render::RandomizeEarthParameters(_terrainSettings,
+                                     _shadingSettings,
+                                     _biomeSettings,
+                                     _sceneSettings,
+                                     _atmosphereSettings,
+                                     _oceanSettings,
+                                     _genConfig.seed);
 
     if (_lodConfig.enabled && _genConfig.useGpu)
         RegenerateLodSystem();
@@ -411,8 +426,8 @@ void Application::RegeneratePlanetCpu()
     auto end = std::chrono::high_resolution_clock::now();
     _terrainStats.cpuTimeMs = std::chrono::duration<float, std::milli>(end - start).count();
 
-    std::cout << "[Planet] CPU generated " << _planetMesh.GetVertexCount()
-              << " vertices in " << _terrainStats.cpuTimeMs << " ms" << std::endl;
+    std::cout << "[Planet] CPU generated " << _planetMesh.GetVertexCount() << " vertices in " << _terrainStats.cpuTimeMs
+              << " ms" << std::endl;
 }
 
 void Application::RegeneratePlanetGpu()
@@ -431,15 +446,13 @@ void Application::RegeneratePlanetGpu()
     render::MeshData meshData;
     if (_terrainGenerator.IsShadingReady())
     {
-        auto shadingData = _terrainGenerator.GenerateShadingData(
-            vertices, _genConfig.seed, _shadingSettings);
+        auto shadingData = _terrainGenerator.GenerateShadingData(vertices, _genConfig.seed, _shadingSettings);
         meshData = render::MeshGenerator::GeneratePlanetMesh(
             _genConfig.subdivisions, _lodConfig.planetRadius, heights, shadingData);
     }
     else
     {
-        meshData = render::MeshGenerator::GeneratePlanetMesh(
-            _genConfig.subdivisions, _lodConfig.planetRadius, heights);
+        meshData = render::MeshGenerator::GeneratePlanetMesh(_genConfig.subdivisions, _lodConfig.planetRadius, heights);
     }
 
     _planetMesh.Upload(meshData);
@@ -447,8 +460,8 @@ void Application::RegeneratePlanetGpu()
     auto end = std::chrono::high_resolution_clock::now();
     _terrainStats.gpuTimeMs = std::chrono::duration<float, std::milli>(end - start).count();
 
-    std::cout << "[Planet] GPU generated " << _planetMesh.GetVertexCount()
-              << " vertices in " << _terrainStats.gpuTimeMs << " ms" << std::endl;
+    std::cout << "[Planet] GPU generated " << _planetMesh.GetVertexCount() << " vertices in " << _terrainStats.gpuTimeMs
+              << " ms" << std::endl;
 }
 
 void Application::RegenerateLodSystem()
@@ -473,21 +486,21 @@ void Application::RegenerateLodSystem()
     float farPlane = (std::max)(1000.0f, _lodConfig.planetRadius * 20.0f);
     _camera.SetFarPlane(farPlane);
 
-    std::cout << "[QuadTree] Enqueued " << _generationScheduler.GetPendingCount()
-              << " patches for async generation" << std::endl;
+    std::cout << "[QuadTree] Enqueued " << _generationScheduler.GetPendingCount() << " patches for async generation"
+              << std::endl;
 }
 
 render::lod::QuadTreeConfig Application::BuildQuadTreeConfig() const
 {
     render::lod::QuadTreeConfig config;
-    config.planetRadius     = _lodConfig.planetRadius;
+    config.planetRadius = _lodConfig.planetRadius;
     config.baseSubdivisions = _lodConfig.patchSubdivisions;
-    config.meshResolution   = _lodConfig.meshResolution;
-    config.maxDepth         = _lodConfig.maxDepth;
-    config.splitThreshold   = _lodConfig.splitThreshold;
-    config.hysteresis       = _lodConfig.hysteresis;
+    config.meshResolution = _lodConfig.meshResolution;
+    config.maxDepth = _lodConfig.maxDepth;
+    config.splitThreshold = _lodConfig.splitThreshold;
+    config.hysteresis = _lodConfig.hysteresis;
     config.maxActivePatches = _lodConfig.maxActivePatches;
-    config.skirtFraction    = _lodConfig.skirtFraction;
+    config.skirtFraction = _lodConfig.skirtFraction;
     return config;
 }
 

@@ -2,7 +2,8 @@
 #include "ComputeShader.h"
 #include <glm/glm.hpp>
 
-namespace planets::render {
+namespace planets::render
+{
 
 Earth::Earth()
 {

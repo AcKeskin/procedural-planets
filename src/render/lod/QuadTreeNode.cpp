@@ -5,14 +5,11 @@
 #include <algorithm>
 #include <cmath>
 
-namespace planets::render::lod {
+namespace planets::render::lod
+{
 
 QuadTreeNode::QuadTreeNode(
-    const glm::vec3& v0,
-    const glm::vec3& v1,
-    const glm::vec3& v2,
-    int depth,
-    QuadTreeNode* parent)
+    const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2, int depth, QuadTreeNode* parent)
     : _v0(glm::normalize(v0))
     , _v1(glm::normalize(v1))
     , _v2(glm::normalize(v2))
@@ -104,10 +101,14 @@ const glm::vec3& QuadTreeNode::GetVertex(int index) const
 {
     switch (index)
     {
-        case 0: return _v0;
-        case 1: return _v1;
-        case 2: return _v2;
-        default: return _v0; // Fallback to v0 for out-of-range indices
+    case 0:
+        return _v0;
+    case 1:
+        return _v1;
+    case 2:
+        return _v2;
+    default:
+        return _v0; // Fallback to v0 for out-of-range indices
     }
 }
 

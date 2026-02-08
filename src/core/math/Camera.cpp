@@ -2,7 +2,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
 
-namespace planets::core {
+namespace planets::core
+{
 
 Camera::Camera()
     : _mode(CameraMode::FreeFly)

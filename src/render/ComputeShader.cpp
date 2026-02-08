@@ -7,7 +7,8 @@
 #include <filesystem>
 #include <regex>
 
-namespace planets::render {
+namespace planets::render
+{
 
 ComputeShader::ComputeShader()
     : _program(0)
@@ -153,7 +154,9 @@ std::string ComputeShader::LoadFile(const std::string& path)
     return buffer.str();
 }
 
-std::string ComputeShader::PreprocessIncludes(const std::string& source, const std::string& sourcePath, std::unordered_set<std::string>& includedFiles)
+std::string ComputeShader::PreprocessIncludes(const std::string& source,
+                                              const std::string& sourcePath,
+                                              std::unordered_set<std::string>& includedFiles)
 {
     // Regex pattern to match #include "filename"
     static const std::regex includePattern(R"regex(^\s*#include\s+"([^"]+)"\s*$)regex");
@@ -186,16 +189,16 @@ std::string ComputeShader::PreprocessIncludes(const std::string& source, const s
             }
             catch (const std::filesystem::filesystem_error& e)
             {
-                std::cerr << "[ComputeShader] Include resolution error in " << sourcePath << ":" << lineNumber
-                          << " - " << e.what() << std::endl;
+                std::cerr << "[ComputeShader] Include resolution error in " << sourcePath << ":" << lineNumber << " - "
+                          << e.what() << std::endl;
                 return "";
             }
 
             // Check for circular dependency
             if (includedFiles.find(canonicalIncludePath) != includedFiles.end())
             {
-                std::cerr << "[ComputeShader] Circular include detected: " << canonicalIncludePath
-                          << " in " << sourcePath << ":" << lineNumber << std::endl;
+                std::cerr << "[ComputeShader] Circular include detected: " << canonicalIncludePath << " in "
+                          << sourcePath << ":" << lineNumber << std::endl;
                 return "";
             }
 
@@ -203,8 +206,8 @@ std::string ComputeShader::PreprocessIncludes(const std::string& source, const s
             std::string includedSource = LoadFile(canonicalIncludePath);
             if (includedSource.empty())
             {
-                std::cerr << "[ComputeShader] Failed to load include: " << canonicalIncludePath
-                          << " referenced in " << sourcePath << ":" << lineNumber << std::endl;
+                std::cerr << "[ComputeShader] Failed to load include: " << canonicalIncludePath << " referenced in "
+                          << sourcePath << ":" << lineNumber << std::endl;
                 return "";
             }
 

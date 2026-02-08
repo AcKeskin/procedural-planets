@@ -3,42 +3,53 @@
 #include <iostream>
 #include <cmath>
 
-namespace planets::render::lod {
+namespace planets::render::lod
+{
 
 // Icosahedron vertices (golden ratio based)
 static const float PHI = (1.0f + std::sqrt(5.0f)) / 2.0f;
 
-static const glm::vec3 IcosahedronVertices[12] = {
-    glm::normalize(glm::vec3(-1,  PHI,  0)),
-    glm::normalize(glm::vec3( 1,  PHI,  0)),
-    glm::normalize(glm::vec3(-1, -PHI,  0)),
-    glm::normalize(glm::vec3( 1, -PHI,  0)),
-    glm::normalize(glm::vec3( 0, -1,  PHI)),
-    glm::normalize(glm::vec3( 0,  1,  PHI)),
-    glm::normalize(glm::vec3( 0, -1, -PHI)),
-    glm::normalize(glm::vec3( 0,  1, -PHI)),
-    glm::normalize(glm::vec3( PHI,  0, -1)),
-    glm::normalize(glm::vec3( PHI,  0,  1)),
-    glm::normalize(glm::vec3(-PHI,  0, -1)),
-    glm::normalize(glm::vec3(-PHI,  0,  1))
-};
+static const glm::vec3 IcosahedronVertices[12] = {glm::normalize(glm::vec3(-1, PHI, 0)),
+                                                  glm::normalize(glm::vec3(1, PHI, 0)),
+                                                  glm::normalize(glm::vec3(-1, -PHI, 0)),
+                                                  glm::normalize(glm::vec3(1, -PHI, 0)),
+                                                  glm::normalize(glm::vec3(0, -1, PHI)),
+                                                  glm::normalize(glm::vec3(0, 1, PHI)),
+                                                  glm::normalize(glm::vec3(0, -1, -PHI)),
+                                                  glm::normalize(glm::vec3(0, 1, -PHI)),
+                                                  glm::normalize(glm::vec3(PHI, 0, -1)),
+                                                  glm::normalize(glm::vec3(PHI, 0, 1)),
+                                                  glm::normalize(glm::vec3(-PHI, 0, -1)),
+                                                  glm::normalize(glm::vec3(-PHI, 0, 1))};
 
 // Icosahedron faces (20 triangles)
 static const int IcosahedronFaces[20][3] = {
     // 5 faces around point 0
-    {0, 11, 5}, {0, 5, 1}, {0, 1, 7}, {0, 7, 10}, {0, 10, 11},
+    {0, 11, 5},
+    {0, 5, 1},
+    {0, 1, 7},
+    {0, 7, 10},
+    {0, 10, 11},
     // 5 adjacent faces
-    {1, 5, 9}, {5, 11, 4}, {11, 10, 2}, {10, 7, 6}, {7, 1, 8},
+    {1, 5, 9},
+    {5, 11, 4},
+    {11, 10, 2},
+    {10, 7, 6},
+    {7, 1, 8},
     // 5 faces around point 3
-    {3, 9, 4}, {3, 4, 2}, {3, 2, 6}, {3, 6, 8}, {3, 8, 9},
+    {3, 9, 4},
+    {3, 4, 2},
+    {3, 2, 6},
+    {3, 6, 8},
+    {3, 8, 9},
     // 5 adjacent faces
-    {4, 9, 5}, {2, 4, 11}, {6, 2, 10}, {8, 6, 7}, {9, 8, 1}
-};
+    {4, 9, 5},
+    {2, 4, 11},
+    {6, 2, 10},
+    {8, 6, 7},
+    {9, 8, 1}};
 
-void PlanetQuadTree::Initialize(
-    const QuadTreeConfig& config,
-    GenerationScheduler& scheduler,
-    uint32_t seed)
+void PlanetQuadTree::Initialize(const QuadTreeConfig& config, GenerationScheduler& scheduler, uint32_t seed)
 {
     _config = config;
     _scheduler = &scheduler;
@@ -63,16 +74,15 @@ void PlanetQuadTree::Initialize(
 
 void PlanetQuadTree::BuildRootNodes(int subdivisions)
 {
-    struct Face { glm::vec3 v0, v1, v2; };
+    struct Face
+    {
+        glm::vec3 v0, v1, v2;
+    };
     std::vector<Face> faces;
 
     for (const auto& f : IcosahedronFaces)
     {
-        faces.push_back({
-            IcosahedronVertices[f[0]],
-            IcosahedronVertices[f[1]],
-            IcosahedronVertices[f[2]]
-        });
+        faces.push_back({IcosahedronVertices[f[0]], IcosahedronVertices[f[1]], IcosahedronVertices[f[2]]});
     }
 
     for (int s = 0; s < subdivisions; ++s)
@@ -86,10 +96,10 @@ void PlanetQuadTree::BuildRootNodes(int subdivisions)
             glm::vec3 m12 = glm::normalize((face.v1 + face.v2) * 0.5f);
             glm::vec3 m20 = glm::normalize((face.v2 + face.v0) * 0.5f);
 
-            newFaces.push_back({ face.v0, m01, m20 });
-            newFaces.push_back({ m01, face.v1, m12 });
-            newFaces.push_back({ m20, m12, face.v2 });
-            newFaces.push_back({ m01, m12, m20 });
+            newFaces.push_back({face.v0, m01, m20});
+            newFaces.push_back({m01, face.v1, m12});
+            newFaces.push_back({m20, m12, face.v2});
+            newFaces.push_back({m01, m12, m20});
         }
 
         faces = std::move(newFaces);
@@ -98,8 +108,7 @@ void PlanetQuadTree::BuildRootNodes(int subdivisions)
     _roots.reserve(faces.size());
     for (const auto& face : faces)
     {
-        _roots.push_back(std::make_unique<QuadTreeNode>(
-            face.v0, face.v1, face.v2, 0, nullptr));
+        _roots.push_back(std::make_unique<QuadTreeNode>(face.v0, face.v1, face.v2, 0, nullptr));
     }
 }
 
@@ -157,9 +166,7 @@ void PlanetQuadTree::TraverseAndUpdate(QuadTreeNode& node, const glm::vec3& came
 
     if (node.IsLeaf())
     {
-        bool shouldSplit = distance < splitDistance &&
-                          node.CanSplit() &&
-                          _activeLeafCount < _config.maxActivePatches;
+        bool shouldSplit = distance < splitDistance && node.CanSplit() && _activeLeafCount < _config.maxActivePatches;
 
         if (shouldSplit && !IsPending(&node))
         {
@@ -236,13 +243,12 @@ void PlanetQuadTree::EnqueueGeneration(QuadTreeNode& node, GenerationType type)
         return;
 
     auto patch = _patchPool.Acquire();
-    patch->Initialize(
-        node.GetVertex(0),
-        node.GetVertex(1),
-        node.GetVertex(2),
-        _config.planetRadius,
-        _config.meshResolution,
-        _config.skirtFraction);
+    patch->Initialize(node.GetVertex(0),
+                      node.GetVertex(1),
+                      node.GetVertex(2),
+                      _config.planetRadius,
+                      _config.meshResolution,
+                      _config.skirtFraction);
 
     float distance = glm::length(_lastCameraPos - node.GetCenter() * _config.planetRadius);
 
@@ -286,9 +292,7 @@ void PlanetQuadTree::Render(const Shader& shader) const
     _visiblePatchCount = visibleCount;
 }
 
-void PlanetQuadTree::CollectRenderableNodes(
-    const QuadTreeNode& node,
-    std::vector<const QuadTreeNode*>& nodes) const
+void PlanetQuadTree::CollectRenderableNodes(const QuadTreeNode& node, std::vector<const QuadTreeNode*>& nodes) const
 {
     if (node.IsLeaf())
     {

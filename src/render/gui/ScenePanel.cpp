@@ -3,11 +3,13 @@
 #include <imgui.h>
 #include <cmath>
 
-namespace planets::render {
+namespace planets::render
+{
 
 void ScenePanel::Draw(SceneSettings& settings, bool& visible)
 {
-    if (!visible) return;
+    if (!visible)
+        return;
 
     ImGui::Begin("Scene", &visible);
 
@@ -47,7 +49,8 @@ void ScenePanel::DrawSpaceContent(SceneSettings& settings)
     ImGui::Text("Sun Appearance");
 
     ImGui::SliderFloat("Sun Size", &settings.sunSize, 0.01f, 0.1f, "%.3f rad");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Angular size in radians");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Angular size in radians");
 
     ImGui::ColorEdit3("Sun Color", &settings.sunColor.x);
 
@@ -63,10 +66,12 @@ void ScenePanel::DrawLightingContent(LightingSettings& settings)
     ImGui::Separator();
 
     ImGui::SliderFloat("Sun Intensity", &settings.sunIntensity, 0.6f, 1.8f, "%.2f");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Overall brightness of sunlight on terrain");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Overall brightness of sunlight on terrain");
 
     ImGui::SliderFloat("Ambient Light", &settings.ambientLight, 0.05f, 0.25f, "%.3f");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Base illumination in shadows");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Base illumination in shadows");
 
     ImGui::Separator();
     ImGui::Text("Specular");

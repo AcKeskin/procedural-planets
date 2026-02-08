@@ -2,11 +2,13 @@
 
 #include <cstdint>
 
-namespace planets::core {
+namespace planets::core
+{
 class Planet;
 }
 
-namespace planets::render {
+namespace planets::render
+{
 
 struct EarthTerrainSettings;
 struct GenerationConfig;
@@ -17,13 +19,20 @@ class TerrainPanel
 {
 public:
     // Returns true if planet needs regeneration
-    bool Draw(GenerationConfig& config, EarthTerrainSettings& terrain,
-              LodConfig& lod, const TerrainStats& stats,
-              planets::core::Planet& planet, bool& visible, bool& randomizeRequested);
+    bool Draw(GenerationConfig& config,
+              EarthTerrainSettings& terrain,
+              LodConfig& lod,
+              const TerrainStats& stats,
+              planets::core::Planet& planet,
+              bool& visible,
+              bool& randomizeRequested);
 
 private:
     void DrawGpuContent(GenerationConfig& config, const TerrainStats& stats);
-    bool DrawEarthTerrainContent(EarthTerrainSettings& settings, uint32_t& seed, int& subdivisions, bool& randomizeRequested);
+    bool DrawEarthTerrainContent(EarthTerrainSettings& settings,
+                                 uint32_t& seed,
+                                 int& subdivisions,
+                                 bool& randomizeRequested);
     bool DrawPlanetContent(planets::core::Planet& planet);
     bool DrawLodContent(LodConfig& lod, const TerrainStats& stats);
 };
