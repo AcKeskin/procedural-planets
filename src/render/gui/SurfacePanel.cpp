@@ -184,7 +184,8 @@ bool SurfacePanel::DrawShadingContent(EarthShadingSettings& settings)
         if (ImGui::IsItemDeactivatedAfterEdit())
             needsRegeneration = true;
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Strength of latitude-based moisture pattern\n0 = uniform, 1 = Earth-like, 2 = exaggerated");
+            ImGui::SetTooltip(
+                "Strength of latitude-based moisture pattern\n0 = uniform, 1 = Earth-like, 2 = exaggerated");
     }
 
     return needsRegeneration;

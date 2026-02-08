@@ -67,8 +67,9 @@ bool Application::Initialize()
     }
 
     // GPU terrain generator
-    _genConfig.useGpu =
-        _terrainGenerator.Initialize("shaders/compute/height_earth.comp", "shaders/compute/shading_earth.comp", "shaders/compute/erosion_earth.comp");
+    _genConfig.useGpu = _terrainGenerator.Initialize("shaders/compute/height_earth.comp",
+                                                     "shaders/compute/shading_earth.comp",
+                                                     "shaders/compute/erosion_earth.comp");
     _terrainStats.gpuAvailable = _genConfig.useGpu;
 
     if (_genConfig.useGpu)
@@ -376,7 +377,8 @@ void Application::RenderGui()
         _genConfig.seed = _planet.GetSettings().seed;
     }
 
-    needsRegen |= _surfacePanel.Draw(_biomeSettings, _earthColors, _shadingSettings, _oceanSettings, _seaLevel, visibility.surface);
+    needsRegen |= _surfacePanel.Draw(
+        _biomeSettings, _earthColors, _shadingSettings, _oceanSettings, _seaLevel, visibility.surface);
     _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
     _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
 
