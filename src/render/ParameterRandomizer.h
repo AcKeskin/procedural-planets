@@ -167,9 +167,11 @@ inline void RandomizeEarthParameters(EarthTerrainSettings& terrain,
     // Climate model
     shading.useClimateModel = true;
     shading.temperatureLapseRate = randFloat(1.0f, 3.0f);
+    shading.temperatureExponent = randFloat(0.4f, 1.2f);
     shading.moistureNoiseScale = randFloat(0.8f, 2.5f);
     shading.moistureNoiseStrength = randFloat(0.05f, 0.25f);
     shading.hadleyIntensity = randFloat(0.5f, 1.5f);
+    shading.continentalityStrength = randFloat(0.1f, 0.5f);
 }
 
 } // namespace planets::render

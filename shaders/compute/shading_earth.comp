@@ -39,9 +39,11 @@ uniform float warpStrength;
 // Climate model parameters
 uniform int useClimateModel;
 uniform float temperatureLapseRate;
+uniform float temperatureExponent;
 uniform float moistureNoiseScale;
 uniform float moistureNoiseStrength;
 uniform float hadleyIntensity;
+uniform float continentalityStrength;
 
 // Height range for normalization
 uniform float heightScale;
@@ -91,14 +93,14 @@ float computeTemperature(vec3 dir, float normalizedHeight)
     float lat = geographicLatitude(dir);
 
     // Cosine-based temperature: warm equator, cold poles
-    // cos(lat) gives 1.0 at equator, 0.0 at poles — smoother than linear
-    float baseTemp = pow(cos(lat), 0.6);
+    // Exponent controls gradient sharpness (low = wide tropics, high = sharp falloff)
+    float baseTemp = pow(cos(lat), temperatureExponent);
 
-    // Add slight noise to break perfect symmetry
+    // Slight noise breaks perfect hemispheric symmetry
     float tempNoise = snoise(dir * 2.0, seed + 500u) * 0.08;
 
-    // Elevation cooling: normalized height in [0,1] scaled by lapse rate
-    float elevationCooling = max(normalizedHeight, 0.0) * temperatureLapseRate * 0.4;
+    // Elevation cooling: only significant at high elevations
+    float elevationCooling = smoothstep(0.1, 0.8, normalizedHeight) * temperatureLapseRate * 0.3;
 
     return clamp(baseTemp + tempNoise - elevationCooling, 0.0, 1.0);
 }
@@ -110,38 +112,27 @@ float computeMoisture(vec3 dir, float normalizedHeight, uint baseSeed)
     float lat = geographicLatitude(dir);
     float latDeg = lat * (180.0 / PI);
 
-    // Hadley cell pattern using real latitude degrees
-    // ITCZ (0-10): wet, Subtropical high (20-35): dry,
-    // Mid-latitude (40-60): moderate, Polar (70+): dry
-    float hadley;
-    if (latDeg < 10.0)
-        hadley = 0.85;
-    else if (latDeg < 20.0)
-        hadley = mix(0.85, 0.55, smoothstep(10.0, 20.0, latDeg));
-    else if (latDeg < 35.0)
-        hadley = mix(0.55, 0.2, smoothstep(20.0, 35.0, latDeg));
-    else if (latDeg < 45.0)
-        hadley = mix(0.2, 0.6, smoothstep(35.0, 45.0, latDeg));
-    else if (latDeg < 60.0)
-        hadley = mix(0.6, 0.5, smoothstep(45.0, 60.0, latDeg));
-    else if (latDeg < 75.0)
-        hadley = mix(0.5, 0.25, smoothstep(60.0, 75.0, latDeg));
-    else
-        hadley = mix(0.25, 0.1, smoothstep(75.0, 90.0, latDeg));
+    // Hadley cell as sum of Gaussians — continuous, no branching
+    // ITCZ convergence at equator, subtropical drying ~28deg,
+    // mid-latitude storm belt ~50deg, polar drying ~80deg
+    float itcz       =  0.85 * exp(-pow(latDeg / 8.0, 2.0));
+    float subtropical = -0.45 * exp(-pow((latDeg - 28.0) / 10.0, 2.0));
+    float midlat     =  0.35 * exp(-pow((latDeg - 50.0) / 12.0, 2.0));
+    float polar      = -0.30 * exp(-pow((latDeg - 80.0) / 8.0, 2.0));
 
+    float hadley = clamp(0.40 + itcz + subtropical + midlat + polar, 0.05, 0.95);
     hadley = mix(0.45, hadley, hadleyIntensity);
 
-    // Elevation drying: mountains are drier (rain shadow proxy)
-    float elevationDrying = smoothstep(0.2, 0.7, normalizedHeight) * 0.3;
-
-    // Coastal moisture: low-elevation land near sea level is wetter
-    float coastalWet = smoothstep(0.25, 0.0, normalizedHeight) * 0.2;
+    // Continentality: gradual moisture response to elevation
+    // smoothstep avoids the sharp exponential cliff at plate boundaries
+    float coastalProxy = (1.0 - smoothstep(0.0, 0.4, normalizedHeight)) * continentalityStrength;
+    float interiorDrying = smoothstep(0.3, 0.7, normalizedHeight) * continentalityStrength * 0.35;
 
     // Regional noise for variation (monsoons, continental interiors)
     float moistNoise = multiOctaveNoise(dir, moistureNoiseScale, 3, baseSeed);
     float noiseContrib = (moistNoise * 2.0 - 1.0) * moistureNoiseStrength;
 
-    return clamp(hadley - elevationDrying + coastalWet + noiseContrib, 0.0, 1.0);
+    return clamp(hadley + coastalProxy - interiorDrying + noiseContrib, 0.0, 1.0);
 }
 
 void main()

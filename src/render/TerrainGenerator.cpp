@@ -159,9 +159,11 @@ void TerrainGenerator::SetShadingUniforms(uint32_t seed, size_t vertexCount, con
     // Climate model uniforms
     _shadingShader.SetInt("useClimateModel", settings.useClimateModel ? 1 : 0);
     _shadingShader.SetFloat("temperatureLapseRate", settings.temperatureLapseRate);
+    _shadingShader.SetFloat("temperatureExponent", settings.temperatureExponent);
     _shadingShader.SetFloat("moistureNoiseScale", settings.moistureNoiseScale);
     _shadingShader.SetFloat("moistureNoiseStrength", settings.moistureNoiseStrength);
     _shadingShader.SetFloat("hadleyIntensity", settings.hadleyIntensity);
+    _shadingShader.SetFloat("continentalityStrength", settings.continentalityStrength);
     _shadingShader.SetFloat("heightScale", heightScale);
 }
 
