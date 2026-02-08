@@ -68,7 +68,7 @@ bool Application::Initialize()
 
     // GPU terrain generator
     _genConfig.useGpu =
-        _terrainGenerator.Initialize("shaders/compute/height_earth.comp", "shaders/compute/shading_earth.comp");
+        _terrainGenerator.Initialize("shaders/compute/height_earth.comp", "shaders/compute/shading_earth.comp", "shaders/compute/erosion_earth.comp");
     _terrainStats.gpuAvailable = _genConfig.useGpu;
 
     if (_genConfig.useGpu)
@@ -254,6 +254,7 @@ void Application::Render()
     _planetShader.SetFloat("uSnowBlend", _biomeSettings.snowBlend);
     _planetShader.SetFloat("uSnowLine", _biomeSettings.snowLine);
     _planetShader.SetFloat("uShoreHeight", _biomeSettings.shoreHeight);
+    _planetShader.SetInt("uUseClimateModel", _shadingSettings.useClimateModel ? 1 : 0);
 
     // Earth colors
     _planetShader.SetVec3("uShoreLow", _earthColors.shoreLow);
@@ -375,7 +376,7 @@ void Application::RenderGui()
         _genConfig.seed = _planet.GetSettings().seed;
     }
 
-    _surfacePanel.Draw(_biomeSettings, _earthColors, _shadingSettings, _oceanSettings, _seaLevel, visibility.surface);
+    needsRegen |= _surfacePanel.Draw(_biomeSettings, _earthColors, _shadingSettings, _oceanSettings, _seaLevel, visibility.surface);
     _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
     _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
 
