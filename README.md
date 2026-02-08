@@ -11,11 +11,14 @@ Inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-S
 ## Features
 
 - **GPU Compute Terrain** — Height and shading generated in two compute shader passes, entirely on the GPU
+- **Async Generation** — Non-blocking terrain generation with a priority scheduler and GPU fence synchronization
 - **Icosahedron LOD** — Subdivided into patches with 4 detail levels, switching based on camera distance
-- **Atmospheric Scattering** — Rayleigh scattering with angle-dependent glow
-- **Ocean Rendering** — Separate pass with configurable sea level
+- **Atmospheric Scattering** — Rayleigh scattering with wavelength-dependent coloring and angle-based glow
+- **Ocean Rendering** — Depth-based shallow-to-deep color blending, animated procedural wave normals, and specular highlights
+- **Fresnel Rim** — Distance-adaptive rim lighting that scales with camera distance for a sense of planetary scale
 - **Biome System** — Classification by temperature, moisture, and height with triplanar texturing
 - **Multi-Layer Noise** — Simplex and fractal noise with octaves, lacunarity, persistence, and ridge noise
+- **Parameter Randomizer** — One-click randomization of all planet parameters within Earth-like constraints
 - **Camera Modes** — FreeFly and Orbit cameras
 - **Live Tweaking** — ImGui debug panels for all parameters
 
@@ -49,6 +52,21 @@ Everything is handled through CMake FetchContent, so you don't need to install a
 | [gl3w](https://github.com/skaslev/gl3w) | latest | OpenGL loader |
 | [stb](https://github.com/nothings/stb) | latest | Image loading |
 
+## Controls
+
+| Input | Action |
+|-------|--------|
+| `W A S D` | Move camera |
+| `E / Q` | Move up / down |
+| `Right Mouse` + drag | Look around |
+| `Shift` | Speed boost (5x) |
+| `G` | Toggle orbit / free-fly camera |
+| `H` | Toggle atmosphere |
+| `R` | Randomize planet |
+| `Esc` | Quit |
+
+All terrain, atmosphere, ocean, and scene parameters are exposed in ImGui panels on the left side of the viewport.
+
 ## Project Structure
 
 ```
@@ -60,8 +78,10 @@ src/
 ├── render/             GPU rendering pipeline
 │   ├── lod/            Icosahedron patch LOD system
 │   ├── effects/        Atmosphere and ocean renderers
-│   ├── settings/       Typed configuration (terrain, ocean, surface, scene)
-│   └── gui/            ImGui debug panels
+│   ├── settings/       Typed configuration (terrain, ocean, surface, scene, atmosphere)
+│   ├── gui/            ImGui debug panels
+│   ├── GenerationScheduler   Async compute dispatch with GPU fence sync
+│   └── ParameterRandomizer   Constrained Earth-like parameter generation
 └── app/                Application entry, input handling
 
 shaders/
@@ -76,12 +96,13 @@ shaders/
 ## How It Works
 
 1. **Patch Generation** — An icosahedron is subdivided into spherical patches projected onto a unit sphere
-2. **Height Pass** — A compute shader generates terrain elevation from layered noise (continents, mountains, ocean masks)
-3. **Shading Pass** — Another compute shader classifies biomes and surface detail from height, temperature, and moisture
-4. **LOD Selection** — Each frame, patches pick their detail level based on distance and get culled if outside the view
-5. **Surface Rendering** — The displaced mesh is rendered with triplanar texturing and biome-driven coloring
-6. **Effects** — Atmospheric scattering and ocean are composited as separate passes on top
+2. **Async Scheduling** — Patches are queued into a priority scheduler that dispatches compute work across frames with GPU fence synchronization, keeping the UI responsive
+3. **Height Pass** — A compute shader generates terrain elevation from layered noise (continents, mountains, ocean masks)
+4. **Shading Pass** — Another compute shader classifies biomes and surface detail from height, temperature, and moisture
+5. **LOD Selection** — Each frame, patches pick their detail level based on distance and get culled if outside the view
+6. **Surface Rendering** — The displaced mesh is rendered with triplanar texturing, biome-driven coloring, and distance-adaptive fresnel rim
+7. **Effects** — Atmospheric scattering and ocean with depth coloring and wave animation are composited as post-processing passes
 
 ## License
 
-TBD
+[MIT](LICENSE)
