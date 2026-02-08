@@ -1,0 +1,58 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+IndentCaseLabels: false
+NamespaceIndentation: None
+AccessModifierOffset: -4
+
+# Braces — Allman (next line everywhere)
+BreakBeforeBraces: Allman
+
+# Line width
+ColumnLimit: 120
+
+# Includes
+SortIncludes: Never
+IncludeBlocks: Preserve
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignOperands: Align
+AlignTrailingComments: true
+
+# Short forms
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: Inline
+
+# Constructor initializers — each on own line, colon/comma leading
+BreakConstructorInitializers: BeforeComma
+PackConstructorInitializers: Never
+
+# Arguments / parameters
+BinPackArguments: false
+BinPackParameters: false
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+
+# Pointers and references
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# Spacing
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyBlock: false
+SpacesInAngles: Never
+
+# Misc
+FixNamespaceComments: true
+CompactNamespaces: false
+ReflowComments: true
+...

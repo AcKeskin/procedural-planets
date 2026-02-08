@@ -6,6 +6,8 @@
 #include "Shader.h"
 #include "Mesh.h"
 #include "TerrainGenerator.h"
+#include "GenerationScheduler.h"
+#include "ParameterRandomizer.h"
 #include "Framebuffer.h"
 #include "PostProcessor.h"
 #include "lod/PlanetQuadTree.h"
@@ -51,6 +53,9 @@ private:
     void RegenerateLodSystem();
     void ShuffleTerrain();
 
+    // Build QuadTreeConfig from current LodConfig
+    render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
+
     // Core systems
     render::Window _window;
     Input _input;
@@ -66,6 +71,7 @@ private:
     render::PostProcessor _postProcessor;
     render::Mesh _planetMesh;
     render::TerrainGenerator _terrainGenerator;
+    render::GenerationScheduler _generationScheduler;
     render::lod::PlanetQuadTree _quadTree;
     render::effects::OceanRenderer _oceanRenderer;
     render::effects::AtmosphereRenderer _atmosphereRenderer;

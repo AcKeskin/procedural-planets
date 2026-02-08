@@ -50,9 +50,7 @@ struct EarthTerrainSettings
 // Shading noise settings for Earth-like surface detail
 struct EarthShadingSettings
 {
-    float biomeNoiseScale = 0.5f;
     float detailNoiseScale = 2.0f;
-    float fineNoiseScale = 8.0f;
     float warpStrength = 0.3f;
 
     float largeNoiseScale = 0.3f;

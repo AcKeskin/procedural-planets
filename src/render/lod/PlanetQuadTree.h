@@ -3,11 +3,12 @@
 #include "QuadTreeNode.h"
 #include "SpherePatch.h"
 #include "PatchPool.h"
-#include "../TerrainGenerator.h"
+#include "../GenerationScheduler.h"
 #include "../settings/TerrainSettings.h"
 #include "../settings/SurfaceSettings.h"
 #include <glm/glm.hpp>
 #include <vector>
+#include <unordered_set>
 #include <memory>
 #include <cstdint>
 
@@ -30,8 +31,9 @@ struct QuadTreeConfig
     float skirtFraction     = 0.02f;   // Skirt depth as fraction of patch arc length
 };
 
-// Top-level manager for adaptive planet LOD using quadtree hierarchy
-// Owns root nodes from subdivided icosahedron and handles split/merge traversal
+// Adaptive planet LOD using quadtree hierarchy with async patch generation.
+// Enqueues generation requests to a scheduler instead of generating synchronously.
+// Old patches stay visible until replacements are ready.
 class PlanetQuadTree
 {
 public:
@@ -41,49 +43,49 @@ public:
     PlanetQuadTree(const PlanetQuadTree&) = delete;
     PlanetQuadTree& operator=(const PlanetQuadTree&) = delete;
 
-    // Initialize tree from icosahedron and generate initial patches
+    // Build tree structure and enqueue initial patches (non-blocking)
     void Initialize(
         const QuadTreeConfig& config,
-        TerrainGenerator& terrainGen,
-        const EarthTerrainSettings& terrainSettings,
-        const EarthShadingSettings& shadingSettings,
+        GenerationScheduler& scheduler,
         uint32_t seed);
 
-    // Per-frame update: traverse tree and apply split/merge decisions
+    // Apply completed patches from scheduler into the tree
+    void ApplyCompletedPatches();
+
+    // Per-frame update: traverse tree and enqueue split/merge requests
     void Update(const glm::vec3& cameraPos, const glm::mat4& viewProjection);
 
-    // Render all visible leaf patches
+    // Render visible patches, falling back to parent LOD when children aren't ready
     void Render(const Shader& shader) const;
 
-    // Statistics for debug panel
     int GetActiveLeafCount() const { return _activeLeafCount; }
     int GetTotalNodeCount() const { return _totalNodeCount; }
     int GetVisiblePatchCount() const { return _visiblePatchCount; }
 
 private:
-    // Build root nodes from subdivided icosahedron
     void BuildRootNodes(int subdivisions);
-
-    // Recursive traversal for split/merge decisions
     void TraverseAndUpdate(QuadTreeNode& node, const glm::vec3& cameraPos);
+    void EnqueueGeneration(QuadTreeNode& node, GenerationType type);
+    bool IsPending(const QuadTreeNode* node) const;
 
-    // Generate patch data for a node
-    void GeneratePatchForNode(QuadTreeNode& node);
+    // Collect nodes to render, falling back to parent when children lack patches
+    void CollectRenderableNodes(const QuadTreeNode& node,
+                                std::vector<const QuadTreeNode*>& nodes) const;
 
-    // Collect all leaf nodes for rendering
-    void CollectLeaves(QuadTreeNode& node, std::vector<QuadTreeNode*>& leaves) const;
+    // Check if every leaf in subtree has a patch
+    bool IsSubtreeReady(const QuadTreeNode& node) const;
 
     std::vector<std::unique_ptr<QuadTreeNode>> _roots;
     QuadTreeConfig _config;
     PatchPool _patchPool;
 
-    // Non-owning references set during Initialize
-    TerrainGenerator* _terrainGen = nullptr;
-    const EarthTerrainSettings* _terrainSettings = nullptr;
-    const EarthShadingSettings* _shadingSettings = nullptr;
+    GenerationScheduler* _scheduler = nullptr;
     uint32_t _seed = 0;
 
-    // Per-frame state
+    // Nodes with pending generation (to avoid duplicate requests)
+    std::unordered_set<const QuadTreeNode*> _pendingNodes;
+
+    glm::vec3 _lastCameraPos = glm::vec3(0.0f);
     int _activeLeafCount = 0;
     int _totalNodeCount = 0;
     mutable int _visiblePatchCount = 0;

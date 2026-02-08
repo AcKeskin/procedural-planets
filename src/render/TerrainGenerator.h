@@ -64,18 +64,34 @@ public:
         uint32_t seed,
         const EarthShadingSettings& settings);
 
-    // Check if compute shader is available
-    bool IsReady() const { return _computeShader.IsValid(); }
+    // Dispatch height compute to caller-owned buffers (no barrier, no readback)
+    void DispatchHeightsAsync(
+        GpuBuffer<float>& vertexBuffer,
+        GpuBuffer<float>& heightBuffer,
+        size_t vertexCount,
+        uint32_t seed,
+        const EarthTerrainSettings& settings);
 
-    // Check if shading shader is available
+    // Dispatch shading compute to caller-owned buffers (no barrier, no readback)
+    void DispatchShadingAsync(
+        GpuBuffer<float>& vertexBuffer,
+        GpuBuffer<glm::vec4>& shadingBuffer,
+        size_t vertexCount,
+        uint32_t seed,
+        const EarthShadingSettings& settings);
+
+    bool IsReady() const { return _computeShader.IsValid(); }
     bool IsShadingReady() const { return _shadingShader.IsValid(); }
 
 private:
+    void SetHeightUniforms(uint32_t seed, size_t vertexCount, const EarthTerrainSettings& settings);
+    void SetShadingUniforms(uint32_t seed, size_t vertexCount, const EarthShadingSettings& settings);
+
     ComputeShader _computeShader;
     ComputeShader _shadingShader;
-    GpuBuffer<float> _vertexBuffer;  // Packed as x,y,z floats to avoid alignment issues
+    GpuBuffer<float> _vertexBuffer;
     GpuBuffer<float> _heightBuffer;
-    GpuBuffer<glm::vec4> _shadingBuffer;  // Output: vec4 per vertex (biome, detail, temp, moisture)
+    GpuBuffer<glm::vec4> _shadingBuffer;
 };
 
 } // namespace planets::render

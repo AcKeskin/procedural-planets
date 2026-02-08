@@ -13,6 +13,8 @@ add_library(render STATIC
     Mesh.cpp
     MeshGenerator.cpp
     TerrainGenerator.cpp
+    GlFence.cpp
+    GenerationScheduler.cpp
     CelestialBody.cpp
     Earth.cpp
     Framebuffer.cpp
