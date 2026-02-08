@@ -1,4 +1,5 @@
 #include "OceanRenderer.h"
+#include "../../core/math/Constants.h"
 #include <GL/gl3w.h>
 #include <glm/glm.hpp>
 #include <cmath>
@@ -10,7 +11,7 @@ namespace planets::render::effects
 {
 
 // Icosahedron base geometry
-static const float PHI = (1.0f + std::sqrt(5.0f)) / 2.0f;
+static const float PHI = planets::core::GoldenRatio;
 
 static const glm::vec3 IcosahedronVertices[12] = {glm::normalize(glm::vec3(-1, PHI, 0)),
                                                   glm::normalize(glm::vec3(1, PHI, 0)),
@@ -83,8 +84,8 @@ void OceanRenderer::GenerateOceanSphere(float radius, int subdivisions)
         Vertex vert;
         vert.position = mid;
         vert.normal = glm::normalize(mid);
-        vert.uv = glm::vec2(0.5f + std::atan2(mid.z, mid.x) / (2.0f * 3.14159265f),
-                            0.5f - std::asin(glm::clamp(mid.y / radius, -1.0f, 1.0f)) / 3.14159265f);
+        vert.uv = glm::vec2(0.5f + std::atan2(mid.z, mid.x) / planets::core::TwoPi,
+                            0.5f - std::asin(glm::clamp(mid.y / radius, -1.0f, 1.0f)) / planets::core::Pi);
         meshData.vertices.push_back(vert);
 
         edgeCache[key] = idx;
@@ -98,8 +99,8 @@ void OceanRenderer::GenerateOceanSphere(float radius, int subdivisions)
         Vertex vert;
         vert.position = pos;
         vert.normal = v;
-        vert.uv = glm::vec2(0.5f + std::atan2(pos.z, pos.x) / (2.0f * 3.14159265f),
-                            0.5f - std::asin(glm::clamp(v.y, -1.0f, 1.0f)) / 3.14159265f);
+        vert.uv = glm::vec2(0.5f + std::atan2(pos.z, pos.x) / planets::core::TwoPi,
+                            0.5f - std::asin(glm::clamp(v.y, -1.0f, 1.0f)) / planets::core::Pi);
         meshData.vertices.push_back(vert);
     }
 

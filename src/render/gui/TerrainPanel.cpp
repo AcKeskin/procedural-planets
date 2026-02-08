@@ -511,7 +511,7 @@ bool TerrainPanel::DrawLodContent(LodConfig& lod, const TerrainStats& stats)
         ImGui::Separator();
         ImGui::Text("Settings");
 
-        ImGui::SliderFloat("Planet Radius", &lod.planetRadius, 1.0f, 1000.0f);
+        ImGui::SliderFloat("Planet Radius", &lod.planetRadius, 1.0f, 5000.0f);
         if (ImGui::IsItemDeactivatedAfterEdit())
             needsRegeneration = true;
 

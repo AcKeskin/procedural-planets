@@ -1,8 +1,18 @@
 #include "TerrainGenerator.h"
+#include "GpuConstants.h"
 #include <iostream>
 
 namespace planets::render
 {
+
+namespace
+{
+    const glm::vec3 ContinentNoiseOffset(0.0f);
+    const glm::vec3 MountainNoiseOffset(1000.0f);
+    const glm::vec3 MaskNoiseOffset(2000.0f);
+    constexpr float DefaultMaskMultiplier = 1.0f;
+    constexpr float FallbackHeightScale = 0.04f;
+}
 
 TerrainGenerator::TerrainGenerator() = default;
 TerrainGenerator::~TerrainGenerator() = default;
@@ -45,7 +55,7 @@ bool TerrainGenerator::Initialize(const std::string& heightShaderPath, const std
 void TerrainGenerator::SetHeightUniforms(uint32_t seed, size_t vertexCount, const EarthTerrainSettings& settings)
 {
     ComputeNoiseParams continentParams;
-    continentParams.offset = glm::vec3(0.0f);
+    continentParams.offset = ContinentNoiseOffset;
     continentParams.numLayers = settings.continentOctaves;
     continentParams.scale = settings.continentScale;
     continentParams.persistence = settings.continentPersistence;
@@ -53,7 +63,7 @@ void TerrainGenerator::SetHeightUniforms(uint32_t seed, size_t vertexCount, cons
     continentParams.multiplier = settings.continentStrength;
 
     ComputeNoiseParams mountainParams;
-    mountainParams.offset = glm::vec3(1000.0f);
+    mountainParams.offset = MountainNoiseOffset;
     mountainParams.numLayers = settings.mountainOctaves;
     mountainParams.scale = settings.mountainScale;
     mountainParams.persistence = settings.mountainPersistence;
@@ -64,12 +74,12 @@ void TerrainGenerator::SetHeightUniforms(uint32_t seed, size_t vertexCount, cons
     mountainParams.smoothOffset = settings.mountainSmoothing;
 
     ComputeNoiseParams maskParams;
-    maskParams.offset = glm::vec3(2000.0f);
+    maskParams.offset = MaskNoiseOffset;
     maskParams.numLayers = settings.maskOctaves;
     maskParams.scale = settings.maskScale;
     maskParams.persistence = settings.maskPersistence;
     maskParams.lacunarity = settings.maskLacunarity;
-    maskParams.multiplier = 1.0f;
+    maskParams.multiplier = DefaultMaskMultiplier;
 
     _computeShader.Use();
     _computeShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
@@ -194,7 +204,7 @@ std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3
 
     SetHeightUniforms(seed, vertexCount, settings);
 
-    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + 511) / 512;
+    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + HeightWorkgroupSize - 1) / HeightWorkgroupSize;
     _computeShader.Dispatch(groupCount);
     ComputeShader::WaitForCompletion();
 
@@ -309,9 +319,9 @@ std::vector<glm::vec4> TerrainGenerator::GenerateShadingData(const std::vector<g
     // Height buffer not available in synchronous path, bind empty
     // Climate model will use zero heights as fallback
 
-    SetShadingUniforms(seed, vertexCount, settings, 0.04f);
+    SetShadingUniforms(seed, vertexCount, settings, FallbackHeightScale);
 
-    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + 255) / 256;
+    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + ShadingWorkgroupSize - 1) / ShadingWorkgroupSize;
     _shadingShader.Dispatch(groupCount);
     ComputeShader::WaitForCompletion();
 
@@ -331,7 +341,7 @@ void TerrainGenerator::DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
 
     SetHeightUniforms(seed, vertexCount, settings);
 
-    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + 511) / 512;
+    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + HeightWorkgroupSize - 1) / HeightWorkgroupSize;
     _computeShader.Dispatch(groupCount);
 }
 
@@ -349,7 +359,7 @@ void TerrainGenerator::DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
 
     SetShadingUniforms(seed, vertexCount, settings, heightScale);
 
-    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + 255) / 256;
+    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + ShadingWorkgroupSize - 1) / ShadingWorkgroupSize;
     _shadingShader.Dispatch(groupCount);
 }
 
@@ -373,7 +383,7 @@ void TerrainGenerator::DispatchErosionAsync(GpuBuffer<float>& heightBuffer,
     heightBuffer.Bind(1);
     SetErosionUniforms(vertexCount, gridResolution, settings);
 
-    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + 255) / 256;
+    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + ErosionWorkgroupSize - 1) / ErosionWorkgroupSize;
     _erosionShader.Dispatch(groupCount);
 }
 
