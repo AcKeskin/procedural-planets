@@ -36,6 +36,16 @@ inline void RandomizeEarthParameters(EarthTerrainSettings& terrain,
     // New generation seed
     seed = static_cast<uint32_t>(rng());
 
+    // --- Tectonic plates ---
+    terrain.useTectonics = true;
+    terrain.numPlates = randInt(8, 18);
+    terrain.continentalFraction = randFloat(0.3f, 0.6f);
+    terrain.boundaryWidth = randFloat(0.08f, 0.3f);
+    terrain.convergentMountainScale = randFloat(0.2f, 1.0f);
+    terrain.divergentRiftDepth = randFloat(0.1f, 0.5f);
+    terrain.coastlineNoise = randFloat(0.15f, 0.6f);
+    terrain.plateElevationNoise = randFloat(0.05f, 0.3f);
+
     // --- Terrain shape ---
     terrain.continentOctaves = randInt(4, 7);
     terrain.continentScale = randFloat(0.5f, 1.5f);
@@ -61,10 +71,43 @@ inline void RandomizeEarthParameters(EarthTerrainSettings& terrain,
     terrain.oceanFloorDepth = randFloat(0.8f, 2.0f);
     terrain.oceanFloorSmoothing = randFloat(0.3f, 1.2f);
 
+    // Ocean floor topology
+    terrain.useOceanFloor = true;
+    terrain.shelfWidth = randFloat(0.08f, 0.25f);
+    terrain.oceanRidgeOctaves = randInt(3, 5);
+    terrain.oceanRidgeScale = randFloat(0.5f, 1.5f);
+    terrain.oceanRidgeStrength = randFloat(0.1f, 0.5f);
+    terrain.oceanRidgePower = randFloat(1.5f, 2.5f);
+    terrain.oceanRidgeGain = randFloat(0.6f, 1.0f);
+    terrain.trenchOctaves = randInt(2, 4);
+    terrain.trenchScale = randFloat(0.8f, 2.5f);
+    terrain.trenchDepth = randFloat(0.15f, 0.6f);
+    terrain.abyssalOctaves = randInt(3, 5);
+    terrain.abyssalScale = randFloat(1.0f, 3.0f);
+    terrain.abyssalStrength = randFloat(0.03f, 0.15f);
+
     terrain.heightScale = randFloat(0.02f, 0.08f);
     terrain.globalFrequency = randFloat(0.6f, 2.0f);
-    terrain.perturbStrength = randFloat(0.001f, 0.005f);
+
+    // Height-dependent detail
+    terrain.detailLowThreshold = randFloat(-0.3f, 0.0f);
+    terrain.detailHighThreshold = randFloat(0.1f, 0.5f);
+    terrain.perturbStrengthLow = randFloat(0.0005f, 0.002f);
+    terrain.perturbStrengthHigh = randFloat(0.002f, 0.008f);
+    terrain.detailOctavesLow = randInt(1, 3);
+    terrain.detailOctavesHigh = randInt(3, 7);
+    terrain.detailPersistence = randFloat(0.3f, 0.6f);
+    terrain.detailLacunarity = randFloat(1.8f, 3.0f);
     terrain.perturbScale = randFloat(10.0f, 30.0f);
+
+    // Erosion (randomly enable ~40% of the time)
+    terrain.enableErosion = (randInt(0, 9) < 4);
+    terrain.erosionIterations = randInt(2, 8);
+    terrain.thermalErosionRate = randFloat(0.005f, 0.05f);
+    terrain.thermalThreshold = randFloat(0.005f, 0.03f);
+    terrain.hydraulicErosionRate = randFloat(0.003f, 0.02f);
+    terrain.depositionRate = randFloat(0.002f, 0.01f);
+    terrain.evaporationRate = randFloat(0.05f, 0.3f);
 
     // Correlation: mountains subordinate to continents
     terrain.mountainStrength = randFloat(0.4f, (std::min)(1.3f, terrain.continentStrength * 0.7f));
@@ -120,6 +163,13 @@ inline void RandomizeEarthParameters(EarthTerrainSettings& terrain,
     shading.warpStrength = randFloat(0.1f, 0.6f);
     shading.flatColBlend = randFloat(0.8f, 2.5f);
     shading.flatColBlendNoise = randFloat(0.1f, 0.5f);
+
+    // Climate model
+    shading.useClimateModel = true;
+    shading.temperatureLapseRate = randFloat(1.0f, 3.0f);
+    shading.moistureNoiseScale = randFloat(0.8f, 2.5f);
+    shading.moistureNoiseStrength = randFloat(0.05f, 0.25f);
+    shading.hadleyIntensity = randFloat(0.5f, 1.5f);
 }
 
 } // namespace planets::render

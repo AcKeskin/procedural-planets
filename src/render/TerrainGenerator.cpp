@@ -17,7 +17,7 @@ bool TerrainGenerator::Initialize(const std::string& shaderPath)
     return true;
 }
 
-bool TerrainGenerator::Initialize(const std::string& heightShaderPath, const std::string& shadingShaderPath)
+bool TerrainGenerator::Initialize(const std::string& heightShaderPath, const std::string& shadingShaderPath, const std::string& erosionShaderPath)
 {
     bool success = true;
 
@@ -30,6 +30,12 @@ bool TerrainGenerator::Initialize(const std::string& heightShaderPath, const std
     if (!_shadingShader.LoadFromFile(shadingShaderPath))
     {
         std::cerr << "[TerrainGenerator] Failed to load shading compute shader: " << shadingShaderPath << std::endl;
+        success = false;
+    }
+
+    if (!_erosionShader.LoadFromFile(erosionShaderPath))
+    {
+        std::cerr << "[TerrainGenerator] Failed to load erosion compute shader: " << erosionShaderPath << std::endl;
         success = false;
     }
 
@@ -100,12 +106,44 @@ void TerrainGenerator::SetHeightUniforms(uint32_t seed, size_t vertexCount, cons
     _computeShader.SetFloat("heightScale", settings.heightScale);
     _computeShader.SetFloat("continentBaseLevel", settings.continentBaseLevel);
 
-    _computeShader.SetFloat("perturbStrength", settings.perturbStrength);
+    // Tectonic plate uniforms
+    _computeShader.SetInt("useTectonics", settings.useTectonics ? 1 : 0);
+    _computeShader.SetInt("numPlates", settings.numPlates);
+    _computeShader.SetFloat("continentalFraction", settings.continentalFraction);
+    _computeShader.SetFloat("boundaryWidth", settings.boundaryWidth);
+    _computeShader.SetFloat("convergentMountainScale", settings.convergentMountainScale);
+    _computeShader.SetFloat("divergentRiftDepth", settings.divergentRiftDepth);
+    _computeShader.SetFloat("coastlineNoise", settings.coastlineNoise);
+    _computeShader.SetFloat("plateElevationNoise", settings.plateElevationNoise);
+
+    _computeShader.SetFloat("detailLowThreshold", settings.detailLowThreshold);
+    _computeShader.SetFloat("detailHighThreshold", settings.detailHighThreshold);
+    _computeShader.SetFloat("perturbStrengthLow", settings.perturbStrengthLow);
+    _computeShader.SetFloat("perturbStrengthHigh", settings.perturbStrengthHigh);
+    _computeShader.SetInt("detailOctavesLow", settings.detailOctavesLow);
+    _computeShader.SetInt("detailOctavesHigh", settings.detailOctavesHigh);
+    _computeShader.SetFloat("detailPersistence", settings.detailPersistence);
+    _computeShader.SetFloat("detailLacunarity", settings.detailLacunarity);
     _computeShader.SetFloat("perturbScale", settings.perturbScale);
     _computeShader.SetFloat("globalFrequency", settings.globalFrequency);
+
+    // Ocean floor topology uniforms
+    _computeShader.SetInt("useOceanFloor", settings.useOceanFloor ? 1 : 0);
+    _computeShader.SetFloat("shelfWidth", settings.shelfWidth);
+    _computeShader.SetInt("oceanRidgeOctaves", settings.oceanRidgeOctaves);
+    _computeShader.SetFloat("oceanRidgeScale", settings.oceanRidgeScale);
+    _computeShader.SetFloat("oceanRidgeStrength", settings.oceanRidgeStrength);
+    _computeShader.SetFloat("oceanRidgePower", settings.oceanRidgePower);
+    _computeShader.SetFloat("oceanRidgeGain", settings.oceanRidgeGain);
+    _computeShader.SetInt("trenchOctaves", settings.trenchOctaves);
+    _computeShader.SetFloat("trenchScale", settings.trenchScale);
+    _computeShader.SetFloat("trenchDepth", settings.trenchDepth);
+    _computeShader.SetInt("abyssalOctaves", settings.abyssalOctaves);
+    _computeShader.SetFloat("abyssalScale", settings.abyssalScale);
+    _computeShader.SetFloat("abyssalStrength", settings.abyssalStrength);
 }
 
-void TerrainGenerator::SetShadingUniforms(uint32_t seed, size_t vertexCount, const EarthShadingSettings& settings)
+void TerrainGenerator::SetShadingUniforms(uint32_t seed, size_t vertexCount, const EarthShadingSettings& settings, float heightScale)
 {
     _shadingShader.Use();
     _shadingShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
@@ -117,6 +155,14 @@ void TerrainGenerator::SetShadingUniforms(uint32_t seed, size_t vertexCount, con
     _shadingShader.SetFloat("smallNoiseScale", settings.smallNoiseScale);
     _shadingShader.SetInt("smallNoiseOctaves", settings.smallNoiseOctaves);
     _shadingShader.SetFloat("warpStrength", settings.warpStrength);
+
+    // Climate model uniforms
+    _shadingShader.SetInt("useClimateModel", settings.useClimateModel ? 1 : 0);
+    _shadingShader.SetFloat("temperatureLapseRate", settings.temperatureLapseRate);
+    _shadingShader.SetFloat("moistureNoiseScale", settings.moistureNoiseScale);
+    _shadingShader.SetFloat("moistureNoiseStrength", settings.moistureNoiseStrength);
+    _shadingShader.SetFloat("hadleyIntensity", settings.hadleyIntensity);
+    _shadingShader.SetFloat("heightScale", heightScale);
 }
 
 std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3>& vertices,
@@ -258,8 +304,10 @@ std::vector<glm::vec4> TerrainGenerator::GenerateShadingData(const std::vector<g
     _shadingBuffer.Allocate(vertexCount);
     _vertexBuffer.Bind(0);
     _shadingBuffer.Bind(1);
+    // Height buffer not available in synchronous path, bind empty
+    // Climate model will use zero heights as fallback
 
-    SetShadingUniforms(seed, vertexCount, settings);
+    SetShadingUniforms(seed, vertexCount, settings, 0.04f);
 
     unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + 255) / 256;
     _shadingShader.Dispatch(groupCount);
@@ -287,17 +335,44 @@ void TerrainGenerator::DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
 
 void TerrainGenerator::DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
                                             GpuBuffer<glm::vec4>& shadingBuffer,
+                                            GpuBuffer<float>& heightBuffer,
                                             size_t vertexCount,
                                             uint32_t seed,
-                                            const EarthShadingSettings& settings)
+                                            const EarthShadingSettings& settings,
+                                            float heightScale)
 {
     vertexBuffer.Bind(0);
     shadingBuffer.Bind(1);
+    heightBuffer.Bind(2);
 
-    SetShadingUniforms(seed, vertexCount, settings);
+    SetShadingUniforms(seed, vertexCount, settings, heightScale);
 
     unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + 255) / 256;
     _shadingShader.Dispatch(groupCount);
+}
+
+void TerrainGenerator::SetErosionUniforms(size_t vertexCount, int gridResolution, const EarthTerrainSettings& settings)
+{
+    _erosionShader.Use();
+    _erosionShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
+    _erosionShader.SetInt("gridResolution", gridResolution);
+    _erosionShader.SetFloat("thermalRate", settings.thermalErosionRate);
+    _erosionShader.SetFloat("thermalThreshold", settings.thermalThreshold);
+    _erosionShader.SetFloat("hydraulicRate", settings.hydraulicErosionRate);
+    _erosionShader.SetFloat("depositionRate", settings.depositionRate);
+    _erosionShader.SetFloat("evaporationRate", settings.evaporationRate);
+}
+
+void TerrainGenerator::DispatchErosionAsync(GpuBuffer<float>& heightBuffer,
+                                            size_t vertexCount,
+                                            int gridResolution,
+                                            const EarthTerrainSettings& settings)
+{
+    heightBuffer.Bind(1);
+    SetErosionUniforms(vertexCount, gridResolution, settings);
+
+    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + 255) / 256;
+    _erosionShader.Dispatch(groupCount);
 }
 
 } // namespace planets::render

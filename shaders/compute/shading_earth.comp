@@ -6,7 +6,8 @@ layout(local_size_x = 256) in;
 // ============================================================================
 // Earth Shading Compute Shader
 // Pre-computes per-vertex shading data for gradient-based terrain coloring
-// Outputs: x=large, y=detail, z=small, w=biomeBlend
+// Climate mode: x=temperature, y=moisture, z=detailNoise, w=smallNoise
+// Legacy mode:  x=largeNoise,  y=detailNoise, z=smallNoise, w=biomeBlend
 // ============================================================================
 
 layout(std430, binding = 0) readonly buffer Vertices
@@ -19,18 +20,35 @@ layout(std430, binding = 1) writeonly buffer ShadingData
     vec4 shadingOutput[];
 };
 
+layout(std430, binding = 2) readonly buffer Heights
+{
+    float heightData[];
+};
+
 uniform uint numVertices;
 uniform uint seed;
 
 // Noise parameters
-uniform float largeNoiseScale;    // ~0.3 (climate zones)
-uniform int largeNoiseOctaves;    // 3
-uniform float detailNoiseScale;   // ~2.0 (terrain texture)
-uniform float smallNoiseScale;    // ~15.0 (micro-detail)
-uniform int smallNoiseOctaves;    // 5
-uniform float warpStrength;       // ~0.1 (biome boundary irregularity)
+uniform float largeNoiseScale;
+uniform int largeNoiseOctaves;
+uniform float detailNoiseScale;
+uniform float smallNoiseScale;
+uniform int smallNoiseOctaves;
+uniform float warpStrength;
 
-// Multi-octave normalized noise (returns 0-1)
+// Climate model parameters
+uniform int useClimateModel;
+uniform float temperatureLapseRate;
+uniform float moistureNoiseScale;
+uniform float moistureNoiseStrength;
+uniform float hadleyIntensity;
+
+// Height range for normalization
+uniform float heightScale;
+
+const float PI = 3.14159265;
+
+// Multi-octave normalized noise (returns ~[-1,1] range, centered near 0)
 float multiOctaveNoise(vec3 pos, float scale, int octaves, uint baseSeed)
 {
     float sum = 0.0;
@@ -52,14 +70,78 @@ float multiOctaveNoise(vec3 pos, float scale, int octaves, uint baseSeed)
 // Warped noise for irregular boundaries
 float warpedNoise(vec3 pos, float scale, float warpAmount, uint baseSeed)
 {
-    // Sample warp offset
     float warpX = snoise(pos * scale * 0.5, baseSeed) * 2.0 - 1.0;
     float warpY = snoise(pos * scale * 0.5 + vec3(31.7, 47.3, 89.1), baseSeed) * 2.0 - 1.0;
     float warpZ = snoise(pos * scale * 0.5 + vec3(73.1, 23.9, 61.7), baseSeed) * 2.0 - 1.0;
 
-    // Apply warp and sample again
     vec3 warpedPos = pos + vec3(warpX, warpY, warpZ) * warpAmount;
     return snoise(warpedPos * scale, baseSeed + 100u);
+}
+
+// Geographic latitude in [0, PI/2] from unit sphere direction
+float geographicLatitude(vec3 dir)
+{
+    return asin(clamp(abs(dir.y), 0.0, 1.0));
+}
+
+// Temperature from latitude and elevation
+// Returns 0 (freezing) to 1 (tropical)
+float computeTemperature(vec3 dir, float normalizedHeight)
+{
+    float lat = geographicLatitude(dir);
+
+    // Cosine-based temperature: warm equator, cold poles
+    // cos(lat) gives 1.0 at equator, 0.0 at poles — smoother than linear
+    float baseTemp = pow(cos(lat), 0.6);
+
+    // Add slight noise to break perfect symmetry
+    float tempNoise = snoise(dir * 2.0, seed + 500u) * 0.08;
+
+    // Elevation cooling: normalized height in [0,1] scaled by lapse rate
+    float elevationCooling = max(normalizedHeight, 0.0) * temperatureLapseRate * 0.4;
+
+    return clamp(baseTemp + tempNoise - elevationCooling, 0.0, 1.0);
+}
+
+// Moisture from Hadley circulation, elevation, and noise
+// Returns 0 (arid) to 1 (wet)
+float computeMoisture(vec3 dir, float normalizedHeight, uint baseSeed)
+{
+    float lat = geographicLatitude(dir);
+    float latDeg = lat * (180.0 / PI);
+
+    // Hadley cell pattern using real latitude degrees
+    // ITCZ (0-10): wet, Subtropical high (20-35): dry,
+    // Mid-latitude (40-60): moderate, Polar (70+): dry
+    float hadley;
+    if (latDeg < 10.0)
+        hadley = 0.85;
+    else if (latDeg < 20.0)
+        hadley = mix(0.85, 0.55, smoothstep(10.0, 20.0, latDeg));
+    else if (latDeg < 35.0)
+        hadley = mix(0.55, 0.2, smoothstep(20.0, 35.0, latDeg));
+    else if (latDeg < 45.0)
+        hadley = mix(0.2, 0.6, smoothstep(35.0, 45.0, latDeg));
+    else if (latDeg < 60.0)
+        hadley = mix(0.6, 0.5, smoothstep(45.0, 60.0, latDeg));
+    else if (latDeg < 75.0)
+        hadley = mix(0.5, 0.25, smoothstep(60.0, 75.0, latDeg));
+    else
+        hadley = mix(0.25, 0.1, smoothstep(75.0, 90.0, latDeg));
+
+    hadley = mix(0.45, hadley, hadleyIntensity);
+
+    // Elevation drying: mountains are drier (rain shadow proxy)
+    float elevationDrying = smoothstep(0.2, 0.7, normalizedHeight) * 0.3;
+
+    // Coastal moisture: low-elevation land near sea level is wetter
+    float coastalWet = smoothstep(0.25, 0.0, normalizedHeight) * 0.2;
+
+    // Regional noise for variation (monsoons, continental interiors)
+    float moistNoise = multiOctaveNoise(dir, moistureNoiseScale, 3, baseSeed);
+    float noiseContrib = (moistNoise * 2.0 - 1.0) * moistureNoiseStrength;
+
+    return clamp(hadley - elevationDrying + coastalWet + noiseContrib, 0.0, 1.0);
 }
 
 void main()
@@ -71,27 +153,36 @@ void main()
     vec3 pos = vec3(vertexData[baseIdx], vertexData[baseIdx + 1u], vertexData[baseIdx + 2u]);
     vec3 dir = normalize(pos);
 
-    // Large-scale noise (continental climate zones)
-    // Used for broad biome distribution: tropical/temperate/polar gradients
-    float largeNoise = multiOctaveNoise(dir, largeNoiseScale, largeNoiseOctaves, seed);
-
-    // Detail noise with domain warping (natural biome boundaries)
-    // Warping creates irregular, organic-looking transitions
+    // Detail noise with domain warping
     float detailNoise = warpedNoise(dir, detailNoiseScale, warpStrength, seed + 1u);
 
-    // Small-scale noise (high-frequency surface detail)
-    // Used for color variation within terrain types (rock banding, grass patches)
+    // Small-scale noise
     float smallNoise = multiOctaveNoise(dir, smallNoiseScale, smallNoiseOctaves, seed + 2u);
 
-    // Biome blend noise (for A/B terrain variant mixing)
-    // Separate from large noise to allow independent control
-    vec3 blendWarp;
-    blendWarp.x = snoise(dir * largeNoiseScale * 0.7, seed + 200u) * 2.0 - 1.0;
-    blendWarp.y = snoise(dir * largeNoiseScale * 0.7 + vec3(99.0, 0.0, 0.0), seed + 200u) * 2.0 - 1.0;
-    blendWarp.z = snoise(dir * largeNoiseScale * 0.7 - vec3(99.0, 0.0, 0.0), seed + 200u) * 2.0 - 1.0;
-    float biomeBlendNoise = multiOctaveNoise(dir + blendWarp * 0.1, largeNoiseScale * 1.5, 3, seed + 3u);
+    if (useClimateModel != 0)
+    {
+        float rawHeight = heightData[id];
 
-    // Output packed shading data
-    // All values in [0, 1] range for easy shader use
-    shadingOutput[id] = vec4(largeNoise, detailNoise, smallNoise, biomeBlendNoise);
+        // Normalize height: 0 = sea level (1.0), 1 = max terrain
+        // Raw height is planet radius + displacement, sea level ~ 1.0
+        float normalizedHeight = clamp(rawHeight / max(heightScale, 0.001), 0.0, 1.0);
+
+        float temperature = computeTemperature(dir, normalizedHeight);
+        float moisture = computeMoisture(dir, normalizedHeight, seed + 50u);
+
+        shadingOutput[id] = vec4(temperature, moisture, detailNoise, smallNoise);
+    }
+    else
+    {
+        // Legacy mode
+        float largeNoise = multiOctaveNoise(dir, largeNoiseScale, largeNoiseOctaves, seed);
+
+        vec3 blendWarp;
+        blendWarp.x = snoise(dir * largeNoiseScale * 0.7, seed + 200u) * 2.0 - 1.0;
+        blendWarp.y = snoise(dir * largeNoiseScale * 0.7 + vec3(99.0, 0.0, 0.0), seed + 200u) * 2.0 - 1.0;
+        blendWarp.z = snoise(dir * largeNoiseScale * 0.7 - vec3(99.0, 0.0, 0.0), seed + 200u) * 2.0 - 1.0;
+        float biomeBlendNoise = multiOctaveNoise(dir + blendWarp * 0.1, largeNoiseScale * 1.5, 3, seed + 3u);
+
+        shadingOutput[id] = vec4(largeNoise, detailNoise, smallNoise, biomeBlendNoise);
+    }
 }

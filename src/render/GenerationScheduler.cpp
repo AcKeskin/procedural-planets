@@ -88,18 +88,32 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
     task.vertexBuffer.Upload(packedVertices);
     task.heightBuffer.Allocate(task.vertexCount);
 
-    // Dispatch height compute (no barrier)
+    // Dispatch height compute
     _terrainGen->DispatchHeightsAsync(task.vertexBuffer, task.heightBuffer, task.vertexCount, _seed, *_terrainSettings);
 
-    // Dispatch shading compute (no barrier)
+    // Erosion iterations (requires barrier between height and each iteration)
+    if (_terrainSettings->enableErosion && _terrainGen->IsErosionReady())
+    {
+        int gridRes = task.request.patch->GetResolution();
+        for (int i = 0; i < _terrainSettings->erosionIterations; ++i)
+        {
+            ComputeShader::WaitForCompletion();
+            _terrainGen->DispatchErosionAsync(task.heightBuffer, task.vertexCount, gridRes, *_terrainSettings);
+        }
+    }
+
+    // Barrier ensures height data (potentially eroded) is readable by shading
+    ComputeShader::WaitForCompletion();
+
+    // Dispatch shading compute (reads height buffer for climate model)
     if (_terrainGen->IsShadingReady())
     {
         task.shadingBuffer.Allocate(task.vertexCount);
         _terrainGen->DispatchShadingAsync(
-            task.vertexBuffer, task.shadingBuffer, task.vertexCount, _seed, *_shadingSettings);
+            task.vertexBuffer, task.shadingBuffer, task.heightBuffer, task.vertexCount, _seed, *_shadingSettings, _terrainSettings->heightScale);
     }
 
-    // Single fence covers both dispatches
+    // Single fence covers all dispatches
     task.fence.Place();
 }
 

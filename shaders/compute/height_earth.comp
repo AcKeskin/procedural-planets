@@ -7,6 +7,7 @@ layout(local_size_x = 512) in;
 
 const float F3 = 1.0 / 3.0;
 const float G3 = 1.0 / 6.0;
+const float PI = 3.14159265359;
 
 const vec3 grad3[12] = vec3[12](
     vec3(1, 1, 0), vec3(-1, 1, 0), vec3(1, -1, 0), vec3(-1, -1, 0),
@@ -181,6 +182,72 @@ float Blend(float startHeight, float blendDst, float height)
 }
 
 // ============================================================================
+// Tectonic Plate Functions
+// ============================================================================
+
+// Deterministic plate center on unit sphere from index and seed
+vec3 plateCenter(int plateIndex, uint seed)
+{
+    uint h1 = hash(uint(plateIndex) * 7u + 3u, seed + 100u);
+    uint h2 = hash(uint(plateIndex) * 13u + 7u, seed + 200u);
+
+    // Uniform sphere distribution via cosine-weighted latitude
+    float theta = 2.0 * PI * float(h1) / float(0xFFFFFFFFu);
+    float cosLat = 2.0 * float(h2) / float(0xFFFFFFFFu) - 1.0;
+    float sinLat = sqrt(max(0.0, 1.0 - cosLat * cosLat));
+
+    return vec3(sinLat * cos(theta), cosLat, sinLat * sin(theta));
+}
+
+// Is this plate continental (true) or oceanic (false)?
+bool isPlateContinental(int plateId, uint seed, float continentalFraction)
+{
+    uint h = hash(uint(plateId) * 31u + 17u, seed + 300u);
+    return float(h) / float(0xFFFFFFFFu) < continentalFraction;
+}
+
+// Classify boundary between two plates: >0 convergent, <0 divergent, ~0 transform
+float boundaryType(int plate1, int plate2, uint seed)
+{
+    uint minP = uint(min(plate1, plate2));
+    uint maxP = uint(max(plate1, plate2));
+    uint h = hash(minP * 53u + maxP * 97u, seed + 400u);
+    return float(h) / float(0xFFFFFFFFu) * 2.0 - 1.0;
+}
+
+// Spherical voronoi: find nearest and second-nearest plate
+// Returns: vec4(nearestDist, secondDist, nearestId, secondId)
+vec4 sphericalVoronoi(vec3 dir, int numPlates, uint seed)
+{
+    float nearDist = 1e10;
+    float secondDist = 1e10;
+    int nearId = 0;
+    int secondId = 0;
+
+    for (int i = 0; i < numPlates; i++)
+    {
+        vec3 center = plateCenter(i, seed);
+        // Great-circle distance approximated by acos(dot) — cheaper than full acos for comparison
+        float d = acos(clamp(dot(dir, center), -1.0, 1.0));
+
+        if (d < nearDist)
+        {
+            secondDist = nearDist;
+            secondId = nearId;
+            nearDist = d;
+            nearId = i;
+        }
+        else if (d < secondDist)
+        {
+            secondDist = d;
+            secondId = i;
+        }
+    }
+
+    return vec4(nearDist, secondDist, float(nearId), float(secondId));
+}
+
+// ============================================================================
 // Main Compute Shader
 // ============================================================================
 
@@ -198,7 +265,17 @@ layout(std430, binding = 1) writeonly buffer Heights
 uniform uint numVertices;
 uniform uint seed;
 
-// Continent noise parameters
+// Tectonic plate parameters
+uniform int useTectonics;
+uniform int numPlates;
+uniform float continentalFraction;
+uniform float boundaryWidth;
+uniform float convergentMountainScale;
+uniform float divergentRiftDepth;
+uniform float coastlineNoise;
+uniform float plateElevationNoise;
+
+// Continent noise parameters (interior plate detail when tectonics enabled)
 uniform vec3 continentOffset;
 uniform int continentLayers;
 uniform float continentScale;
@@ -233,12 +310,34 @@ uniform float mountainBlend;
 uniform float heightScale;
 uniform float continentBaseLevel;  // Vertical shift - negative = more ocean
 
-// Perturbation (micro-detail roughness)
-uniform float perturbStrength;
+// Height-dependent detail
+uniform float detailLowThreshold;
+uniform float detailHighThreshold;
+uniform float perturbStrengthLow;
+uniform float perturbStrengthHigh;
+uniform int detailOctavesLow;
+uniform int detailOctavesHigh;
+uniform float detailPersistence;
+uniform float detailLacunarity;
 uniform float perturbScale;
 
 // Global frequency multiplier (higher = more detail = planet feels larger)
 uniform float globalFrequency;
+
+// Ocean floor topology
+uniform int useOceanFloor;
+uniform float shelfWidth;
+uniform int oceanRidgeOctaves;
+uniform float oceanRidgeScale;
+uniform float oceanRidgeStrength;
+uniform float oceanRidgePower;
+uniform float oceanRidgeGain;
+uniform int trenchOctaves;
+uniform float trenchScale;
+uniform float trenchDepth;
+uniform int abyssalOctaves;
+uniform float abyssalScale;
+uniform float abyssalStrength;
 
 void main()
 {
@@ -256,21 +355,110 @@ void main()
     float mskScale = maskScale * globalFrequency;
     float ptbScale = perturbScale * globalFrequency;
 
-    // Continental shape (large-scale landmass definition)
-    // Center around zero for proper ocean/land distribution
-    float continentShape = fbm(dir, continentOffset, continentLayers, contScale,
-                               continentPersistence, continentLacunarity, continentMultiplier, seed);
+    float continentShape;
+    float mountainMask;
 
-    // Apply vertical shift (negative = more terrain below sea level = more ocean)
-    continentShape += continentBaseLevel;
-
-    // Ocean floor clamping with smooth transition (creates continental shelves)
-    continentShape = smoothMax(continentShape, -oceanFloorDepth, oceanFloorSmoothing);
-
-    // Amplify ocean depths (makes oceans deeper than landmass heights)
-    if (continentShape < 0.0)
+    if (useTectonics != 0)
     {
-        continentShape *= 1.0 + oceanDepthMultiplier;
+        // Tectonic plate-driven continent shapes
+        vec4 voronoi = sphericalVoronoi(dir, numPlates, seed + 500u);
+        float nearDist = voronoi.x;
+        float secondDist = voronoi.y;
+        int nearId = int(voronoi.z);
+        int secondId = int(voronoi.w);
+
+        // Boundary proximity: 0 at plate center, 1 at boundary edge
+        float boundaryDist = secondDist - nearDist;
+        float boundaryProximity = 1.0 - smoothstep(0.0, boundaryWidth, boundaryDist);
+
+        // Plate type determines base elevation
+        bool isContinental = isPlateContinental(nearId, seed, continentalFraction);
+        float baseElevation = isContinental ? 0.5 : -0.5;
+
+        // Interior plate noise (reuses continental FBM as detail)
+        float interiorNoise = fbm(dir, continentOffset, continentLayers, contScale,
+                                   continentPersistence, continentLacunarity,
+                                   plateElevationNoise, seed);
+
+        // Coastline perturbation at plate boundary
+        float coastPerturb = fbm(dir, vec3(3000.0), 4, contScale * 1.5,
+                                  0.5, 2.0, coastlineNoise, seed + 3u);
+
+        // Boundary classification between nearest plates
+        float bType = boundaryType(nearId, secondId, seed);
+
+        // Convergent boundary: mountain ridges
+        float convergentEffect = max(0.0, bType) * boundaryProximity * convergentMountainScale;
+
+        // Divergent boundary: rift valleys
+        float divergentEffect = max(0.0, -bType) * boundaryProximity * divergentRiftDepth;
+
+        // Final tectonic shape
+        continentShape = baseElevation + interiorNoise + coastPerturb * boundaryProximity
+                         + convergentEffect - divergentEffect;
+        continentShape += continentBaseLevel;
+
+        // Mountain mask driven by convergent plate boundaries
+        mountainMask = max(0.0, bType) * boundaryProximity;
+        // Also allow mountains on elevated terrain
+        mountainMask = max(mountainMask, Blend(0.0, mountainBlend, continentShape));
+    }
+    else
+    {
+        // Original FBM-based continental shape
+        continentShape = fbm(dir, continentOffset, continentLayers, contScale,
+                              continentPersistence, continentLacunarity, continentMultiplier, seed);
+        continentShape += continentBaseLevel;
+
+        // Original mask: elevation + noise
+        float maskNoise = fbm(dir, maskOffset, maskLayers, mskScale,
+                               maskPersistence, maskLacunarity, maskMultiplier, seed + 2u);
+        float elevationMask = Blend(0.0, mountainBlend, continentShape);
+        float noiseMask = Blend(0.0, mountainBlend * 0.5, maskNoise);
+        mountainMask = elevationMask * noiseMask;
+    }
+
+    // Ocean floor topology or simple clamping
+    if (useOceanFloor != 0 && continentShape < 0.0)
+    {
+        // Continental shelf: gradual slope near coastline
+        float shelfFactor = smoothstep(-shelfWidth, 0.0, continentShape);
+
+        // Abyssal plain base depth
+        float abyssalBase = -oceanFloorDepth;
+
+        // Mid-ocean ridges
+        float ridgeVal = ridgeNoise(dir, vec3(4000.0), oceanRidgeOctaves,
+                                     oceanRidgeScale * globalFrequency,
+                                     0.5, 2.0, oceanRidgeStrength,
+                                     oceanRidgePower, oceanRidgeGain, seed + 20u);
+
+        // Oceanic trenches (inverted ridge noise at different scale)
+        float trenchVal = ridgeNoise(dir, vec3(5000.0), trenchOctaves,
+                                      trenchScale * globalFrequency,
+                                      0.5, 2.5, trenchDepth,
+                                      2.5, 0.8, seed + 21u);
+
+        // Abyssal detail undulations
+        float abyssalDetail = fbm(dir, vec3(6000.0), abyssalOctaves,
+                                   abyssalScale * globalFrequency,
+                                   0.5, 2.0, abyssalStrength, seed + 22u);
+
+        // Deep ocean: ridges + trenches + subtle detail
+        float deepOcean = abyssalBase + ridgeVal - trenchVal + abyssalDetail;
+
+        // Blend between shelf (near coast) and deep ocean features
+        continentShape = mix(deepOcean, continentShape, shelfFactor);
+    }
+    else
+    {
+        // Original simple ocean floor clamping
+        continentShape = smoothMax(continentShape, -oceanFloorDepth, oceanFloorSmoothing);
+
+        if (continentShape < 0.0)
+        {
+            continentShape *= 1.0 + oceanDepthMultiplier;
+        }
     }
 
     // Mountain ridges (fine-scale detail on landmasses)
@@ -278,24 +466,25 @@ void main()
                                       mountainPersistence, mountainLacunarity, mountainMultiplier,
                                       mountainPower, mountainGain, mountainSmooth, seed + 1u);
 
-    // Mask noise determines where mountains appear
-    // Blends mountains onto elevated terrain (continents)
-    float maskNoise = fbm(dir, maskOffset, maskLayers, mskScale,
-                          maskPersistence, maskLacunarity, maskMultiplier, seed + 2u);
-
-    // Elevation-based mask: mountains only on land above certain height
-    // Also use the continental shape itself as a partial mask
-    float elevationMask = Blend(0.0, mountainBlend, continentShape);
-    float noiseMask = Blend(0.0, mountainBlend * 0.5, maskNoise);
-    float combinedMask = elevationMask * noiseMask;
-
     // Base terrain height
-    float terrainHeight = (continentShape + ridges * combinedMask) * heightScale;
+    float terrainHeight = (continentShape + ridges * mountainMask) * heightScale;
 
-    // Perturbation: high-frequency micro-detail for surface roughness
-    float perturbNoise = snoise(dir * ptbScale, seed + 10u) * 2.0 - 1.0;
-    perturbNoise += (snoise(dir * ptbScale * 2.0, seed + 11u) * 2.0 - 1.0) * 0.5;
-    float perturbation = perturbNoise * perturbStrength;
+    // Height-dependent perturbation: mountains get rougher, plains get smoother
+    float baseTerrainHeight = continentShape + ridges * mountainMask;
+    float heightFactor = smoothstep(detailLowThreshold, detailHighThreshold, baseTerrainHeight);
+    float effectiveStrength = mix(perturbStrengthLow, perturbStrengthHigh, heightFactor);
+    int effectiveOctaves = int(mix(float(detailOctavesLow), float(detailOctavesHigh), heightFactor) + 0.5);
+
+    float perturbNoise = 0.0;
+    float ptbAmplitude = 1.0;
+    float ptbFrequency = ptbScale;
+    for (int i = 0; i < effectiveOctaves; i++)
+    {
+        perturbNoise += (snoise(dir * ptbFrequency, seed + 10u + uint(i)) * 2.0 - 1.0) * ptbAmplitude;
+        ptbAmplitude *= detailPersistence;
+        ptbFrequency *= detailLacunarity;
+    }
+    float perturbation = perturbNoise * effectiveStrength;
 
     // Final height: base (1.0) + terrain displacement + perturbation
     float finalHeight = 1.0 + terrainHeight + perturbation;

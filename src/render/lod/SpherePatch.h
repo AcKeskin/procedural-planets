@@ -65,6 +65,7 @@ public:
     // Get vertices for height generation (unit sphere positions)
     const std::vector<glm::vec3>& GetUnitSphereVertices() const { return _vertices; }
     int GetVertexCount() const { return static_cast<int>(_vertices.size()); }
+    int GetResolution() const { return _resolution; }
 
 private:
     void GenerateGridVertices(int resolution, std::vector<glm::vec3>& vertices);

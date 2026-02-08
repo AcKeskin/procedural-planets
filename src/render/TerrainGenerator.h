@@ -38,8 +38,8 @@ public:
     // Initialize height compute shader
     bool Initialize(const std::string& shaderPath);
 
-    // Initialize both height and shading compute shaders
-    bool Initialize(const std::string& heightShaderPath, const std::string& shadingShaderPath);
+    // Initialize height, shading, and erosion compute shaders
+    bool Initialize(const std::string& heightShaderPath, const std::string& shadingShaderPath, const std::string& erosionShaderPath);
 
     // Generate heights using EarthTerrainSettings
     std::vector<float>
@@ -70,19 +70,30 @@ public:
     // Dispatch shading compute to caller-owned buffers (no barrier, no readback)
     void DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
                               GpuBuffer<glm::vec4>& shadingBuffer,
+                              GpuBuffer<float>& heightBuffer,
                               size_t vertexCount,
                               uint32_t seed,
-                              const EarthShadingSettings& settings);
+                              const EarthShadingSettings& settings,
+                              float heightScale);
+
+    // Dispatch one erosion iteration on the height buffer (no barrier, no readback)
+    void DispatchErosionAsync(GpuBuffer<float>& heightBuffer,
+                              size_t vertexCount,
+                              int gridResolution,
+                              const EarthTerrainSettings& settings);
 
     bool IsReady() const { return _computeShader.IsValid(); }
     bool IsShadingReady() const { return _shadingShader.IsValid(); }
+    bool IsErosionReady() const { return _erosionShader.IsValid(); }
 
 private:
     void SetHeightUniforms(uint32_t seed, size_t vertexCount, const EarthTerrainSettings& settings);
-    void SetShadingUniforms(uint32_t seed, size_t vertexCount, const EarthShadingSettings& settings);
+    void SetShadingUniforms(uint32_t seed, size_t vertexCount, const EarthShadingSettings& settings, float heightScale);
+    void SetErosionUniforms(size_t vertexCount, int gridResolution, const EarthTerrainSettings& settings);
 
     ComputeShader _computeShader;
     ComputeShader _shadingShader;
+    ComputeShader _erosionShader;
     GpuBuffer<float> _vertexBuffer;
     GpuBuffer<float> _heightBuffer;
     GpuBuffer<glm::vec4> _shadingBuffer;
