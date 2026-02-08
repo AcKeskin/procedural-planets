@@ -25,6 +25,7 @@ public:
         const glm::mat4& projection,
         const glm::vec3& cameraPos,
         const glm::vec3& lightDir,
+        float elapsedTime,
         const OceanSettings& settings);
 
     bool IsReady() const { return _initialized; }

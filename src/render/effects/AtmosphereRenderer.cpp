@@ -175,12 +175,12 @@ void AtmosphereRenderer::Render(
     _atmosphereShader.SetFloat("uNearPlane", nearPlane);
     _atmosphereShader.SetFloat("uFarPlane", farPlane);
 
-    // Rayleigh scattering coefficients
-    // Scattering is inversely proportional to wavelength^4
+    // Rayleigh scattering coefficients (inverse 4th power of wavelength)
+    // Divided by planet radius to make strength scale-independent
     float scatterX = std::pow(400.0f / settings.wavelengths.x, 4.0f);
     float scatterY = std::pow(400.0f / settings.wavelengths.y, 4.0f);
     float scatterZ = std::pow(400.0f / settings.wavelengths.z, 4.0f);
-    glm::vec3 scatterCoeffs = glm::vec3(scatterX, scatterY, scatterZ) * settings.scatteringStrength;
+    glm::vec3 scatterCoeffs = glm::vec3(scatterX, scatterY, scatterZ) * settings.scatteringStrength / planetRadius;
     _atmosphereShader.SetVec3("uScatteringCoefficients", scatterCoeffs);
 
     // Quality and density
@@ -188,6 +188,8 @@ void AtmosphereRenderer::Render(
     _atmosphereShader.SetInt("uNumOpticalDepthPoints", settings.numOpticalDepthPoints);
     _atmosphereShader.SetFloat("uDensityFalloff", settings.densityFalloff);
     _atmosphereShader.SetFloat("uIntensity", settings.intensity);
+    _atmosphereShader.SetFloat("uMieCoefficient", settings.mieCoefficient);
+    _atmosphereShader.SetFloat("uMieDensityFalloff", settings.mieDensityFalloff);
 
     // Dithering parameters
     _atmosphereShader.SetFloat("uDitherStrength", settings.ditherStrength);

@@ -17,22 +17,31 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
     {
         ImGui::Separator();
         ImGui::Text("Geometry");
-        ImGui::SliderFloat("Atmosphere Scale", &settings.atmosphereScale, 0.02f, 0.3f, "%.3f");
+        ImGui::SliderFloat("Atmosphere Scale", &settings.atmosphereScale, 0.05f, 0.50f, "%.3f");
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Height as fraction of planet radius");
 
         ImGui::Separator();
         ImGui::Text("Rayleigh Scattering");
 
-        ImGui::SliderFloat("Red Wavelength", &settings.wavelengths.x, 550.0f, 780.0f, "%.0f nm");
-        ImGui::SliderFloat("Green Wavelength", &settings.wavelengths.y, 450.0f, 600.0f, "%.0f nm");
-        ImGui::SliderFloat("Blue Wavelength", &settings.wavelengths.z, 380.0f, 500.0f, "%.0f nm");
+        ImGui::SliderFloat("Red Wavelength", &settings.wavelengths.x, 620.0f, 740.0f, "%.0f nm");
+        ImGui::SliderFloat("Green Wavelength", &settings.wavelengths.y, 480.0f, 560.0f, "%.0f nm");
+        ImGui::SliderFloat("Blue Wavelength", &settings.wavelengths.z, 400.0f, 480.0f, "%.0f nm");
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Shorter wavelengths scatter more (blue sky)");
 
-        ImGui::SliderFloat("Scattering Strength", &settings.scatteringStrength, 1.0f, 30.0f);
+        ImGui::SliderFloat("Scattering Strength", &settings.scatteringStrength, 5.0f, 40.0f);
+
+        ImGui::Separator();
+        ImGui::Text("Mie Scattering");
+        ImGui::SliderFloat("Mie Coefficient", &settings.mieCoefficient, 0.0f, 0.03f, "%.4f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Haze and sun glow amount");
+        ImGui::SliderFloat("Mie Anisotropy", &settings.mieAnisotropy, 0.0f, 0.99f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Higher = tighter sun glow");
+        ImGui::SliderFloat("Mie Density Falloff", &settings.mieDensityFalloff, 1.0f, 10.0f);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("How quickly Mie density decreases with altitude");
 
         ImGui::Separator();
         ImGui::Text("Density");
-        ImGui::SliderFloat("Density Falloff", &settings.densityFalloff, 1.0f, 20.0f);
+        ImGui::SliderFloat("Density Falloff", &settings.densityFalloff, 1.0f, 10.0f);
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("How quickly density decreases with altitude");
 
         ImGui::Separator();
@@ -42,7 +51,7 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("More samples = better quality, slower");
 
         ImGui::Separator();
-        ImGui::SliderFloat("Intensity", &settings.intensity, 0.1f, 50.0f);
+        ImGui::SliderFloat("Intensity", &settings.intensity, 0.5f, 3.0f);
 
         ImGui::Separator();
         ImGui::Text("Dithering");
@@ -55,10 +64,13 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
         if (ImGui::Button("Earth Preset"))
         {
             settings.wavelengths = glm::vec3(700.0f, 530.0f, 460.0f);
-            settings.scatteringStrength = 3.0f;
-            settings.densityFalloff = 10.0f;
-            settings.atmosphereScale = 0.2f;
-            settings.intensity = 2.0f;
+            settings.scatteringStrength = 20.0f;
+            settings.densityFalloff = 4.5f;
+            settings.atmosphereScale = 0.25f;
+            settings.mieCoefficient = 0.005f;
+            settings.mieAnisotropy = 0.76f;
+            settings.mieDensityFalloff = 4.0f;
+            settings.intensity = 1.0f;
             settings.ditherStrength = 0.8f;
             settings.ditherScale = 4.0f;
         }
@@ -66,10 +78,13 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
         if (ImGui::Button("Mars Preset"))
         {
             settings.wavelengths = glm::vec3(600.0f, 550.0f, 500.0f);
-            settings.scatteringStrength = 1.5f;
-            settings.densityFalloff = 5.0f;
-            settings.atmosphereScale = 0.04f;
-            settings.intensity = 8.0f;
+            settings.scatteringStrength = 8.0f;
+            settings.densityFalloff = 3.0f;
+            settings.atmosphereScale = 0.08f;
+            settings.mieCoefficient = 0.015f;
+            settings.mieAnisotropy = 0.65f;
+            settings.mieDensityFalloff = 2.5f;
+            settings.intensity = 1.2f;
             settings.ditherStrength = 0.8f;
             settings.ditherScale = 4.0f;
         }

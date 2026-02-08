@@ -34,11 +34,16 @@ uniform float uIntensity;
 uniform int uNumInScatteringPoints;
 uniform int uNumOpticalDepthPoints;
 
+// Mie scattering (contributes to extinction, not in-scattering color)
+uniform float uMieCoefficient;
+uniform float uMieDensityFalloff;
+
 // Camera planes for depth reconstruction
 uniform float uNearPlane;
 uniform float uFarPlane;
 
 const float MAX_FLOAT = 3.402823466e+38;
+const float PI = 3.14159265359;
 
 // Convert UV to square-scaled coordinates for blue noise tiling
 vec2 squareUV(vec2 uv, vec2 screenSize) {
@@ -73,40 +78,36 @@ vec2 raySphere(vec3 sphereCenter, float sphereRadius, vec3 rayOrigin, vec3 rayDi
 }
 
 // Atmospheric density at a given point
-// Pure exponential falloff matching real atmospheric scale height model
-float densityAtPoint(vec3 point)
+// Returns vec2(Rayleigh density, Mie density)
+// Uses exp(-h*falloff)*(1-h) to force density to zero at atmosphere edge
+vec2 densityAtPoint(vec3 point)
 {
     float heightAboveSurface = length(point - uPlanetCenter) - uPlanetRadius;
-    float scaleHeight = (uAtmosphereRadius - uPlanetRadius) / uDensityFalloff;
-    return exp(-heightAboveSurface / scaleHeight);
+    float height01 = heightAboveSurface / (uAtmosphereRadius - uPlanetRadius);
+    float rayleigh = exp(-height01 * uDensityFalloff) * (1.0 - height01);
+    float mie = exp(-height01 * uMieDensityFalloff) * (1.0 - height01);
+    return vec2(rayleigh, mie);
 }
 
 // Calculate optical depth along a ray
-// This represents how much light is absorbed/scattered along the path
-float opticalDepth(vec3 rayOrigin, vec3 rayDir, float rayLength)
+// Returns vec2(Rayleigh optical depth, Mie optical depth)
+vec2 opticalDepth(vec3 rayOrigin, vec3 rayDir, float rayLength)
 {
     vec3 samplePoint = rayOrigin;
     float stepSize = rayLength / float(uNumOpticalDepthPoints - 1);
-    float depth = 0.0;
+    vec2 depth = vec2(0.0);
 
     for (int i = 0; i < uNumOpticalDepthPoints; i++)
     {
-        float localDensity = densityAtPoint(samplePoint);
+        vec2 localDensity = densityAtPoint(samplePoint);
         depth += localDensity * stepSize;
         samplePoint += rayDir * stepSize;
     }
     return depth;
 }
 
-// Rayleigh phase function: P(theta) = 3/4 * (1 + cos^2(theta))
-// Normalized so average over sphere equals 1
-float rayleighPhase(float cosTheta)
-{
-    return 0.75 * (1.0 + cosTheta * cosTheta);
-}
-
 // Calculate in-scattered light along the view ray
-// Compositing follows physical transmittance: result = scene * T + scattered
+// Uses brightness-adapted compositing for natural surface attenuation
 vec3 calculateLight(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 originalColor, vec2 uv)
 {
     // Blue noise dithering
@@ -114,14 +115,10 @@ vec3 calculateLight(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 originalC
     float blueNoise = texture(uBlueNoise, squareUV(uv, screenSize) * uDitherScale).r;
     blueNoise = (blueNoise - 0.5) * uDitherStrength;
 
-    // Rayleigh phase — brighter toward and away from the sun
-    float cosTheta = dot(rayDir, uLightDir);
-    float phase = rayleighPhase(cosTheta);
-
     vec3 inScatterPoint = rayOrigin;
     float stepSize = rayLength / float(uNumInScatteringPoints - 1);
     vec3 inScatteredLight = vec3(0.0);
-    float viewRayOpticalDepth = 0.0;
+    vec2 viewRayOpticalDepth = vec2(0.0);
 
     for (int i = 0; i < uNumInScatteringPoints; i++)
     {
@@ -129,30 +126,45 @@ vec3 calculateLight(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 originalC
         float sunRayLength = raySphere(uPlanetCenter, uAtmosphereRadius, inScatterPoint, uLightDir).y;
 
         // Optical depth from this point to the sun
-        float sunRayOpticalDepth = opticalDepth(inScatterPoint, uLightDir, sunRayLength);
+        vec2 sunRayOpticalDepth = opticalDepth(inScatterPoint, uLightDir, sunRayLength);
 
         // Optical depth from camera to this point (accumulated incrementally)
-        float localDensity = densityAtPoint(inScatterPoint);
+        vec2 localDensity = densityAtPoint(inScatterPoint);
         viewRayOpticalDepth += localDensity * stepSize;
 
-        // Transmittance: how much light survives from sun → sample → camera
-        vec3 transmittance = exp(-(sunRayOpticalDepth + viewRayOpticalDepth) * uScatteringCoefficients);
+        // Transmittance: combined extinction from Rayleigh and Mie optical depths
+        vec3 transmittance = exp(-(sunRayOpticalDepth.x + viewRayOpticalDepth.x) * uScatteringCoefficients
+                                - (sunRayOpticalDepth.y + viewRayOpticalDepth.y) * uMieCoefficient);
 
-        // Accumulate scattered light weighted by density and step size
-        inScatteredLight += localDensity * transmittance * stepSize;
+        // Accumulate density weighted by transmittance
+        inScatteredLight += localDensity.x * transmittance;
 
         inScatterPoint += rayDir * stepSize;
     }
 
-    // Apply phase function, scattering coefficients, and light intensity
-    inScatteredLight *= phase * uScatteringCoefficients * uIntensity;
+    // Apply scattering coefficients, intensity, and step size
+    inScatteredLight *= uScatteringCoefficients * uIntensity * stepSize;
 
     // Dither to reduce banding
     inScatteredLight += blueNoise * 0.01;
 
-    // Physically-based compositing: transmittance along view ray attenuates surface
-    vec3 viewTransmittance = exp(-viewRayOpticalDepth * uScatteringCoefficients);
-    return originalColor * viewTransmittance + inScatteredLight;
+    // Brightness-adapted compositing (scalar attenuation avoids per-wavelength color shift)
+    // Use coefficient-weighted optical depth for physically consistent surface dimming
+    float avgCoeff = dot(uScatteringCoefficients, vec3(0.333));
+    float weightedOpticalDepth = viewRayOpticalDepth.x * avgCoeff;
+
+    const float brightnessAdaptionStrength = 0.15;
+    const float reflectedLightOutScatterStrength = 3.0;
+    float brightnessAdaption = dot(inScatteredLight, vec3(1.0)) * brightnessAdaptionStrength;
+    float brightnessSum = weightedOpticalDepth * uIntensity * reflectedLightOutScatterStrength + brightnessAdaption;
+    float reflectedLightStrength = exp(-brightnessSum);
+
+    // HDR preservation: bright surfaces (snow, specular) punch through atmosphere
+    float hdrStrength = clamp(dot(originalColor, vec3(1.0)) / 3.0 - 1.0, 0.0, 1.0);
+    reflectedLightStrength = mix(reflectedLightStrength, 1.0, hdrStrength);
+
+    vec3 reflectedLight = originalColor * reflectedLightStrength;
+    return reflectedLight + inScatteredLight;
 }
 
 // Reconstruct world-space ray from screen UV

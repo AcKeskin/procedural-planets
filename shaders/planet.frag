@@ -47,6 +47,12 @@ uniform float uAmbientLight;
 uniform float uSpecularStrength;
 uniform float uSpecularPower;
 
+// Fresnel rim (distance-adaptive for sense of scale)
+uniform float uPlanetScale;
+uniform float uFresnelStrengthNear;
+uniform float uFresnelStrengthFar;
+uniform float uFresnelPow;
+
 // Ocean colors (fallback for underwater terrain)
 const vec3 DEEP_OCEAN = vec3(0.02, 0.05, 0.15);
 const vec3 SHALLOW_OCEAN = vec3(0.05, 0.15, 0.35);
@@ -232,6 +238,19 @@ void main()
 
     // Final color with lighting (ambient + diffuse * intensity + specular)
     vec3 color = terrainColor * (uAmbientLight + diff * uSunIntensity) + vec3(spec);
+
+    // Distance-adaptive fresnel rim (fades near surface, strong from far)
+    float camDist = length(uCameraPos - vWorldPos);
+    float camRadiiFromSurface = (camDist - uPlanetScale) / uPlanetScale;
+    float fresnelT = smoothstep(0.0, 1.0, camRadiiFromSurface);
+    float fresStrength = mix(uFresnelStrengthNear, uFresnelStrengthFar, fresnelT);
+
+    vec3 sphereNormal = normalize(vWorldPos);
+    float fresnelDot = 1.0 + dot(normalize(vWorldPos - uCameraPos), sphereNormal);
+    float fresnel = clamp(fresStrength * pow(max(fresnelDot, 0.0), uFresnelPow), 0.0, 1.0);
+
+    vec3 rimColor = vec3(0.4, 0.6, 1.0);
+    color += rimColor * fresnel * 0.3;
 
     FragColor = vec4(color, 1.0);
 }

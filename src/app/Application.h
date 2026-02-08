@@ -7,6 +7,7 @@
 #include "Mesh.h"
 #include "TerrainGenerator.h"
 #include "GenerationScheduler.h"
+#include "ParameterRandomizer.h"
 #include "Framebuffer.h"
 #include "PostProcessor.h"
 #include "lod/PlanetQuadTree.h"
