@@ -75,66 +75,60 @@ float calcSteepness(vec3 worldPos, vec3 normal)
 }
 
 // Biome color for a given moisture level at a specific temperature band
-// Returns smoothly blended dry→wet gradient
-vec3 biomeByMoisture(float moisture, vec3 dry, vec3 mid, vec3 wet, float detailVar)
+// Overlapping tri-blend: dry peaks at 0.0, mid at 0.45, wet at 0.85
+vec3 biomeByMoisture(float moisture, vec3 dry, vec3 mid, vec3 wet, vec3 detailVar)
 {
-    vec3 color;
-    if (moisture < 0.35)
-        color = mix(dry, mid, smoothstep(0.1, 0.35, moisture));
-    else
-        color = mix(mid, wet, smoothstep(0.35, 0.7, moisture));
+    float wDry = 1.0 - smoothstep(0.15, 0.50, moisture);
+    float wMid = smoothstep(0.15, 0.45, moisture) * (1.0 - smoothstep(0.55, 0.85, moisture));
+    float wWet = smoothstep(0.50, 0.80, moisture);
+
+    float wSum = wDry + wMid + wWet;
+    vec3 color = (dry * wDry + mid * wMid + wet * wWet) / wSum;
     return color + detailVar;
 }
 
 // Whittaker biome color from temperature x moisture
-// Smooth 2D interpolation avoids hard band boundaries
-vec3 getWhittakerBiome(float temperature, float moisture, float detailNoise)
+// Overlapping weight-based blending eliminates hard band boundaries
+vec3 getWhittakerBiome(float temperature, float moisture, float detailNoise, float smallNoise)
 {
-    // Biome palette
-    const vec3 TROPICAL_WET  = vec3(0.08, 0.32, 0.06);
-    const vec3 TROPICAL_MID  = vec3(0.35, 0.42, 0.18);
-    const vec3 TROPICAL_DRY  = vec3(0.68, 0.58, 0.38);
+    // Earth-referenced biome palette
+    const vec3 TROPICAL_WET  = vec3(0.05, 0.28, 0.03);
+    const vec3 TROPICAL_MID  = vec3(0.28, 0.40, 0.12);
+    const vec3 TROPICAL_DRY  = vec3(0.76, 0.62, 0.35);
 
-    const vec3 TEMPERATE_WET = vec3(0.15, 0.38, 0.12);
-    const vec3 TEMPERATE_MID = vec3(0.38, 0.48, 0.22);
-    const vec3 TEMPERATE_DRY = vec3(0.62, 0.55, 0.35);
+    const vec3 TEMPERATE_WET = vec3(0.12, 0.35, 0.08);
+    const vec3 TEMPERATE_MID = vec3(0.32, 0.42, 0.18);
+    const vec3 TEMPERATE_DRY = vec3(0.65, 0.55, 0.30);
 
-    const vec3 BOREAL_WET    = vec3(0.10, 0.25, 0.10);
-    const vec3 BOREAL_MID    = vec3(0.30, 0.35, 0.22);
-    const vec3 BOREAL_DRY    = vec3(0.50, 0.48, 0.38);
+    const vec3 BOREAL_WET    = vec3(0.06, 0.20, 0.08);
+    const vec3 BOREAL_MID    = vec3(0.22, 0.28, 0.16);
+    const vec3 BOREAL_DRY    = vec3(0.42, 0.40, 0.32);
 
-    const vec3 TUNDRA        = vec3(0.52, 0.52, 0.42);
-    const vec3 ICE           = vec3(0.90, 0.91, 0.94);
+    const vec3 TUNDRA        = vec3(0.48, 0.50, 0.40);
+    const vec3 ICE           = vec3(0.92, 0.94, 0.97);
 
-    float d = (detailNoise - 0.5) * 0.1;
+    // Per-channel detail variation (green varies most for vegetation density)
+    float dBase = detailNoise - 0.5;
+    vec3 dVar = vec3(dBase * 0.08, dBase * 0.12, dBase * 0.04);
 
-    // Compute color for each temperature band
-    vec3 tropical  = biomeByMoisture(moisture, TROPICAL_DRY, TROPICAL_MID, TROPICAL_WET, d);
-    vec3 temperate = biomeByMoisture(moisture, TEMPERATE_DRY, TEMPERATE_MID, TEMPERATE_WET, d);
-    vec3 boreal    = biomeByMoisture(moisture, BOREAL_DRY, BOREAL_MID, BOREAL_WET, d);
+    // Color for each temperature band
+    vec3 tropical  = biomeByMoisture(moisture, TROPICAL_DRY, TROPICAL_MID, TROPICAL_WET, dVar);
+    vec3 temperate = biomeByMoisture(moisture, TEMPERATE_DRY, TEMPERATE_MID, TEMPERATE_WET, dVar);
+    vec3 boreal    = biomeByMoisture(moisture, BOREAL_DRY, BOREAL_MID, BOREAL_WET, dVar);
     vec3 polar     = mix(ICE, TUNDRA, smoothstep(0.0, 0.2, moisture));
 
-    // Smooth blend between temperature bands
-    vec3 color;
-    if (temperature > 0.65)
-    {
-        float t = smoothstep(0.65, 0.85, temperature);
-        color = mix(temperate, tropical, t);
-    }
-    else if (temperature > 0.35)
-    {
-        float t = smoothstep(0.35, 0.65, temperature);
-        color = mix(boreal, temperate, t);
-    }
-    else if (temperature > 0.12)
-    {
-        float t = smoothstep(0.12, 0.35, temperature);
-        color = mix(polar, boreal, t);
-    }
-    else
-    {
-        color = polar;
-    }
+    // Overlapping weight functions for continuous temperature blending
+    float wTropical  = smoothstep(0.50, 0.80, temperature);
+    float wTemperate = smoothstep(0.25, 0.55, temperature) * (1.0 - smoothstep(0.60, 0.85, temperature));
+    float wBoreal    = smoothstep(0.08, 0.30, temperature) * (1.0 - smoothstep(0.35, 0.60, temperature));
+    float wPolar     = 1.0 - smoothstep(0.08, 0.30, temperature);
+
+    float wSum = wTropical + wTemperate + wBoreal + wPolar;
+    vec3 color = (tropical * wTropical + temperate * wTemperate + boreal * wBoreal + polar * wPolar) / wSum;
+
+    // Micro-variation from small noise (subtle surface texture breakup)
+    float micro = (smallNoise - 0.5) * 0.04;
+    color += vec3(micro * 0.5, micro, micro * 0.3);
 
     return clamp(color, 0.0, 1.0);
 }
@@ -154,16 +148,28 @@ vec3 getTerrainColor(vec3 worldPos, vec3 normal, float height)
         float temperature = vShadingData.x;
         float moisture = vShadingData.y;
         float detailNoise = vShadingData.z;
+        float smallNoise = vShadingData.w;
 
-        flatColor = getWhittakerBiome(temperature, moisture, detailNoise);
+        // Noise-perturbed biome boundaries to break visual banding
+        float perturbedTemp = clamp(temperature + (detailNoise - 0.5) * 0.12, 0.0, 1.0);
+        float perturbedMoist = clamp(moisture + (smallNoise - 0.5) * 0.15, 0.0, 1.0);
 
-        // Shore zone override near sea level
-        float shoreBlend = smoothstep(uShoreHeight, 0.0, h);
-        vec3 shoreColor = mix(uShoreLow, uShoreHigh, h + (detailNoise - 0.5) * 0.2);
+        flatColor = getWhittakerBiome(perturbedTemp, perturbedMoist, detailNoise, smallNoise);
+
+        // Temperature-aware shore: warm sandy beaches, cold rocky coasts
+        float shoreBoundary = uShoreHeight + (detailNoise - 0.5) * uShoreHeight * 0.5;
+        float shoreBlend = smoothstep(shoreBoundary * 1.5, 0.0, h);
+        shoreBlend *= (1.0 - smoothstep(0.2, 0.4, steepness));
+        vec3 warmShore = mix(uShoreLow, uShoreHigh, h + (detailNoise - 0.5) * 0.2);
+        vec3 coldShore = mix(vec3(0.45, 0.42, 0.38), vec3(0.35, 0.33, 0.30), h);
+        vec3 shoreColor = mix(coldShore, warmShore, smoothstep(0.2, 0.5, temperature));
         flatColor = mix(flatColor, shoreColor, shoreBlend);
 
-        // Snow at high altitude
-        float snowBlend = smoothstep(uSnowLine - 0.05, uSnowLine, h);
+        // Snow: combined altitude + temperature model
+        float effectiveSnowLine = uSnowLine - (1.0 - temperature) * 0.12;
+        float snowBlend = smoothstep(effectiveSnowLine - 0.08, effectiveSnowLine, h);
+        float coldSnow = smoothstep(0.06, 0.01, temperature) * 0.4;
+        snowBlend = max(snowBlend, coldSnow);
         flatColor = mix(flatColor, uSnowColor, snowBlend);
     }
     else

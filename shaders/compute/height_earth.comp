@@ -372,8 +372,15 @@ void main()
         float boundaryProximity = 1.0 - smoothstep(0.0, boundaryWidth, boundaryDist);
 
         // Plate type determines base elevation
-        bool isContinental = isPlateContinental(nearId, seed, continentalFraction);
-        float baseElevation = isContinental ? 0.5 : -0.5;
+        bool nearContinental = isPlateContinental(nearId, seed, continentalFraction);
+        bool secondContinental = isPlateContinental(secondId, seed, continentalFraction);
+        float nearBaseElev = nearContinental ? 0.5 : -0.5;
+        float secondBaseElev = secondContinental ? 0.5 : -0.5;
+
+        // Smooth elevation transition at plate boundary
+        // boundaryBlend ramps from 0 (plate interior) to ~0.5 at the boundary midpoint
+        float boundaryBlend = boundaryProximity * 0.5;
+        float baseElevation = mix(nearBaseElev, secondBaseElev, boundaryBlend);
 
         // Interior plate noise (reuses continental FBM as detail)
         float interiorNoise = fbm(dir, continentOffset, continentLayers, contScale,

@@ -1,4 +1,5 @@
 #include "Shader.h"
+#include "GpuConstants.h"
 #include <GL/gl3w.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <fstream>
@@ -67,8 +68,8 @@ bool Shader::LoadFromFiles(const std::string& vertexPath, const std::string& fra
     glGetProgramiv(_program, GL_LINK_STATUS, &success);
     if (!success)
     {
-        char infoLog[512];
-        glGetProgramInfoLog(_program, 512, nullptr, infoLog);
+        char infoLog[ShaderInfoLogSize];
+        glGetProgramInfoLog(_program, ShaderInfoLogSize, nullptr, infoLog);
         std::cerr << "[Shader] Link error: " << infoLog << std::endl;
         glDeleteProgram(_program);
         _program = 0;
@@ -126,8 +127,8 @@ bool Shader::CompileShader(unsigned int& shader, unsigned int type, const std::s
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (!success)
     {
-        char infoLog[512];
-        glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+        char infoLog[ShaderInfoLogSize];
+        glGetShaderInfoLog(shader, ShaderInfoLogSize, nullptr, infoLog);
         std::cerr << "[Shader] Compile error: " << infoLog << std::endl;
         glDeleteShader(shader);
         return false;

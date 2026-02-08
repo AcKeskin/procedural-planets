@@ -12,8 +12,8 @@ namespace planets::app
 {
 
 Application::Application()
-    : _seaLevel(0.995f)
-    , _moveSpeed(75.0f)
+    : _seaLevel(AppDefaults::SeaLevel)
+    , _moveSpeed(AppDefaults::MoveSpeed)
     , _lastTime(0.0f)
     , _previousWidth(0)
     , _previousHeight(0)
@@ -98,7 +98,7 @@ bool Application::Initialize()
     else
         RegeneratePlanetCpu();
 
-    _camera.SetPosition(glm::vec3(0.0f, 0.0f, 125.0f));
+    _camera.SetPosition(glm::vec3(0.0f, 0.0f, _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier));
 
     _lastTime = static_cast<float>(glfwGetTime());
     _previousWidth = _window.GetWidth();
@@ -187,7 +187,7 @@ void Application::ProcessInput(float deltaTime)
         if (_input.IsCursorEnabled())
             _input.SetCursorEnabled(false);
 
-        _camera.Rotate(_input.GetMouseDeltaX() * 0.1f, _input.GetMouseDeltaY() * 0.1f);
+        _camera.Rotate(_input.GetMouseDeltaX() * AppDefaults::MouseRotationSensitivity, _input.GetMouseDeltaY() * AppDefaults::MouseRotationSensitivity);
     }
     else
     {
@@ -195,7 +195,7 @@ void Application::ProcessInput(float deltaTime)
             _input.SetCursorEnabled(true);
     }
 
-    float speedMultiplier = _input.IsKeyDown(Key::LeftShift) ? 5.0f : 1.0f;
+    float speedMultiplier = _input.IsKeyDown(Key::LeftShift) ? AppDefaults::SprintSpeedMultiplier : 1.0f;
     float speed = _moveSpeed * deltaTime * speedMultiplier;
 
     if (_input.IsKeyDown(Key::W))
@@ -272,8 +272,8 @@ void Application::Render()
     _planetShader.SetFloat("uFlatColBlendNoise", _shadingSettings.flatColBlendNoise);
 
     // Height range (auto-computed from terrain scale)
-    float heightMin = 1.0f - _terrainSettings.heightScale * 1.5f;
-    float heightMax = 1.0f + _terrainSettings.heightScale * 1.5f;
+    float heightMin = 1.0f - _terrainSettings.heightScale * AppDefaults::HeightRangeMultiplier;
+    float heightMax = 1.0f + _terrainSettings.heightScale * AppDefaults::HeightRangeMultiplier;
     _planetShader.SetVec2("uHeightMinMax", glm::vec2(heightMin, heightMax));
 
     // Lighting
@@ -284,14 +284,14 @@ void Application::Render()
 
     // Fresnel rim for sense of scale
     _planetShader.SetFloat("uPlanetScale", _lodConfig.planetRadius);
-    _planetShader.SetFloat("uFresnelStrengthNear", 0.5f);
-    _planetShader.SetFloat("uFresnelStrengthFar", 2.0f);
-    _planetShader.SetFloat("uFresnelPow", 3.0f);
+    _planetShader.SetFloat("uFresnelStrengthNear", AppDefaults::FresnelStrengthNear);
+    _planetShader.SetFloat("uFresnelStrengthFar", AppDefaults::FresnelStrengthFar);
+    _planetShader.SetFloat("uFresnelPow", AppDefaults::FresnelPower);
 
     if (_lodConfig.enabled && _genConfig.useGpu)
     {
         // Async pipeline: process scheduler, apply results, then update + render
-        _generationScheduler.ProcessFrame(4, 4);
+        _generationScheduler.ProcessFrame(AppDefaults::SchedulerPatchesPerFrame, AppDefaults::SchedulerPatchesPerFrame);
         _quadTree.ApplyCompletedPatches();
         _quadTree.Update(_camera.GetPosition(), viewProjection);
         _quadTree.Render(_planetShader);
@@ -481,10 +481,10 @@ void Application::RegenerateLodSystem()
 
     // Build tree structure and enqueue patches (non-blocking)
     _quadTree.Initialize(qtConfig, _generationScheduler, _genConfig.seed);
-    _oceanRenderer.Initialize(_lodConfig.planetRadius, _seaLevel, 5);
+    _oceanRenderer.Initialize(_lodConfig.planetRadius, _seaLevel, AppDefaults::OceanSubdivisions);
     _atmosphereRenderer.Initialize();
 
-    float farPlane = (std::max)(1000.0f, _lodConfig.planetRadius * 20.0f);
+    float farPlane = (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
     _camera.SetFarPlane(farPlane);
 
     std::cout << "[QuadTree] Enqueued " << _generationScheduler.GetPendingCount() << " patches for async generation"

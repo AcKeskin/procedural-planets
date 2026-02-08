@@ -11,6 +11,18 @@ enum class CameraMode
     Orbit
 };
 
+namespace CameraDefaults
+{
+    inline constexpr float Yaw = -90.0f;
+    inline constexpr float Pitch = 0.0f;
+    inline constexpr float OrbitDistance = 10.0f;
+    inline constexpr float Fov = 45.0f;
+    inline constexpr float NearPlane = 0.1f;
+    inline constexpr float FarPlane = 1000.0f;
+    inline constexpr float MaxPitch = 89.0f;
+    inline constexpr float MinOrbitDistance = 1.0f;
+}
+
 class Camera
 {
 public:

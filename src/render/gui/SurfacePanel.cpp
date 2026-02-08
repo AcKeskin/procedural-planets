@@ -185,6 +185,18 @@ bool SurfacePanel::DrawShadingContent(EarthShadingSettings& settings)
             needsRegeneration = true;
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Strength of latitude-based moisture pattern\n0 = uniform, 1 = Earth-like, 2 = exaggerated");
+
+        ImGui::SliderFloat("Temp Exponent", &settings.temperatureExponent, 0.3f, 1.5f, "%.2f");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Temperature latitude falloff\n0.3 = wide tropics, 1.5 = sharp equator-pole gradient");
+
+        ImGui::SliderFloat("Continentality", &settings.continentalityStrength, 0.0f, 0.6f, "%.2f");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Moisture effect of distance from coast\n0 = none, higher = drier interiors, wetter coasts");
     }
 
     return needsRegeneration;

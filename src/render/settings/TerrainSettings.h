@@ -107,9 +107,11 @@ struct EarthShadingSettings
     // Climate model (latitude + elevation → temperature/moisture)
     bool useClimateModel = true;
     float temperatureLapseRate = 2.0f;
+    float temperatureExponent = 0.6f;
     float moistureNoiseScale = 1.5f;
     float moistureNoiseStrength = 0.15f;
     float hadleyIntensity = 1.0f;
+    float continentalityStrength = 0.3f;
 };
 
 // Generation parameters (seed, subdivisions, GPU toggle)
@@ -125,7 +127,7 @@ struct LodConfig
 {
     bool enabled = true;
     int patchSubdivisions = 2;
-    float planetRadius = 50.0f;
+    float planetRadius = 200.0f;
 
     // Quadtree parameters
     int meshResolution = 32;
