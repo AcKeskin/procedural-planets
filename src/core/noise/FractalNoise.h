@@ -3,7 +3,8 @@
 #include "Noise.h"
 #include <memory>
 
-namespace planets::core {
+namespace planets::core
+{
 
 class SimplexNoise;
 
@@ -11,11 +12,7 @@ class SimplexNoise;
 class FractalNoise : public INoiseGenerator
 {
 public:
-    FractalNoise(
-        uint32_t seed = 0,
-        int octaves = 4,
-        float persistence = 0.5f,
-        float lacunarity = 2.0f);
+    FractalNoise(uint32_t seed = 0, int octaves = 4, float persistence = 0.5f, float lacunarity = 2.0f);
 
     float Sample(float x, float y, float z) const override;
 

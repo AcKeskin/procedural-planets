@@ -1,7 +1,8 @@
 #include "TerrainGenerator.h"
 #include <iostream>
 
-namespace planets::render {
+namespace planets::render
+{
 
 TerrainGenerator::TerrainGenerator() = default;
 TerrainGenerator::~TerrainGenerator() = default;
@@ -118,10 +119,9 @@ void TerrainGenerator::SetShadingUniforms(uint32_t seed, size_t vertexCount, con
     _shadingShader.SetFloat("warpStrength", settings.warpStrength);
 }
 
-std::vector<float> TerrainGenerator::GenerateHeights(
-    const std::vector<glm::vec3>& vertices,
-    uint32_t seed,
-    const EarthTerrainSettings& settings)
+std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3>& vertices,
+                                                     uint32_t seed,
+                                                     const EarthTerrainSettings& settings)
 {
     if (!_computeShader.IsValid())
         return {};
@@ -155,16 +155,15 @@ std::vector<float> TerrainGenerator::GenerateHeights(
     return heights;
 }
 
-std::vector<float> TerrainGenerator::GenerateHeights(
-    const std::vector<glm::vec3>& vertices,
-    uint32_t seed,
-    const ComputeNoiseParams& continentParams,
-    const ComputeNoiseParams& mountainParams,
-    const ComputeNoiseParams& maskParams,
-    float oceanDepthMultiplier,
-    float oceanFloorDepth,
-    float oceanFloorSmoothing,
-    float mountainBlend)
+std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3>& vertices,
+                                                     uint32_t seed,
+                                                     const ComputeNoiseParams& continentParams,
+                                                     const ComputeNoiseParams& mountainParams,
+                                                     const ComputeNoiseParams& maskParams,
+                                                     float oceanDepthMultiplier,
+                                                     float oceanFloorDepth,
+                                                     float oceanFloorSmoothing,
+                                                     float mountainBlend)
 {
     if (!_computeShader.IsValid())
     {
@@ -232,10 +231,9 @@ std::vector<float> TerrainGenerator::GenerateHeights(
     return heights;
 }
 
-std::vector<glm::vec4> TerrainGenerator::GenerateShadingData(
-    const std::vector<glm::vec3>& vertices,
-    uint32_t seed,
-    const EarthShadingSettings& settings)
+std::vector<glm::vec4> TerrainGenerator::GenerateShadingData(const std::vector<glm::vec3>& vertices,
+                                                             uint32_t seed,
+                                                             const EarthShadingSettings& settings)
 {
     if (!_shadingShader.IsValid())
     {
@@ -272,12 +270,11 @@ std::vector<glm::vec4> TerrainGenerator::GenerateShadingData(
     return shadingData;
 }
 
-void TerrainGenerator::DispatchHeightsAsync(
-    GpuBuffer<float>& vertexBuffer,
-    GpuBuffer<float>& heightBuffer,
-    size_t vertexCount,
-    uint32_t seed,
-    const EarthTerrainSettings& settings)
+void TerrainGenerator::DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
+                                            GpuBuffer<float>& heightBuffer,
+                                            size_t vertexCount,
+                                            uint32_t seed,
+                                            const EarthTerrainSettings& settings)
 {
     vertexBuffer.Bind(0);
     heightBuffer.Bind(1);
@@ -288,12 +285,11 @@ void TerrainGenerator::DispatchHeightsAsync(
     _computeShader.Dispatch(groupCount);
 }
 
-void TerrainGenerator::DispatchShadingAsync(
-    GpuBuffer<float>& vertexBuffer,
-    GpuBuffer<glm::vec4>& shadingBuffer,
-    size_t vertexCount,
-    uint32_t seed,
-    const EarthShadingSettings& settings)
+void TerrainGenerator::DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
+                                            GpuBuffer<glm::vec4>& shadingBuffer,
+                                            size_t vertexCount,
+                                            uint32_t seed,
+                                            const EarthShadingSettings& settings)
 {
     vertexBuffer.Bind(0);
     shadingBuffer.Bind(1);

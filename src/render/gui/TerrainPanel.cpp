@@ -6,13 +6,19 @@
 #include <string>
 #include <cstdlib>
 
-namespace planets::render {
-
-bool TerrainPanel::Draw(GenerationConfig& config, EarthTerrainSettings& terrain,
-                        LodConfig& lod, const TerrainStats& stats,
-                        planets::core::Planet& planet, bool& visible, bool& randomizeRequested)
+namespace planets::render
 {
-    if (!visible) return false;
+
+bool TerrainPanel::Draw(GenerationConfig& config,
+                        EarthTerrainSettings& terrain,
+                        LodConfig& lod,
+                        const TerrainStats& stats,
+                        planets::core::Planet& planet,
+                        bool& visible,
+                        bool& randomizeRequested)
+{
+    if (!visible)
+        return false;
 
     bool regen = false;
     ImGui::Begin("Terrain", &visible);
@@ -59,7 +65,10 @@ void TerrainPanel::DrawGpuContent(GenerationConfig& config, const TerrainStats& 
     }
 }
 
-bool TerrainPanel::DrawEarthTerrainContent(EarthTerrainSettings& settings, uint32_t& seed, int& subdivisions, bool& randomizeRequested)
+bool TerrainPanel::DrawEarthTerrainContent(EarthTerrainSettings& settings,
+                                           uint32_t& seed,
+                                           int& subdivisions,
+                                           bool& randomizeRequested)
 {
     bool needsRegeneration = false;
 
@@ -67,113 +76,147 @@ bool TerrainPanel::DrawEarthTerrainContent(EarthTerrainSettings& settings, uint3
     ImGui::Separator();
 
     ImGui::SliderInt("Subdivisions", &subdivisions, 3, 7);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     int seedInt = static_cast<int>(seed);
     if (ImGui::InputInt("Seed", &seedInt))
     {
         seed = static_cast<uint32_t>(seedInt);
     }
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Height Scale", &settings.heightScale, 0.02f, 0.08f, "%.3f");
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Terrain height as fraction of planet radius.\n0.01 = subtle hills, 0.10 = dramatic mountains");
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip(
+            "Terrain height as fraction of planet radius.\n0.01 = subtle hills, 0.10 = dramatic mountains");
 
     ImGui::SliderFloat("Global Frequency", &settings.globalFrequency, 0.6f, 2.0f, "%.2f");
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Multiplier for all noise frequencies.\nHigher = more detail = planet feels larger.\n1.0 = default, 2.0 = twice as detailed");
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Multiplier for all noise frequencies.\nHigher = more detail = planet feels larger.\n1.0 = "
+                          "default, 2.0 = twice as detailed");
 
-    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Tip: Lower height scale + higher frequency = larger-feeling planet");
+    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f),
+                       "Tip: Lower height scale + higher frequency = larger-feeling planet");
 
     ImGui::Spacing();
     ImGui::Text("Continental Shape");
     ImGui::Separator();
 
     ImGui::SliderInt("Continent Octaves", &settings.continentOctaves, 4, 7);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Continent Scale", &settings.continentScale, 0.5f, 1.5f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Continent Strength", &settings.continentStrength, 0.8f, 2.5f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Continent Persistence", &settings.continentPersistence, 0.35f, 0.65f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Continent Lacunarity", &settings.continentLacunarity, 1.8f, 2.5f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Base Level", &settings.continentBaseLevel, -0.6f, -0.1f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Negative = more ocean, Positive = more land");
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Negative = more ocean, Positive = more land");
 
     ImGui::Spacing();
     ImGui::Text("Ocean Settings");
     ImGui::Separator();
 
     ImGui::SliderFloat("Ocean Depth Mult", &settings.oceanDepthMultiplier, 2.0f, 7.0f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Ocean Floor Depth", &settings.oceanFloorDepth, 0.8f, 2.0f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Ocean Floor Smooth", &settings.oceanFloorSmoothing, 0.3f, 1.2f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::Spacing();
     ImGui::Text("Mountain Ridges");
     ImGui::Separator();
 
     ImGui::SliderInt("Mountain Octaves", &settings.mountainOctaves, 4, 6);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Mountain Scale", &settings.mountainScale, 0.8f, 2.5f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Mountain Strength", &settings.mountainStrength, 0.4f, 1.3f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Mountain Power", &settings.mountainPower, 1.5f, 3.0f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Mountain Gain", &settings.mountainGain, 0.6f, 1.2f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Mountain Lacunarity", &settings.mountainLacunarity, 2.0f, 5.0f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Mountain Smoothing", &settings.mountainSmoothing, 0.5f, 2.0f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Mountain Blend", &settings.mountainBlend, 0.6f, 2.0f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::Spacing();
     ImGui::Text("Mountain Mask");
     ImGui::Separator();
 
     ImGui::SliderInt("Mask Octaves", &settings.maskOctaves, 2, 4);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Mask Scale", &settings.maskScale, 0.5f, 1.5f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Mask Lacunarity", &settings.maskLacunarity, 1.4f, 2.2f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::Spacing();
     ImGui::Text("Surface Detail");
     ImGui::Separator();
 
     ImGui::SliderFloat("Perturb Strength", &settings.perturbStrength, 0.001f, 0.005f, "%.4f");
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("High-frequency micro-detail roughness");
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("High-frequency micro-detail roughness");
 
     ImGui::SliderFloat("Perturb Scale", &settings.perturbScale, 10.0f, 30.0f);
-    if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Frequency of perturbation noise");
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Frequency of perturbation noise");
 
     ImGui::Spacing();
     ImGui::Separator();
@@ -307,9 +350,10 @@ bool TerrainPanel::DrawLodContent(LodConfig& lod, const TerrainStats& stats)
         ImGui::Text("Settings");
 
         ImGui::SliderFloat("Planet Radius", &lod.planetRadius, 1.0f, 1000.0f);
-        if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
 
-        const char* subdivLabels[] = { "20 patches", "80 patches", "320 patches", "1280 patches" };
+        const char* subdivLabels[] = {"20 patches", "80 patches", "320 patches", "1280 patches"};
         if (ImGui::Combo("Patch Density", &lod.patchSubdivisions, subdivLabels, 4))
         {
             needsRegeneration = true;
@@ -320,22 +364,28 @@ bool TerrainPanel::DrawLodContent(LodConfig& lod, const TerrainStats& stats)
         ImGui::Text("Quadtree");
 
         ImGui::SliderInt("Mesh Resolution", &lod.meshResolution, 8, 64);
-        if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
 
         ImGui::SliderInt("Max Depth", &lod.maxDepth, 2, 10);
-        if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
 
         ImGui::SliderFloat("Split Threshold", &lod.splitThreshold, 0.5f, 5.0f);
-        if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
 
         ImGui::SliderFloat("Hysteresis", &lod.hysteresis, 1.0f, 2.0f);
-        if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
 
         ImGui::SliderInt("Max Active Patches", &lod.maxActivePatches, 50, 800);
-        if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
 
         ImGui::SliderFloat("Skirt Fraction", &lod.skirtFraction, 0.0f, 0.1f);
-        if (ImGui::IsItemDeactivatedAfterEdit()) needsRegeneration = true;
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
 
         ImGui::Separator();
         ImGui::Text("Statistics");

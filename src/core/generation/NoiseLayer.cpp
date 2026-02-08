@@ -2,7 +2,8 @@
 #include "../noise/SimplexNoise.h"
 #include "../noise/FractalNoise.h"
 
-namespace planets::core {
+namespace planets::core
+{
 
 NoiseLayer::NoiseLayer()
 {
@@ -42,19 +43,15 @@ void NoiseLayer::CreateGenerator()
 {
     switch (_settings.type)
     {
-        case NoiseType::Simplex:
-            _generator = std::make_unique<SimplexNoise>(_settings.seed);
-            break;
+    case NoiseType::Simplex:
+        _generator = std::make_unique<SimplexNoise>(_settings.seed);
+        break;
 
-        case NoiseType::Fractal:
-        default:
-            _generator = std::make_unique<FractalNoise>(
-                _settings.seed,
-                _settings.octaves,
-                _settings.persistence,
-                _settings.lacunarity
-            );
-            break;
+    case NoiseType::Fractal:
+    default:
+        _generator = std::make_unique<FractalNoise>(
+            _settings.seed, _settings.octaves, _settings.persistence, _settings.lacunarity);
+        break;
     }
 }
 

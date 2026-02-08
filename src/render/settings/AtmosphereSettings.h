@@ -2,7 +2,8 @@
 
 #include <glm/glm.hpp>
 
-namespace planets::render::effects {
+namespace planets::render::effects
+{
 
 // Physically-based atmosphere scattering parameters
 struct AtmosphereSettings

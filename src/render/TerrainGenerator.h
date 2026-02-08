@@ -8,7 +8,8 @@
 #include "settings/TerrainSettings.h"
 #include "settings/SurfaceSettings.h"
 
-namespace planets::render {
+namespace planets::render
+{
 
 // Noise layer configuration for compute shader
 struct ComputeNoiseParams
@@ -41,44 +42,37 @@ public:
     bool Initialize(const std::string& heightShaderPath, const std::string& shadingShaderPath);
 
     // Generate heights using EarthTerrainSettings
-    std::vector<float> GenerateHeights(
-        const std::vector<glm::vec3>& vertices,
-        uint32_t seed,
-        const EarthTerrainSettings& settings);
+    std::vector<float>
+    GenerateHeights(const std::vector<glm::vec3>& vertices, uint32_t seed, const EarthTerrainSettings& settings);
 
     // Generate heights on GPU (legacy API)
-    std::vector<float> GenerateHeights(
-        const std::vector<glm::vec3>& vertices,
-        uint32_t seed,
-        const ComputeNoiseParams& continentParams,
-        const ComputeNoiseParams& mountainParams,
-        const ComputeNoiseParams& maskParams,
-        float oceanDepthMultiplier,
-        float oceanFloorDepth,
-        float oceanFloorSmoothing,
-        float mountainBlend);
+    std::vector<float> GenerateHeights(const std::vector<glm::vec3>& vertices,
+                                       uint32_t seed,
+                                       const ComputeNoiseParams& continentParams,
+                                       const ComputeNoiseParams& mountainParams,
+                                       const ComputeNoiseParams& maskParams,
+                                       float oceanDepthMultiplier,
+                                       float oceanFloorDepth,
+                                       float oceanFloorSmoothing,
+                                       float mountainBlend);
 
     // Generate shading data (biome, detail, temperature, moisture)
-    std::vector<glm::vec4> GenerateShadingData(
-        const std::vector<glm::vec3>& vertices,
-        uint32_t seed,
-        const EarthShadingSettings& settings);
+    std::vector<glm::vec4>
+    GenerateShadingData(const std::vector<glm::vec3>& vertices, uint32_t seed, const EarthShadingSettings& settings);
 
     // Dispatch height compute to caller-owned buffers (no barrier, no readback)
-    void DispatchHeightsAsync(
-        GpuBuffer<float>& vertexBuffer,
-        GpuBuffer<float>& heightBuffer,
-        size_t vertexCount,
-        uint32_t seed,
-        const EarthTerrainSettings& settings);
+    void DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
+                              GpuBuffer<float>& heightBuffer,
+                              size_t vertexCount,
+                              uint32_t seed,
+                              const EarthTerrainSettings& settings);
 
     // Dispatch shading compute to caller-owned buffers (no barrier, no readback)
-    void DispatchShadingAsync(
-        GpuBuffer<float>& vertexBuffer,
-        GpuBuffer<glm::vec4>& shadingBuffer,
-        size_t vertexCount,
-        uint32_t seed,
-        const EarthShadingSettings& settings);
+    void DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
+                              GpuBuffer<glm::vec4>& shadingBuffer,
+                              size_t vertexCount,
+                              uint32_t seed,
+                              const EarthShadingSettings& settings);
 
     bool IsReady() const { return _computeShader.IsValid(); }
     bool IsShadingReady() const { return _shadingShader.IsValid(); }

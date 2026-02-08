@@ -11,13 +11,20 @@
 #include <memory>
 #include <cstdint>
 
-namespace planets::render::lod {
+namespace planets::render::lod
+{
 class QuadTreeNode;
 }
 
-namespace planets::render {
+namespace planets::render
+{
 
-enum class GenerationType { Initial, Split, Merge };
+enum class GenerationType
+{
+    Initial,
+    Split,
+    Merge
+};
 
 struct GenerationRequest
 {
@@ -60,17 +67,15 @@ public:
     GenerationScheduler(const GenerationScheduler&) = delete;
     GenerationScheduler& operator=(const GenerationScheduler&) = delete;
 
-    void Initialize(
-        TerrainGenerator& terrainGen,
-        const EarthTerrainSettings& terrainSettings,
-        const EarthShadingSettings& shadingSettings,
-        uint32_t seed);
+    void Initialize(TerrainGenerator& terrainGen,
+                    const EarthTerrainSettings& terrainSettings,
+                    const EarthShadingSettings& shadingSettings,
+                    uint32_t seed);
 
     // Update settings without full reinit (e.g. parameter slider change)
-    void SetSettings(
-        const EarthTerrainSettings& terrainSettings,
-        const EarthShadingSettings& shadingSettings,
-        uint32_t seed);
+    void SetSettings(const EarthTerrainSettings& terrainSettings,
+                     const EarthShadingSettings& shadingSettings,
+                     uint32_t seed);
 
     void Enqueue(GenerationRequest request);
 

@@ -3,11 +3,13 @@
 #include <imgui.h>
 #include <glm/glm.hpp>
 
-namespace planets::render {
+namespace planets::render
+{
 
 void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
 {
-    if (!visible) return;
+    if (!visible)
+        return;
 
     ImGui::Begin("Atmosphere", &visible);
 
@@ -18,7 +20,8 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
         ImGui::Separator();
         ImGui::Text("Geometry");
         ImGui::SliderFloat("Atmosphere Scale", &settings.atmosphereScale, 0.05f, 0.50f, "%.3f");
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Height as fraction of planet radius");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Height as fraction of planet radius");
 
         ImGui::Separator();
         ImGui::Text("Rayleigh Scattering");
@@ -26,27 +29,32 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
         ImGui::SliderFloat("Red Wavelength", &settings.wavelengths.x, 620.0f, 740.0f, "%.0f nm");
         ImGui::SliderFloat("Green Wavelength", &settings.wavelengths.y, 480.0f, 560.0f, "%.0f nm");
         ImGui::SliderFloat("Blue Wavelength", &settings.wavelengths.z, 400.0f, 480.0f, "%.0f nm");
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Shorter wavelengths scatter more (blue sky)");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Shorter wavelengths scatter more (blue sky)");
 
         ImGui::SliderFloat("Scattering Strength", &settings.scatteringStrength, 5.0f, 40.0f);
 
         ImGui::Separator();
         ImGui::Text("Mie Scattering");
         ImGui::SliderFloat("Mie Coefficient", &settings.mieCoefficient, 0.0f, 0.03f, "%.4f");
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Haze extinction amount");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Haze extinction amount");
         ImGui::SliderFloat("Mie Density Falloff", &settings.mieDensityFalloff, 1.0f, 10.0f);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("How quickly Mie density decreases with altitude");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("How quickly Mie density decreases with altitude");
 
         ImGui::Separator();
         ImGui::Text("Density");
         ImGui::SliderFloat("Density Falloff", &settings.densityFalloff, 1.0f, 10.0f);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("How quickly density decreases with altitude");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("How quickly density decreases with altitude");
 
         ImGui::Separator();
         ImGui::Text("Quality");
         ImGui::SliderInt("In-Scatter Samples", &settings.numInScatteringPoints, 3, 20);
         ImGui::SliderInt("Optical Depth Samples", &settings.numOpticalDepthPoints, 3, 20);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("More samples = better quality, slower");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("More samples = better quality, slower");
 
         ImGui::Separator();
         ImGui::SliderFloat("Intensity", &settings.intensity, 0.5f, 3.0f);
@@ -54,9 +62,11 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
         ImGui::Separator();
         ImGui::Text("Dithering");
         ImGui::SliderFloat("Dither Strength", &settings.ditherStrength, 0.0f, 2.0f);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Blue noise dithering to reduce banding");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Blue noise dithering to reduce banding");
         ImGui::SliderFloat("Dither Scale", &settings.ditherScale, 1.0f, 10.0f);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Scale of the noise pattern");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Scale of the noise pattern");
 
         ImGui::Separator();
         if (ImGui::Button("Earth Preset"))

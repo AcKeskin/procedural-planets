@@ -4,7 +4,8 @@
 
 struct GLFWwindow;
 
-namespace planets::render {
+namespace planets::render
+{
 
 struct WindowConfig
 {

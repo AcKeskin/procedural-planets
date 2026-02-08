@@ -2,7 +2,8 @@
 
 #include <GL/gl3w.h>
 
-namespace planets::render {
+namespace planets::render
+{
 
 // RAII wrapper around GLsync for non-blocking GPU completion checks
 class GlFence

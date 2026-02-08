@@ -27,7 +27,8 @@
 #include "math/Camera.h"
 #include "generation/Planet.h"
 
-namespace planets::app {
+namespace planets::app
+{
 
 // Owns all state, systems, and the frame loop
 class Application

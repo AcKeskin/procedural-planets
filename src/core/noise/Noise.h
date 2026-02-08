@@ -1,6 +1,7 @@
 #pragma once
 
-namespace planets::core {
+namespace planets::core
+{
 
 // Interface for all noise generators
 class INoiseGenerator

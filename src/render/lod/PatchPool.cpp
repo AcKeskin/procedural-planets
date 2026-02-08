@@ -1,6 +1,7 @@
 #include "PatchPool.h"
 
-namespace planets::render::lod {
+namespace planets::render::lod
+{
 
 PatchPool::PatchPool(int maxCacheSize)
     : _maxCacheSize(maxCacheSize)
@@ -19,7 +20,8 @@ std::unique_ptr<SpherePatch> PatchPool::Acquire()
 
 void PatchPool::Release(std::unique_ptr<SpherePatch> patch)
 {
-    if (!patch) return;
+    if (!patch)
+        return;
 
     // Evict oldest if at capacity
     if (static_cast<int>(_cache.size()) >= _maxCacheSize)
