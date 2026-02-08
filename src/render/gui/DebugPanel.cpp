@@ -2,12 +2,14 @@
 #include "../../core/math/Camera.h"
 #include <imgui.h>
 
-namespace planets::render {
-
-void DebugPanel::Draw(const planets::core::Camera& camera, float& moveSpeed,
-                      bool autoOrbit, float& autoOrbitSpeed, bool& visible)
+namespace planets::render
 {
-    if (!visible) return;
+
+void DebugPanel::Draw(
+    const planets::core::Camera& camera, float& moveSpeed, bool autoOrbit, float& autoOrbitSpeed, bool& visible)
+{
+    if (!visible)
+        return;
 
     ImGui::Begin("Debug", &visible);
 

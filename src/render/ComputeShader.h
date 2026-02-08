@@ -4,7 +4,8 @@
 #include <unordered_set>
 #include <glm/glm.hpp>
 
-namespace planets::render {
+namespace planets::render
+{
 
 class ComputeShader
 {
@@ -40,7 +41,9 @@ public:
 
 private:
     std::string LoadFile(const std::string& path);
-    std::string PreprocessIncludes(const std::string& source, const std::string& sourcePath, std::unordered_set<std::string>& includedFiles);
+    std::string PreprocessIncludes(const std::string& source,
+                                   const std::string& sourcePath,
+                                   std::unordered_set<std::string>& includedFiles);
 
     unsigned int _program;
 };

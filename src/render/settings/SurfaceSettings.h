@@ -2,7 +2,8 @@
 
 #include <glm/glm.hpp>
 
-namespace planets::render {
+namespace planets::render
+{
 
 // Biome settings for shader - height zones from sea level
 // All height thresholds are RELATIVE (0 = sea level, 1 = max terrain height)

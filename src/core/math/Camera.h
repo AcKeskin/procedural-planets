@@ -2,7 +2,8 @@
 
 #include <glm/glm.hpp>
 
-namespace planets::core {
+namespace planets::core
+{
 
 enum class CameraMode
 {

@@ -4,7 +4,8 @@
 #include <deque>
 #include <memory>
 
-namespace planets::render::lod {
+namespace planets::render::lod
+{
 
 // Recycles SpherePatch GPU resources to avoid per-split allocation overhead
 class PatchPool

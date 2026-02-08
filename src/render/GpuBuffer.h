@@ -4,11 +4,11 @@
 #include <vector>
 #include <cstddef>
 
-namespace planets::render {
+namespace planets::render
+{
 
 // GPU storage buffer (SSBO) for compute shader data transfer
-template<typename T>
-class GpuBuffer
+template <typename T> class GpuBuffer
 {
 public:
     GpuBuffer();
@@ -46,15 +46,14 @@ private:
 };
 
 // Template implementation
-template<typename T>
+template <typename T>
 GpuBuffer<T>::GpuBuffer()
     : _buffer(0)
     , _count(0)
 {
 }
 
-template<typename T>
-GpuBuffer<T>::~GpuBuffer()
+template <typename T> GpuBuffer<T>::~GpuBuffer()
 {
     if (_buffer)
     {
@@ -62,7 +61,7 @@ GpuBuffer<T>::~GpuBuffer()
     }
 }
 
-template<typename T>
+template <typename T>
 GpuBuffer<T>::GpuBuffer(GpuBuffer&& other) noexcept
     : _buffer(other._buffer)
     , _count(other._count)
@@ -71,8 +70,7 @@ GpuBuffer<T>::GpuBuffer(GpuBuffer&& other) noexcept
     other._count = 0;
 }
 
-template<typename T>
-GpuBuffer<T>& GpuBuffer<T>::operator=(GpuBuffer&& other) noexcept
+template <typename T> GpuBuffer<T>& GpuBuffer<T>::operator=(GpuBuffer&& other) noexcept
 {
     if (this != &other)
     {
@@ -88,14 +86,12 @@ GpuBuffer<T>& GpuBuffer<T>::operator=(GpuBuffer&& other) noexcept
     return *this;
 }
 
-template<typename T>
-void GpuBuffer<T>::Upload(const std::vector<T>& data)
+template <typename T> void GpuBuffer<T>::Upload(const std::vector<T>& data)
 {
     Upload(data.data(), data.size());
 }
 
-template<typename T>
-void GpuBuffer<T>::Upload(const T* data, size_t count)
+template <typename T> void GpuBuffer<T>::Upload(const T* data, size_t count)
 {
     if (!_buffer)
     {
@@ -108,8 +104,7 @@ void GpuBuffer<T>::Upload(const T* data, size_t count)
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-template<typename T>
-void GpuBuffer<T>::Allocate(size_t count)
+template <typename T> void GpuBuffer<T>::Allocate(size_t count)
 {
     if (!_buffer)
     {
@@ -122,15 +117,13 @@ void GpuBuffer<T>::Allocate(size_t count)
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-template<typename T>
-void GpuBuffer<T>::Download(std::vector<T>& data) const
+template <typename T> void GpuBuffer<T>::Download(std::vector<T>& data) const
 {
     data.resize(_count);
     Download(data.data(), _count);
 }
 
-template<typename T>
-void GpuBuffer<T>::Download(T* data, size_t count) const
+template <typename T> void GpuBuffer<T>::Download(T* data, size_t count) const
 {
     if (!_buffer || count == 0)
     {
@@ -142,8 +135,7 @@ void GpuBuffer<T>::Download(T* data, size_t count) const
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-template<typename T>
-void GpuBuffer<T>::Bind(unsigned int bindingPoint) const
+template <typename T> void GpuBuffer<T>::Bind(unsigned int bindingPoint) const
 {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingPoint, _buffer);
 }

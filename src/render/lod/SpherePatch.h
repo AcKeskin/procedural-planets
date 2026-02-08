@@ -5,7 +5,8 @@
 #include <vector>
 #include <array>
 
-namespace planets::render::lod {
+namespace planets::render::lod
+{
 
 // Axis-aligned bounding box for frustum culling
 struct AABB
@@ -40,13 +41,12 @@ public:
     SpherePatch& operator=(SpherePatch&&) noexcept = default;
 
     // Initialize patch from three vertices of base icosahedron face
-    void Initialize(
-        const glm::vec3& v0,
-        const glm::vec3& v1,
-        const glm::vec3& v2,
-        float planetRadius,
-        int resolution = 32,
-        float skirtFraction = 0.02f);
+    void Initialize(const glm::vec3& v0,
+                    const glm::vec3& v1,
+                    const glm::vec3& v2,
+                    float planetRadius,
+                    int resolution = 32,
+                    float skirtFraction = 0.02f);
 
     // Generate mesh data from heights and shading
     void GenerateMesh(const std::vector<float>& heights, const std::vector<glm::vec4>& shadingData);
@@ -69,18 +69,19 @@ public:
 private:
     void GenerateGridVertices(int resolution, std::vector<glm::vec3>& vertices);
     void GenerateGridIndices(int resolution, std::vector<uint32_t>& indices);
-    void AppendSkirtGeometry(MeshData& meshData, const std::vector<float>& heights,
+    void AppendSkirtGeometry(MeshData& meshData,
+                             const std::vector<float>& heights,
                              const std::vector<glm::vec4>& shadingData);
 
-    glm::vec3 _v0, _v1, _v2;        // Base triangle vertices (unit sphere)
-    glm::vec3 _center;              // Patch center on unit sphere
-    float _angularSize = 0.0f;      // Angular extent in radians
+    glm::vec3 _v0, _v1, _v2;   // Base triangle vertices (unit sphere)
+    glm::vec3 _center;         // Patch center on unit sphere
+    float _angularSize = 0.0f; // Angular extent in radians
     float _planetRadius = 1.0f;
-    int _resolution = 32;           // Vertices per edge
-    float _skirtFraction = 0.02f;   // Fraction of patch size for skirt depth
+    int _resolution = 32;         // Vertices per edge
+    float _skirtFraction = 0.02f; // Fraction of patch size for skirt depth
     AABB _boundingBox;
 
-    std::vector<glm::vec3> _vertices;  // Unit sphere positions
+    std::vector<glm::vec3> _vertices; // Unit sphere positions
     Mesh _mesh;
     bool _generated = false;
 };

@@ -2,7 +2,8 @@
 
 struct GLFWwindow;
 
-namespace planets::app {
+namespace planets::app
+{
 
 // Key codes matching GLFW
 enum class Key

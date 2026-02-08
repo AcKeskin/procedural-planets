@@ -4,7 +4,8 @@
 #include <array>
 #include <memory>
 
-namespace planets::render::lod {
+namespace planets::render::lod
+{
 
 // Forward declaration to avoid circular dependency
 class SpherePatch;
@@ -17,12 +18,7 @@ public:
     static constexpr int MaxDepth = 8;
 
     // Construct node from three triangle vertices on unit sphere
-    QuadTreeNode(
-        const glm::vec3& v0,
-        const glm::vec3& v1,
-        const glm::vec3& v2,
-        int depth,
-        QuadTreeNode* parent);
+    QuadTreeNode(const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2, int depth, QuadTreeNode* parent);
 
     ~QuadTreeNode() = default;
 

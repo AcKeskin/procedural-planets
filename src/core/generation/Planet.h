@@ -4,7 +4,8 @@
 #include <vector>
 #include <cstdint>
 
-namespace planets::core {
+namespace planets::core
+{
 
 struct PlanetSettings
 {

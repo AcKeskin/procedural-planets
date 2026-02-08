@@ -8,7 +8,8 @@
 #include <regex>
 #include <unordered_set>
 
-namespace planets::render {
+namespace planets::render
+{
 
 Shader::Shader()
     : _program(0)
@@ -149,7 +150,9 @@ std::string Shader::LoadFile(const std::string& path)
     return buffer.str();
 }
 
-std::string Shader::PreprocessIncludes(const std::string& source, const std::string& sourcePath, std::unordered_set<std::string>& includedFiles)
+std::string Shader::PreprocessIncludes(const std::string& source,
+                                       const std::string& sourcePath,
+                                       std::unordered_set<std::string>& includedFiles)
 {
     // Regex pattern to match #include "filename"
     static const std::regex includePattern(R"regex(^\s*#include\s+"([^"]+)"\s*$)regex");
@@ -182,16 +185,16 @@ std::string Shader::PreprocessIncludes(const std::string& source, const std::str
             }
             catch (const std::filesystem::filesystem_error& e)
             {
-                std::cerr << "[Shader] Include resolution error in " << sourcePath << ":" << lineNumber
-                          << " - " << e.what() << std::endl;
+                std::cerr << "[Shader] Include resolution error in " << sourcePath << ":" << lineNumber << " - "
+                          << e.what() << std::endl;
                 return "";
             }
 
             // Check for circular dependency
             if (includedFiles.find(canonicalIncludePath) != includedFiles.end())
             {
-                std::cerr << "[Shader] Circular include detected: " << canonicalIncludePath
-                          << " in " << sourcePath << ":" << lineNumber << std::endl;
+                std::cerr << "[Shader] Circular include detected: " << canonicalIncludePath << " in " << sourcePath
+                          << ":" << lineNumber << std::endl;
                 return "";
             }
 
@@ -199,8 +202,8 @@ std::string Shader::PreprocessIncludes(const std::string& source, const std::str
             std::string includedSource = LoadFile(canonicalIncludePath);
             if (includedSource.empty())
             {
-                std::cerr << "[Shader] Failed to load include: " << canonicalIncludePath
-                          << " referenced in " << sourcePath << ":" << lineNumber << std::endl;
+                std::cerr << "[Shader] Failed to load include: " << canonicalIncludePath << " referenced in "
+                          << sourcePath << ":" << lineNumber << std::endl;
                 return "";
             }
 

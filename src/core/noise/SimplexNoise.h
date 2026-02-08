@@ -4,7 +4,8 @@
 #include <vector>
 #include <cstdint>
 
-namespace planets::core {
+namespace planets::core
+{
 
 // 3D Simplex noise based on Ken Perlin's 2001 paper
 class SimplexNoise : public INoiseGenerator
@@ -24,11 +25,18 @@ private:
     static constexpr float F3 = 1.0f / 3.0f;
     static constexpr float G3 = 1.0f / 6.0f;
 
-    static constexpr int Grad3[12][3] = {
-        {1,1,0}, {-1,1,0}, {1,-1,0}, {-1,-1,0},
-        {1,0,1}, {-1,0,1}, {1,0,-1}, {-1,0,-1},
-        {0,1,1}, {0,-1,1}, {0,1,-1}, {0,-1,-1}
-    };
+    static constexpr int Grad3[12][3] = {{1, 1, 0},
+                                         {-1, 1, 0},
+                                         {1, -1, 0},
+                                         {-1, -1, 0},
+                                         {1, 0, 1},
+                                         {-1, 0, 1},
+                                         {1, 0, -1},
+                                         {-1, 0, -1},
+                                         {0, 1, 1},
+                                         {0, -1, 1},
+                                         {0, 1, -1},
+                                         {0, -1, -1}};
 };
 
 } // namespace planets::core

@@ -8,7 +8,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-namespace planets::render::effects {
+namespace planets::render::effects
+{
 
 AtmosphereRenderer::AtmosphereRenderer() = default;
 
@@ -104,9 +105,18 @@ void AtmosphereRenderer::CreateFullscreenQuad()
 {
     // Fullscreen triangle (more efficient than quad, covers screen in one primitive)
     float vertices[] = {
-        -1.0f, -1.0f,  0.0f, 0.0f,
-         3.0f, -1.0f,  2.0f, 0.0f,
-        -1.0f,  3.0f,  0.0f, 2.0f,
+        -1.0f,
+        -1.0f,
+        0.0f,
+        0.0f,
+        3.0f,
+        -1.0f,
+        2.0f,
+        0.0f,
+        -1.0f,
+        3.0f,
+        0.0f,
+        2.0f,
     };
 
     glGenVertexArrays(1, &_quadVAO);
@@ -125,21 +135,20 @@ void AtmosphereRenderer::CreateFullscreenQuad()
     glBindVertexArray(0);
 }
 
-void AtmosphereRenderer::Render(
-    const glm::mat4& view,
-    const glm::mat4& projection,
-    const glm::mat4& invView,
-    const glm::mat4& invProjection,
-    const glm::vec3& cameraPos,
-    const glm::vec3& lightDir,
-    const glm::vec3& planetCenter,
-    float planetRadius,
-    float oceanRadius,
-    float nearPlane,
-    float farPlane,
-    const AtmosphereSettings& settings,
-    unsigned int sceneTexture,
-    unsigned int depthTexture)
+void AtmosphereRenderer::Render(const glm::mat4& view,
+                                const glm::mat4& projection,
+                                const glm::mat4& invView,
+                                const glm::mat4& invProjection,
+                                const glm::vec3& cameraPos,
+                                const glm::vec3& lightDir,
+                                const glm::vec3& planetCenter,
+                                float planetRadius,
+                                float oceanRadius,
+                                float nearPlane,
+                                float farPlane,
+                                const AtmosphereSettings& settings,
+                                unsigned int sceneTexture,
+                                unsigned int depthTexture)
 {
     if (!_initialized || !settings.enabled)
         return;

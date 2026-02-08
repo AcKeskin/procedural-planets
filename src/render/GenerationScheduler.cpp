@@ -3,13 +3,13 @@
 #include <algorithm>
 #include <iostream>
 
-namespace planets::render {
+namespace planets::render
+{
 
-void GenerationScheduler::Initialize(
-    TerrainGenerator& terrainGen,
-    const EarthTerrainSettings& terrainSettings,
-    const EarthShadingSettings& shadingSettings,
-    uint32_t seed)
+void GenerationScheduler::Initialize(TerrainGenerator& terrainGen,
+                                     const EarthTerrainSettings& terrainSettings,
+                                     const EarthShadingSettings& shadingSettings,
+                                     uint32_t seed)
 {
     CancelAll();
     _terrainGen = &terrainGen;
@@ -18,10 +18,9 @@ void GenerationScheduler::Initialize(
     _seed = seed;
 }
 
-void GenerationScheduler::SetSettings(
-    const EarthTerrainSettings& terrainSettings,
-    const EarthShadingSettings& shadingSettings,
-    uint32_t seed)
+void GenerationScheduler::SetSettings(const EarthTerrainSettings& terrainSettings,
+                                      const EarthShadingSettings& shadingSettings,
+                                      uint32_t seed)
 {
     _terrainSettings = &terrainSettings;
     _shadingSettings = &shadingSettings;
@@ -39,7 +38,7 @@ void GenerationScheduler::ProcessFrame(int maxDispatches, int maxCompletions)
 {
     // Phase 1: Check in-flight fences, readback completed tasks
     int completions = 0;
-    for (auto it = _inFlight.begin(); it != _inFlight.end() && completions < maxCompletions; )
+    for (auto it = _inFlight.begin(); it != _inFlight.end() && completions < maxCompletions;)
     {
         if (it->fence.IsSignaled())
         {
@@ -54,11 +53,9 @@ void GenerationScheduler::ProcessFrame(int maxDispatches, int maxCompletions)
     }
 
     // Phase 2: Sort pending by priority (closest patches first)
-    std::sort(_pending.begin(), _pending.end(),
-        [](const GenerationTask& a, const GenerationTask& b)
-        {
-            return a.request.priority < b.request.priority;
-        });
+    std::sort(_pending.begin(),
+              _pending.end(),
+              [](const GenerationTask& a, const GenerationTask& b) { return a.request.priority < b.request.priority; });
 
     // Phase 3: Dispatch new tasks up to budget
     int dispatches = 0;
@@ -92,17 +89,14 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
     task.heightBuffer.Allocate(task.vertexCount);
 
     // Dispatch height compute (no barrier)
-    _terrainGen->DispatchHeightsAsync(
-        task.vertexBuffer, task.heightBuffer,
-        task.vertexCount, _seed, *_terrainSettings);
+    _terrainGen->DispatchHeightsAsync(task.vertexBuffer, task.heightBuffer, task.vertexCount, _seed, *_terrainSettings);
 
     // Dispatch shading compute (no barrier)
     if (_terrainGen->IsShadingReady())
     {
         task.shadingBuffer.Allocate(task.vertexCount);
         _terrainGen->DispatchShadingAsync(
-            task.vertexBuffer, task.shadingBuffer,
-            task.vertexCount, _seed, *_shadingSettings);
+            task.vertexBuffer, task.shadingBuffer, task.vertexCount, _seed, *_shadingSettings);
     }
 
     // Single fence covers both dispatches
@@ -130,11 +124,7 @@ void GenerationScheduler::CompleteTask(GenerationTask& task)
     task.request.patch->GenerateMesh(heights, shadingData);
 
     // Move to completed results
-    _completed.push_back({
-        task.request.targetNode,
-        task.request.type,
-        std::move(task.request.patch)
-    });
+    _completed.push_back({task.request.targetNode, task.request.type, std::move(task.request.patch)});
 }
 
 std::vector<CompletedGeneration> GenerationScheduler::TakeCompleted()
