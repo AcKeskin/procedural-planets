@@ -41,6 +41,7 @@ public:
     void SetOrbitTarget(const glm::vec3& target);
     void OrbitRotate(float yawDelta, float pitchDelta);
     void OrbitZoom(float amount);
+    void SetOrbitDistance(float distance);
 
     // Matrix getters
     glm::mat4 GetViewMatrix() const;
