@@ -156,15 +156,9 @@ void Application::ProcessInput(float deltaTime)
     if (_input.IsKeyDown(Key::Escape))
     {
         if (_cinematicController.IsPlaying())
-        {
-            _cinematicController.Stop();
-            _guiVisible = true;
-            _camera.SetMode(core::CameraMode::FreeFly);
-        }
+            StopCinematic();
         else
-        {
             _window.SetShouldClose(true);
-        }
     }
 
     // Tab: toggle GUI visibility
@@ -175,18 +169,9 @@ void Application::ProcessInput(float deltaTime)
     if (!guiWantsKeyboard && _input.IsKeyPressed(Key::F5))
     {
         if (_cinematicController.IsPlaying())
-        {
-            _cinematicController.Stop();
-            _guiVisible = true;
-            _camera.SetMode(core::CameraMode::FreeFly);
-        }
+            StopCinematic();
         else
-        {
-            _camera.SetOrbitTarget(glm::vec3(0.0f));
-            _camera.SetMode(core::CameraMode::Orbit);
-            _cinematicController.Start(_cinematicSettings, _lodConfig.planetRadius, _camera);
-            _guiVisible = false;
-        }
+            StartCinematic();
     }
 
     // F12: screenshot (deferred to capture point in Render)
@@ -220,10 +205,7 @@ void Application::ProcessInput(float deltaTime)
 
         // Auto-stop check: controller sets state to Idle when done
         if (!_cinematicController.IsPlaying())
-        {
-            _guiVisible = true;
-            _camera.SetMode(core::CameraMode::FreeFly);
-        }
+            StopCinematic();
         return;
     }
 
@@ -444,17 +426,11 @@ void Application::RenderGui()
         _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
 
         // Cinematic panel: only when not playing
-        bool cinematicVisible = true;
         bool playRequested = false;
-        _cinematicPanel.Draw(_cinematicSettings, _lodConfig.planetRadius, playRequested, cinematicVisible);
+        _cinematicPanel.Draw(_cinematicSettings, _lodConfig.planetRadius, playRequested, _cinematicPanelVisible);
 
         if (playRequested)
-        {
-            _camera.SetOrbitTarget(glm::vec3(0.0f));
-            _camera.SetMode(core::CameraMode::Orbit);
-            _cinematicController.Start(_cinematicSettings, _lodConfig.planetRadius, _camera);
-            _guiVisible = false;
-        }
+            StartCinematic();
 
         if (needsRegen)
         {
@@ -486,6 +462,21 @@ void Application::ShuffleTerrain()
         RegeneratePlanetGpu();
     else
         RegeneratePlanetCpu();
+}
+
+void Application::StartCinematic()
+{
+    _camera.SetOrbitTarget(glm::vec3(0.0f));
+    _camera.SetMode(core::CameraMode::Orbit);
+    _cinematicController.Start(_cinematicSettings, _lodConfig.planetRadius, _camera);
+    _guiVisible = false;
+}
+
+void Application::StopCinematic()
+{
+    _cinematicController.Stop();
+    _guiVisible = true;
+    _camera.SetMode(core::CameraMode::FreeFly);
 }
 
 void Application::RegeneratePlanetCpu()

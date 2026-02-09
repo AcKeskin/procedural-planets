@@ -52,7 +52,7 @@ bool CaptureManager::CaptureScreenshot(int width, int height)
     if (!EnsureCaptureDirectory())
         return false;
 
-    _pixelBuffer.resize(width * height * CaptureDefaults::RgbChannels);
+    _pixelBuffer.resize(static_cast<size_t>(width) * height * CaptureDefaults::RgbChannels);
     glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, _pixelBuffer.data());
 
     // Flip vertically (OpenGL origin is bottom-left, PNG expects top-left)

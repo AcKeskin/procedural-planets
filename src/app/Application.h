@@ -75,6 +75,8 @@ private:
     void RegeneratePlanetGpu();
     void RegenerateLodSystem();
     void ShuffleTerrain();
+    void StartCinematic();
+    void StopCinematic();
 
     // Build QuadTreeConfig from current LodConfig
     render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
@@ -131,6 +133,7 @@ private:
     render::CinematicSettings _cinematicSettings;
     render::CaptureManager _captureManager;
     bool _guiVisible = true;
+    bool _cinematicPanelVisible = true;
     bool _screenshotRequested = false;
 
     // CPU fallback

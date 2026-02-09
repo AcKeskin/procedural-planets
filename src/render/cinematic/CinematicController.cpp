@@ -86,7 +86,10 @@ float CinematicController::ComputeOrbitSpeed(float progress) const
 
     // Speed modulation creates acceleration/deceleration feel
     // Peaks at middle (progress=0.5), slower at boundaries
-    return _settings.orbitSpeed * (1.0f - std::abs(2.0f * progress - 1.0f));
+    // Minimum 10% speed at boundaries prevents camera stalling at start/end
+    constexpr float minSpeedFraction = 0.1f;
+    float speedCurve = 1.0f - std::abs(2.0f * progress - 1.0f);
+    return _settings.orbitSpeed * std::max(speedCurve, minSpeedFraction);
 }
 
 float CinematicController::ComputeZoomDistance(float progress) const
