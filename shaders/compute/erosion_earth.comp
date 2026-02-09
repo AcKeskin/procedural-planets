@@ -1,9 +1,14 @@
 #version 450
 layout(local_size_x = 256) in;
 
-layout(std430, binding = 1) buffer Heights
+layout(std430, binding = 0) readonly buffer HeightsIn
 {
-    float heights[];
+    float heightsIn[];
+};
+
+layout(std430, binding = 1) buffer HeightsOut
+{
+    float heightsOut[];
 };
 
 uniform uint numVertices;
@@ -22,7 +27,7 @@ void main()
     int gx = int(id) % gridResolution;
     int gy = int(id) / gridResolution;
 
-    float h = heights[id];
+    float h = heightsIn[id];
 
     // Gather neighbor heights (clamp at grid edges)
     int left  = max(0, gx - 1) + gy * gridResolution;
@@ -30,10 +35,10 @@ void main()
     int up    = gx + max(0, gy - 1) * gridResolution;
     int down  = gx + min(gridResolution - 1, gy + 1) * gridResolution;
 
-    float hL = heights[left];
-    float hR = heights[right];
-    float hU = heights[up];
-    float hD = heights[down];
+    float hL = heightsIn[left];
+    float hR = heightsIn[right];
+    float hU = heightsIn[up];
+    float hD = heightsIn[down];
 
     // ---- Thermal erosion ----
     // Material moves downhill when slope exceeds threshold
@@ -75,5 +80,5 @@ void main()
         // Deposition happens naturally at neighbors (handled when they process)
     }
 
-    heights[id] = h + thermalDelta + hydraulicDelta;
+    heightsOut[id] = h + thermalDelta + hydraulicDelta;
 }

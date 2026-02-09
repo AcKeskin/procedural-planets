@@ -380,12 +380,14 @@ void TerrainGenerator::SetErosionUniforms(size_t vertexCount, int gridResolution
     _erosionShader.SetFloat("evaporationRate", settings.evaporationRate);
 }
 
-void TerrainGenerator::DispatchErosionAsync(GpuBuffer<float>& heightBuffer,
+void TerrainGenerator::DispatchErosionAsync(GpuBuffer<float>& inputBuffer,
+                                            GpuBuffer<float>& outputBuffer,
                                             size_t vertexCount,
                                             int gridResolution,
                                             const EarthTerrainSettings& settings)
 {
-    heightBuffer.Bind(1);
+    inputBuffer.Bind(0);
+    outputBuffer.Bind(1);
     SetErosionUniforms(vertexCount, gridResolution, settings);
 
     unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + ErosionWorkgroupSize - 1) / ErosionWorkgroupSize;

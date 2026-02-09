@@ -79,7 +79,8 @@ public:
                               float heightScale);
 
     // Dispatch one erosion iteration on the height buffer (no barrier, no readback)
-    void DispatchErosionAsync(GpuBuffer<float>& heightBuffer,
+    void DispatchErosionAsync(GpuBuffer<float>& inputBuffer,
+                              GpuBuffer<float>& outputBuffer,
                               size_t vertexCount,
                               int gridResolution,
                               const EarthTerrainSettings& settings);
