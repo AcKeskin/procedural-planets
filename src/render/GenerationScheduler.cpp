@@ -95,11 +95,21 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
     if (_terrainSettings->enableErosion && _terrainGen->IsErosionReady())
     {
         int gridRes = task.request.patch->GetResolution();
+        task.erosionScratchBuffer.Allocate(task.vertexCount);
+
+        GpuBuffer<float>* readBuf = &task.heightBuffer;
+        GpuBuffer<float>* writeBuf = &task.erosionScratchBuffer;
+
         for (int i = 0; i < _terrainSettings->erosionIterations; ++i)
         {
             ComputeShader::WaitForCompletion();
-            _terrainGen->DispatchErosionAsync(task.heightBuffer, task.vertexCount, gridRes, *_terrainSettings);
+            _terrainGen->DispatchErosionAsync(*readBuf, *writeBuf, task.vertexCount, gridRes, *_terrainSettings);
+            std::swap(readBuf, writeBuf);
         }
+
+        // Ensure final result is in heightBuffer
+        if (readBuf != &task.heightBuffer)
+            std::swap(task.heightBuffer, task.erosionScratchBuffer);
     }
 
     // Barrier ensures height data (potentially eroded) is readable by shading

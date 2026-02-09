@@ -81,6 +81,12 @@ void Camera::OrbitZoom(float amount)
     OrbitRotate(0.0f, 0.0f);
 }
 
+void Camera::SetOrbitDistance(float distance)
+{
+    _orbitDistance = std::max(distance, CameraDefaults::MinOrbitDistance);
+    OrbitRotate(0.0f, 0.0f);
+}
+
 glm::mat4 Camera::GetViewMatrix() const
 {
     return glm::lookAt(_position, _position + _forward, _up);

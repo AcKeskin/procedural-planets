@@ -9,6 +9,7 @@ add_library(render STATIC
     gui/SurfacePanel.cpp
     gui/AtmospherePanel.cpp
     gui/DebugPanel.cpp
+    gui/CinematicPanel.cpp
     Renderer.cpp
     Mesh.cpp
     MeshGenerator.cpp
@@ -25,6 +26,8 @@ add_library(render STATIC
     lod/PatchPool.cpp
     effects/OceanRenderer.cpp
     effects/AtmosphereRenderer.cpp
+    cinematic/CinematicController.cpp
+    cinematic/CaptureManager.cpp
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
