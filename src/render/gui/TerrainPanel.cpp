@@ -105,6 +105,44 @@ bool TerrainPanel::DrawEarthTerrainContent(EarthTerrainSettings& settings,
                        "Tip: Lower height scale + higher frequency = larger-feeling planet");
 
     ImGui::Spacing();
+    ImGui::Text("Tectonic Plates");
+    ImGui::Separator();
+
+    if (ImGui::Checkbox("Use Tectonics", &settings.useTectonics))
+        needsRegeneration = true;
+
+    if (settings.useTectonics)
+    {
+        ImGui::SliderInt("Num Plates", &settings.numPlates, 6, 20);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Continental Fraction", &settings.continentalFraction, 0.2f, 0.7f);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Boundary Width", &settings.boundaryWidth, 0.05f, 0.4f);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Convergent Mountains", &settings.convergentMountainScale, 0.1f, 1.5f);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Divergent Rift Depth", &settings.divergentRiftDepth, 0.0f, 0.8f);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Coastline Noise", &settings.coastlineNoise, 0.0f, 1.0f);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Plate Interior Noise", &settings.plateElevationNoise, 0.0f, 0.5f);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+    }
+
+    ImGui::Spacing();
     ImGui::Text("Continental Shape");
     ImGui::Separator();
 
@@ -149,6 +187,56 @@ bool TerrainPanel::DrawEarthTerrainContent(EarthTerrainSettings& settings,
     ImGui::SliderFloat("Ocean Floor Smooth", &settings.oceanFloorSmoothing, 0.3f, 1.2f);
     if (ImGui::IsItemDeactivatedAfterEdit())
         needsRegeneration = true;
+
+    ImGui::Spacing();
+    ImGui::Text("Ocean Floor Topology");
+    ImGui::Separator();
+
+    if (ImGui::Checkbox("Use Ocean Floor", &settings.useOceanFloor))
+        needsRegeneration = true;
+
+    if (settings.useOceanFloor)
+    {
+        ImGui::SliderFloat("Shelf Width", &settings.shelfWidth, 0.05f, 0.4f);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderInt("Ridge Octaves", &settings.oceanRidgeOctaves, 2, 6);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Ridge Scale", &settings.oceanRidgeScale, 0.3f, 2.0f);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Ridge Strength", &settings.oceanRidgeStrength, 0.05f, 0.8f);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderInt("Trench Octaves", &settings.trenchOctaves, 2, 5);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Trench Scale", &settings.trenchScale, 0.5f, 3.0f);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Trench Depth", &settings.trenchDepth, 0.1f, 0.8f);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderInt("Abyssal Octaves", &settings.abyssalOctaves, 2, 6);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Abyssal Scale", &settings.abyssalScale, 0.5f, 4.0f);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Abyssal Strength", &settings.abyssalStrength, 0.02f, 0.3f);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+    }
 
     ImGui::Spacing();
     ImGui::Text("Mountain Ridges");
@@ -203,20 +291,94 @@ bool TerrainPanel::DrawEarthTerrainContent(EarthTerrainSettings& settings,
         needsRegeneration = true;
 
     ImGui::Spacing();
-    ImGui::Text("Surface Detail");
+    ImGui::Text("Height-Dependent Detail");
     ImGui::Separator();
 
-    ImGui::SliderFloat("Perturb Strength", &settings.perturbStrength, 0.001f, 0.005f, "%.4f");
+    ImGui::SliderFloat("Detail Low Threshold", &settings.detailLowThreshold, -0.5f, 0.1f);
     if (ImGui::IsItemDeactivatedAfterEdit())
         needsRegeneration = true;
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("High-frequency micro-detail roughness");
+        ImGui::SetTooltip("Height below this = minimal detail (smooth plains)");
+
+    ImGui::SliderFloat("Detail High Threshold", &settings.detailHighThreshold, 0.0f, 0.8f);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Height above this = maximum detail (rough mountains)");
+
+    ImGui::SliderFloat("Strength Low", &settings.perturbStrengthLow, 0.0f, 0.003f, "%.4f");
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Perturbation strength for flat terrain");
+
+    ImGui::SliderFloat("Strength High", &settings.perturbStrengthHigh, 0.001f, 0.01f, "%.4f");
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Perturbation strength for elevated terrain");
+
+    ImGui::SliderInt("Octaves Low", &settings.detailOctavesLow, 1, 4);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+
+    ImGui::SliderInt("Octaves High", &settings.detailOctavesHigh, 2, 8);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+
+    ImGui::SliderFloat("Detail Persistence", &settings.detailPersistence, 0.2f, 0.7f);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+
+    ImGui::SliderFloat("Detail Lacunarity", &settings.detailLacunarity, 1.5f, 3.5f);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Perturb Scale", &settings.perturbScale, 10.0f, 30.0f);
     if (ImGui::IsItemDeactivatedAfterEdit())
         needsRegeneration = true;
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Frequency of perturbation noise");
+        ImGui::SetTooltip("Base frequency of perturbation noise");
+
+    ImGui::Spacing();
+    ImGui::Text("Erosion");
+    ImGui::Separator();
+
+    if (ImGui::Checkbox("Enable Erosion", &settings.enableErosion))
+        needsRegeneration = true;
+
+    if (settings.enableErosion)
+    {
+        ImGui::SliderInt("Erosion Iterations", &settings.erosionIterations, 1, 15);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("More iterations = smoother, more eroded terrain");
+
+        ImGui::SliderFloat("Thermal Rate", &settings.thermalErosionRate, 0.001f, 0.1f, "%.3f");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Rate of slope-based material redistribution");
+
+        ImGui::SliderFloat("Thermal Threshold", &settings.thermalThreshold, 0.001f, 0.05f, "%.3f");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Minimum slope angle before thermal erosion activates");
+
+        ImGui::SliderFloat("Hydraulic Rate", &settings.hydraulicErosionRate, 0.001f, 0.05f, "%.3f");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Deposition Rate", &settings.depositionRate, 0.001f, 0.02f, "%.3f");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+
+        ImGui::SliderFloat("Evaporation Rate", &settings.evaporationRate, 0.01f, 0.5f, "%.2f");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+    }
 
     ImGui::Spacing();
     ImGui::Separator();
@@ -349,7 +511,7 @@ bool TerrainPanel::DrawLodContent(LodConfig& lod, const TerrainStats& stats)
         ImGui::Separator();
         ImGui::Text("Settings");
 
-        ImGui::SliderFloat("Planet Radius", &lod.planetRadius, 1.0f, 1000.0f);
+        ImGui::SliderFloat("Planet Radius", &lod.planetRadius, 1.0f, 5000.0f);
         if (ImGui::IsItemDeactivatedAfterEdit())
             needsRegeneration = true;
 

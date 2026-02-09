@@ -24,11 +24,33 @@
 #include "settings/SurfaceSettings.h"
 #include "settings/OceanSettings.h"
 #include "settings/AtmosphereSettings.h"
+#include "settings/CinematicSettings.h"
+#include "cinematic/CinematicController.h"
+#include "cinematic/CaptureManager.h"
+#include "gui/CinematicPanel.h"
 #include "math/Camera.h"
 #include "generation/Planet.h"
 
 namespace planets::app
 {
+
+namespace AppDefaults
+{
+inline constexpr float SeaLevel = 0.995f;
+inline constexpr float MoveSpeed = 75.0f;
+inline constexpr float InitialCameraDistanceMultiplier = 2.5f;
+inline constexpr float MouseRotationSensitivity = 0.1f;
+inline constexpr float SprintSpeedMultiplier = 5.0f;
+inline constexpr float AutoOrbitSpeed = 5.0f;
+inline constexpr float FresnelStrengthNear = 0.5f;
+inline constexpr float FresnelStrengthFar = 2.0f;
+inline constexpr float FresnelPower = 3.0f;
+inline constexpr int SchedulerPatchesPerFrame = 4;
+inline constexpr float MinFarPlane = 1000.0f;
+inline constexpr float FarPlaneRadiusMultiplier = 20.0f;
+inline constexpr int OceanSubdivisions = 5;
+inline constexpr float HeightRangeMultiplier = 1.5f;
+} // namespace AppDefaults
 
 // Owns all state, systems, and the frame loop
 class Application
@@ -53,6 +75,8 @@ private:
     void RegeneratePlanetGpu();
     void RegenerateLodSystem();
     void ShuffleTerrain();
+    void StartCinematic();
+    void StopCinematic();
 
     // Build QuadTreeConfig from current LodConfig
     render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
@@ -84,7 +108,6 @@ private:
     render::SurfacePanel _surfacePanel;
     render::AtmospherePanel _atmospherePanel;
     render::DebugPanel _debugPanel;
-
     // Settings (Application owns all)
     render::SceneSettings _sceneSettings;
     render::EarthTerrainSettings _terrainSettings;
@@ -102,13 +125,23 @@ private:
     core::Camera _camera;
     float _moveSpeed;
     bool _autoOrbit = false;
-    float _autoOrbitSpeed = 5.0f;
+    float _autoOrbitSpeed = AppDefaults::AutoOrbitSpeed;
+
+    // Cinematic
+    render::CinematicController _cinematicController;
+    render::CinematicPanel _cinematicPanel;
+    render::CinematicSettings _cinematicSettings;
+    render::CaptureManager _captureManager;
+    bool _guiVisible = true;
+    bool _cinematicPanelVisible = true;
+    bool _screenshotRequested = false;
 
     // CPU fallback
     core::Planet _planet;
 
     // Frame state
     float _lastTime;
+    float _deltaTime = 0.0f;
     int _previousWidth;
     int _previousHeight;
 };

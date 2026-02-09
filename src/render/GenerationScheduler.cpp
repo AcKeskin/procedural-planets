@@ -88,18 +88,47 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
     task.vertexBuffer.Upload(packedVertices);
     task.heightBuffer.Allocate(task.vertexCount);
 
-    // Dispatch height compute (no barrier)
+    // Dispatch height compute
     _terrainGen->DispatchHeightsAsync(task.vertexBuffer, task.heightBuffer, task.vertexCount, _seed, *_terrainSettings);
 
-    // Dispatch shading compute (no barrier)
+    // Erosion iterations (requires barrier between height and each iteration)
+    if (_terrainSettings->enableErosion && _terrainGen->IsErosionReady())
+    {
+        int gridRes = task.request.patch->GetResolution();
+        task.erosionScratchBuffer.Allocate(task.vertexCount);
+
+        GpuBuffer<float>* readBuf = &task.heightBuffer;
+        GpuBuffer<float>* writeBuf = &task.erosionScratchBuffer;
+
+        for (int i = 0; i < _terrainSettings->erosionIterations; ++i)
+        {
+            ComputeShader::WaitForCompletion();
+            _terrainGen->DispatchErosionAsync(*readBuf, *writeBuf, task.vertexCount, gridRes, *_terrainSettings);
+            std::swap(readBuf, writeBuf);
+        }
+
+        // Ensure final result is in heightBuffer
+        if (readBuf != &task.heightBuffer)
+            std::swap(task.heightBuffer, task.erosionScratchBuffer);
+    }
+
+    // Barrier ensures height data (potentially eroded) is readable by shading
+    ComputeShader::WaitForCompletion();
+
+    // Dispatch shading compute (reads height buffer for climate model)
     if (_terrainGen->IsShadingReady())
     {
         task.shadingBuffer.Allocate(task.vertexCount);
-        _terrainGen->DispatchShadingAsync(
-            task.vertexBuffer, task.shadingBuffer, task.vertexCount, _seed, *_shadingSettings);
+        _terrainGen->DispatchShadingAsync(task.vertexBuffer,
+                                          task.shadingBuffer,
+                                          task.heightBuffer,
+                                          task.vertexCount,
+                                          _seed,
+                                          *_shadingSettings,
+                                          _terrainSettings->heightScale);
     }
 
-    // Single fence covers both dispatches
+    // Single fence covers all dispatches
     task.fence.Place();
 }
 

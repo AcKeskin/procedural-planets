@@ -9,7 +9,17 @@ namespace planets::render
 // Earth terrain settings (balanced defaults for Earth-like appearance)
 struct EarthTerrainSettings
 {
-    // Continental noise (large-scale landmass shapes)
+    // Tectonic plate system
+    bool useTectonics = true;
+    int numPlates = 12;
+    float continentalFraction = 0.45f;
+    float boundaryWidth = 0.15f;
+    float convergentMountainScale = 0.6f;
+    float divergentRiftDepth = 0.3f;
+    float coastlineNoise = 0.4f;
+    float plateElevationNoise = 0.2f;
+
+    // Continental noise (large-scale landmass shapes, used as interior plate detail when tectonics enabled)
     int continentOctaves = 6;
     float continentScale = 0.8f;
     float continentPersistence = 0.5f;
@@ -39,12 +49,43 @@ struct EarthTerrainSettings
     float oceanFloorSmoothing = 0.5f;
     float mountainBlend = 1.16f;
 
+    // Ocean floor topology (ridges, trenches, abyssal plains)
+    bool useOceanFloor = true;
+    float shelfWidth = 0.15f;
+    int oceanRidgeOctaves = 4;
+    float oceanRidgeScale = 0.8f;
+    float oceanRidgeStrength = 0.3f;
+    float oceanRidgePower = 2.0f;
+    float oceanRidgeGain = 0.8f;
+    int trenchOctaves = 3;
+    float trenchScale = 1.5f;
+    float trenchDepth = 0.4f;
+    int abyssalOctaves = 4;
+    float abyssalScale = 2.0f;
+    float abyssalStrength = 0.1f;
+
+    // Erosion simulation
+    bool enableErosion = false;
+    int erosionIterations = 5;
+    float thermalErosionRate = 0.02f;
+    float thermalThreshold = 0.01f;
+    float hydraulicErosionRate = 0.01f;
+    float depositionRate = 0.005f;
+    float evaporationRate = 0.1f;
+
     // Overall scaling
     float heightScale = 0.04f;
     float globalFrequency = 1.0f;
 
-    // Vertex perturbation (micro-detail roughness)
-    float perturbStrength = 0.002f;
+    // Height-dependent detail (mountains rougher, plains smoother)
+    float detailLowThreshold = -0.1f;
+    float detailHighThreshold = 0.3f;
+    float perturbStrengthLow = 0.001f;
+    float perturbStrengthHigh = 0.004f;
+    int detailOctavesLow = 2;
+    int detailOctavesHigh = 5;
+    float detailPersistence = 0.45f;
+    float detailLacunarity = 2.2f;
     float perturbScale = 20.0f;
 };
 
@@ -62,6 +103,15 @@ struct EarthShadingSettings
 
     float flatColBlend = 1.5f;
     float flatColBlendNoise = 0.3f;
+
+    // Climate model (latitude + elevation → temperature/moisture)
+    bool useClimateModel = true;
+    float temperatureLapseRate = 2.0f;
+    float temperatureExponent = 0.6f;
+    float moistureNoiseScale = 1.5f;
+    float moistureNoiseStrength = 0.15f;
+    float hadleyIntensity = 1.0f;
+    float continentalityStrength = 0.3f;
 };
 
 // Generation parameters (seed, subdivisions, GPU toggle)
@@ -77,7 +127,7 @@ struct LodConfig
 {
     bool enabled = true;
     int patchSubdivisions = 2;
-    float planetRadius = 50.0f;
+    float planetRadius = 200.0f;
 
     // Quadtree parameters
     int meshResolution = 32;

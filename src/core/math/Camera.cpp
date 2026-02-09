@@ -11,13 +11,13 @@ Camera::Camera()
     , _forward(0.0f, 0.0f, -1.0f)
     , _right(1.0f, 0.0f, 0.0f)
     , _up(0.0f, 1.0f, 0.0f)
-    , _yaw(-90.0f)
-    , _pitch(0.0f)
+    , _yaw(CameraDefaults::Yaw)
+    , _pitch(CameraDefaults::Pitch)
     , _orbitTarget(0.0f)
-    , _orbitDistance(10.0f)
-    , _fov(45.0f)
-    , _nearPlane(0.1f)
-    , _farPlane(1000.0f)
+    , _orbitDistance(CameraDefaults::OrbitDistance)
+    , _fov(CameraDefaults::Fov)
+    , _nearPlane(CameraDefaults::NearPlane)
+    , _farPlane(CameraDefaults::FarPlane)
 {
     UpdateVectors();
 }
@@ -42,7 +42,7 @@ void Camera::Rotate(float yawDelta, float pitchDelta)
     _yaw += yawDelta;
     _pitch += pitchDelta;
 
-    _pitch = std::clamp(_pitch, -89.0f, 89.0f);
+    _pitch = std::clamp(_pitch, -CameraDefaults::MaxPitch, CameraDefaults::MaxPitch);
 
     UpdateVectors();
 }
@@ -58,7 +58,7 @@ void Camera::OrbitRotate(float yawDelta, float pitchDelta)
     _yaw += yawDelta;
     _pitch += pitchDelta;
 
-    _pitch = std::clamp(_pitch, -89.0f, 89.0f);
+    _pitch = std::clamp(_pitch, -CameraDefaults::MaxPitch, CameraDefaults::MaxPitch);
 
     float yawRad = glm::radians(_yaw);
     float pitchRad = glm::radians(_pitch);
@@ -76,8 +76,14 @@ void Camera::OrbitRotate(float yawDelta, float pitchDelta)
 void Camera::OrbitZoom(float amount)
 {
     _orbitDistance -= amount;
-    _orbitDistance = std::max(_orbitDistance, 1.0f);
+    _orbitDistance = std::max(_orbitDistance, CameraDefaults::MinOrbitDistance);
 
+    OrbitRotate(0.0f, 0.0f);
+}
+
+void Camera::SetOrbitDistance(float distance)
+{
+    _orbitDistance = std::max(distance, CameraDefaults::MinOrbitDistance);
     OrbitRotate(0.0f, 0.0f);
 }
 

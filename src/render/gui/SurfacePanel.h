@@ -15,7 +15,7 @@ struct OceanSettings;
 class SurfacePanel
 {
 public:
-    void Draw(BiomeSettings& biomes,
+    bool Draw(BiomeSettings& biomes,
               EarthColors& colors,
               EarthShadingSettings& shading,
               effects::OceanSettings& ocean,
@@ -25,7 +25,7 @@ public:
 private:
     void DrawBiomeContent(BiomeSettings& settings);
     void DrawEarthColorsContent(EarthColors& colors);
-    void DrawShadingContent(EarthShadingSettings& settings);
+    bool DrawShadingContent(EarthShadingSettings& settings);
     void DrawOceanContent(effects::OceanSettings& settings, float& seaLevel);
 };
 

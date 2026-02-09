@@ -7,7 +7,7 @@
 namespace planets::render
 {
 
-void SurfacePanel::Draw(BiomeSettings& biomes,
+bool SurfacePanel::Draw(BiomeSettings& biomes,
                         EarthColors& colors,
                         EarthShadingSettings& shading,
                         effects::OceanSettings& ocean,
@@ -15,8 +15,9 @@ void SurfacePanel::Draw(BiomeSettings& biomes,
                         bool& visible)
 {
     if (!visible)
-        return;
+        return false;
 
+    bool regen = false;
     ImGui::Begin("Surface", &visible);
 
     if (ImGui::CollapsingHeader("Biomes", ImGuiTreeNodeFlags_DefaultOpen))
@@ -26,12 +27,13 @@ void SurfacePanel::Draw(BiomeSettings& biomes,
         DrawEarthColorsContent(colors);
 
     if (ImGui::CollapsingHeader("Shading Noise"))
-        DrawShadingContent(shading);
+        regen |= DrawShadingContent(shading);
 
     if (ImGui::CollapsingHeader("Ocean"))
         DrawOceanContent(ocean, seaLevel);
 
     ImGui::End();
+    return regen;
 }
 
 void SurfacePanel::DrawBiomeContent(BiomeSettings& settings)
@@ -100,28 +102,42 @@ void SurfacePanel::DrawEarthColorsContent(EarthColors& colors)
     }
 }
 
-void SurfacePanel::DrawShadingContent(EarthShadingSettings& settings)
+bool SurfacePanel::DrawShadingContent(EarthShadingSettings& settings)
 {
+    bool needsRegeneration = false;
+
     ImGui::Text("Noise Scales");
     ImGui::Separator();
 
     ImGui::SliderFloat("Large Scale", &settings.largeNoiseScale, 0.2f, 0.7f);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Climate zone scale");
 
     ImGui::SliderInt("Large Octaves", &settings.largeNoiseOctaves, 2, 4);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Detail Scale", &settings.detailNoiseScale, 1.0f, 4.0f);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Terrain texture variation");
 
     ImGui::SliderFloat("Small Scale", &settings.smallNoiseScale, 8.0f, 25.0f);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("High-frequency surface detail");
 
     ImGui::SliderInt("Small Octaves", &settings.smallNoiseOctaves, 3, 6);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     ImGui::SliderFloat("Warp Strength", &settings.warpStrength, 0.1f, 0.6f);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Biome boundary irregularity");
 
@@ -135,6 +151,57 @@ void SurfacePanel::DrawShadingContent(EarthShadingSettings& settings)
     ImGui::SliderFloat("Flat Col Noise", &settings.flatColBlendNoise, 0.1f, 0.5f);
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Noise influence on gradient blend");
+
+    ImGui::Separator();
+    ImGui::Text("Climate Model");
+
+    if (ImGui::Checkbox("Use Climate Model", &settings.useClimateModel))
+        needsRegeneration = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Replace noise-based biomes with latitude/elevation climate model");
+
+    if (settings.useClimateModel)
+    {
+        ImGui::SliderFloat("Lapse Rate", &settings.temperatureLapseRate, 0.5f, 4.0f, "%.1f");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Temperature drop with elevation.\nHigher = snow at lower altitudes");
+
+        ImGui::SliderFloat("Moisture Scale", &settings.moistureNoiseScale, 0.5f, 3.0f, "%.1f");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Scale of regional moisture noise variation");
+
+        ImGui::SliderFloat("Moisture Noise", &settings.moistureNoiseStrength, 0.0f, 0.4f, "%.2f");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Strength of noise-based moisture variation");
+
+        ImGui::SliderFloat("Hadley Intensity", &settings.hadleyIntensity, 0.0f, 2.0f, "%.1f");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(
+                "Strength of latitude-based moisture pattern\n0 = uniform, 1 = Earth-like, 2 = exaggerated");
+
+        ImGui::SliderFloat("Temp Exponent", &settings.temperatureExponent, 0.3f, 1.5f, "%.2f");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Temperature latitude falloff\n0.3 = wide tropics, 1.5 = sharp equator-pole gradient");
+
+        ImGui::SliderFloat("Continentality", &settings.continentalityStrength, 0.0f, 0.6f, "%.2f");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            needsRegeneration = true;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(
+                "Moisture effect of distance from coast\n0 = none, higher = drier interiors, wetter coasts");
+    }
+
+    return needsRegeneration;
 }
 
 void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& seaLevel)

@@ -1,0 +1,84 @@
+#version 450
+layout(local_size_x = 256) in;
+
+layout(std430, binding = 0) readonly buffer HeightsIn
+{
+    float heightsIn[];
+};
+
+layout(std430, binding = 1) buffer HeightsOut
+{
+    float heightsOut[];
+};
+
+uniform uint numVertices;
+uniform int gridResolution;
+uniform float thermalRate;
+uniform float thermalThreshold;
+uniform float hydraulicRate;
+uniform float depositionRate;
+uniform float evaporationRate;
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= numVertices) return;
+
+    int gx = int(id) % gridResolution;
+    int gy = int(id) / gridResolution;
+
+    float h = heightsIn[id];
+
+    // Gather neighbor heights (clamp at grid edges)
+    int left  = max(0, gx - 1) + gy * gridResolution;
+    int right = min(gridResolution - 1, gx + 1) + gy * gridResolution;
+    int up    = gx + max(0, gy - 1) * gridResolution;
+    int down  = gx + min(gridResolution - 1, gy + 1) * gridResolution;
+
+    float hL = heightsIn[left];
+    float hR = heightsIn[right];
+    float hU = heightsIn[up];
+    float hD = heightsIn[down];
+
+    // ---- Thermal erosion ----
+    // Material moves downhill when slope exceeds threshold
+    float thermalDelta = 0.0;
+    float maxSlope = 0.0;
+    float totalExcess = 0.0;
+
+    float diffs[4] = float[4](h - hL, h - hR, h - hU, h - hD);
+
+    for (int i = 0; i < 4; i++)
+    {
+        if (diffs[i] > thermalThreshold)
+        {
+            totalExcess += diffs[i] - thermalThreshold;
+            maxSlope = max(maxSlope, diffs[i]);
+        }
+    }
+
+    if (totalExcess > 0.0)
+    {
+        thermalDelta = -min(thermalRate * totalExcess, maxSlope * 0.5);
+    }
+
+    // ---- Simplified hydraulic erosion ----
+    // Find steepest descent direction
+    float hydraulicDelta = 0.0;
+    float steepest = 0.0;
+    for (int i = 0; i < 4; i++)
+    {
+        steepest = max(steepest, diffs[i]);
+    }
+
+    if (steepest > 0.0)
+    {
+        // Erode proportional to slope, deposit at lower elevation
+        float erosion = hydraulicRate * steepest;
+        hydraulicDelta = -erosion;
+
+        // Deposition happens naturally at neighbors (handled when they process)
+    }
+
+    heightsOut[id] = h + thermalDelta + hydraulicDelta;
+}

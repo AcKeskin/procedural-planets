@@ -24,8 +24,8 @@ struct BiomeSettings
 // Earth terrain color palette with gradient pairs
 struct EarthColors
 {
-    glm::vec3 shoreLow = glm::vec3(0.76f, 0.70f, 0.50f);
-    glm::vec3 shoreHigh = glm::vec3(0.65f, 0.58f, 0.42f);
+    glm::vec3 shoreLow = glm::vec3(0.78f, 0.72f, 0.50f);
+    glm::vec3 shoreHigh = glm::vec3(0.62f, 0.55f, 0.40f);
 
     glm::vec3 flatLowA = glm::vec3(0.45f, 0.55f, 0.30f);
     glm::vec3 flatHighA = glm::vec3(0.20f, 0.40f, 0.18f);

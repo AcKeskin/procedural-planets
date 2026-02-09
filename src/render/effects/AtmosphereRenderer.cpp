@@ -1,4 +1,5 @@
 #include "AtmosphereRenderer.h"
+#include "../GpuConstants.h"
 #include <GL/gl3w.h>
 #include <glm/glm.hpp>
 #include <cmath>
@@ -10,6 +11,19 @@
 
 namespace planets::render::effects
 {
+
+namespace
+{
+constexpr int BlueNoiseTextureSize = 64;
+// Interleaved gradient noise coefficients (Jimenez 2014)
+constexpr float IgnCoefficientA = 52.9829189f;
+constexpr float IgnCoefficientB = 0.06711056f;
+constexpr float IgnCoefficientC = 0.00583715f;
+constexpr float ByteMaxFloat = 255.0f;
+// Rayleigh scattering: inverse 4th power law
+constexpr float RayleighReferenceWavelength = 400.0f;
+constexpr float RayleighPower = 4.0f;
+} // namespace
 
 AtmosphereRenderer::AtmosphereRenderer() = default;
 
@@ -41,7 +55,7 @@ bool AtmosphereRenderer::Initialize()
 
 bool AtmosphereRenderer::LoadBlueNoiseTexture()
 {
-    constexpr int size = 64;
+    constexpr int size = BlueNoiseTextureSize;
     std::vector<unsigned char> data(size * size);
 
     int width, height, channels;
@@ -63,8 +77,9 @@ bool AtmosphereRenderer::LoadBlueNoiseTexture()
         {
             for (int x = 0; x < size; ++x)
             {
-                float noise = std::fmod(52.9829189f * std::fmod(0.06711056f * x + 0.00583715f * y, 1.0f), 1.0f);
-                data[y * size + x] = static_cast<unsigned char>(noise * 255.0f);
+                float noise =
+                    std::fmod(IgnCoefficientA * std::fmod(IgnCoefficientB * x + IgnCoefficientC * y, 1.0f), 1.0f);
+                data[y * size + x] = static_cast<unsigned char>(noise * ByteMaxFloat);
             }
         }
 
@@ -172,9 +187,9 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
     _atmosphereShader.SetFloat("uFarPlane", farPlane);
 
     // Rayleigh coefficients: inverse 4th power of wavelength, normalized by planet radius
-    float scatterX = std::pow(400.0f / settings.wavelengths.x, 4.0f);
-    float scatterY = std::pow(400.0f / settings.wavelengths.y, 4.0f);
-    float scatterZ = std::pow(400.0f / settings.wavelengths.z, 4.0f);
+    float scatterX = std::pow(RayleighReferenceWavelength / settings.wavelengths.x, RayleighPower);
+    float scatterY = std::pow(RayleighReferenceWavelength / settings.wavelengths.y, RayleighPower);
+    float scatterZ = std::pow(RayleighReferenceWavelength / settings.wavelengths.z, RayleighPower);
     glm::vec3 scatterCoeffs = glm::vec3(scatterX, scatterY, scatterZ) * settings.scatteringStrength / planetRadius;
     _atmosphereShader.SetVec3("uScatteringCoefficients", scatterCoeffs);
 
@@ -201,7 +216,7 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
     _atmosphereShader.SetInt("uBlueNoise", 2);
 
     glBindVertexArray(_quadVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawArrays(GL_TRIANGLES, 0, render::FullscreenTriangleVertices);
     glBindVertexArray(0);
 
     glEnable(GL_DEPTH_TEST);

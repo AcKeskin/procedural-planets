@@ -20,7 +20,10 @@ enum class Key
     Space = 32,
     LeftShift = 340,
     LeftControl = 341,
-    Escape = 256
+    Escape = 256,
+    Tab = 258,
+    F5 = 294,
+    F12 = 301
 };
 
 enum class MouseButton

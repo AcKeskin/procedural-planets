@@ -1,17 +1,24 @@
 #include "MeshGenerator.h"
 #include "../core/generation/Planet.h"
+#include "../core/math/Constants.h"
 #include <cmath>
 #include <map>
 
 namespace planets::render
 {
 
+namespace
+{
+constexpr float HeightNormalizationScale = 10.0f;
+constexpr float HeightNormalizationOffset = 0.5f;
+} // namespace
+
 MeshData MeshGenerator::GenerateIcosphere(int subdivisions)
 {
     MeshData mesh;
 
     // Golden ratio
-    const float t = (1.0f + std::sqrt(5.0f)) / 2.0f;
+    const float t = core::GoldenRatio;
 
     // Create 12 vertices of icosahedron
     auto addVertex = [&mesh](float x, float y, float z) -> uint32_t
@@ -94,7 +101,7 @@ MeshData MeshGenerator::GeneratePlanetMesh(int subdivisions, float baseRadius, c
         float radius = heights[i] * baseRadius;
         mesh.vertices[i].position = dir * radius;
         // Store height for coloring (normalized around 1.0)
-        mesh.vertices[i].uv.x = (heights[i] - 1.0f) * 10.0f + 0.5f;
+        mesh.vertices[i].uv.x = (heights[i] - 1.0f) * HeightNormalizationScale + HeightNormalizationOffset;
         // shadingData already initialized to vec4(0) by GenerateIcosphere
     }
 
@@ -121,7 +128,7 @@ MeshData MeshGenerator::GeneratePlanetMesh(int subdivisions,
         float radius = heights[i] * baseRadius;
         mesh.vertices[i].position = dir * radius;
         // Store height for coloring (normalized around 1.0)
-        mesh.vertices[i].uv.x = (heights[i] - 1.0f) * 10.0f + 0.5f;
+        mesh.vertices[i].uv.x = (heights[i] - 1.0f) * HeightNormalizationScale + HeightNormalizationOffset;
 
         // Assign shading data if available
         if (i < shadingData.size())
@@ -218,8 +225,8 @@ uint32_t MeshGenerator::GetMidpoint(MeshData& mesh, std::map<uint64_t, uint32_t>
 
 glm::vec2 MeshGenerator::SphericalUV(const glm::vec3& position)
 {
-    float u = 0.5f + std::atan2(position.z, position.x) / (2.0f * 3.14159265f);
-    float v = 0.5f - std::asin(position.y) / 3.14159265f;
+    float u = 0.5f + std::atan2(position.z, position.x) / core::TwoPi;
+    float v = 0.5f - std::asin(position.y) / core::Pi;
     return glm::vec2(u, v);
 }
 

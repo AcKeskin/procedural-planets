@@ -63,9 +63,12 @@ Everything is handled through CMake FetchContent, so you don't need to install a
 | `G` | Toggle orbit / free-fly camera |
 | `H` | Toggle atmosphere |
 | `R` | Randomize planet |
-| `Esc` | Quit |
+| `Tab` | Toggle GUI visibility |
+| `F5` | Play / stop cinematic turntable |
+| `F12` | Take screenshot (PNG) |
+| `Esc` | Stop cinematic / quit |
 
-All terrain, atmosphere, ocean, and scene parameters are exposed in ImGui panels on the left side of the viewport.
+All terrain, atmosphere, ocean, and scene parameters are exposed in ImGui panels on the left side of the viewport. Screenshots are saved to the `captures/` directory.
 
 ## Project Structure
 
@@ -102,6 +105,12 @@ shaders/
 5. **LOD Selection** — Each frame, patches pick their detail level based on distance and get culled if outside the view
 6. **Surface Rendering** — The displaced mesh is rendered with triplanar texturing, biome-driven coloring, and distance-adaptive fresnel rim
 7. **Effects** — Atmospheric scattering and ocean with depth coloring and wave animation are composited as post-processing passes
+
+## References
+
+- [Sebastian Lague — Solar System](https://github.com/SebLague/Solar-System) — studied for compute-based terrain generation approach
+- [Inigo Quilez — Smooth Min/Max](https://iquilezles.org/articles/smin/) — polynomial smooth blending functions
+- [Ben Golus — Triplanar Shader](https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a) — triplanar mapping with reoriented normal blending
 
 ## License
 
