@@ -23,7 +23,7 @@ public:
     CinematicState GetState() const { return _state; }
     bool IsPlaying() const { return _state == CinematicState::Playing; }
     float GetElapsedTime() const { return _elapsedTime; }
-    float GetProgress() const;  // 0-1 normalized, meaningful for non-loop modes
+    float GetProgress() const; // 0-1 normalized, meaningful for non-loop modes
 
 private:
     float EaseInOut(float t) const;

@@ -57,7 +57,7 @@ void CinematicController::Update(float deltaTime, core::Camera& camera)
 
     // Apply zoom
     const float zoomDelta = targetDistance - _currentDistance;
-    camera.OrbitZoom(-zoomDelta);  // negative because OrbitZoom subtracts
+    camera.OrbitZoom(-zoomDelta); // negative because OrbitZoom subtracts
     _currentDistance = targetDistance;
 }
 
@@ -118,7 +118,7 @@ float CinematicController::ComputeDuration() const
         return _settings.durationValue;
 
     case CinematicDurationMode::Loop:
-        return 0.0f;  // infinite
+        return 0.0f; // infinite
 
     default:
         return 0.0f;
