@@ -154,9 +154,9 @@ void main()
     {
         float rawHeight = heightData[id];
 
-        // Normalize height: 0 = sea level (1.0), 1 = max terrain
-        // Raw height is planet radius + displacement, sea level ~ 1.0
-        float normalizedHeight = clamp(rawHeight / max(heightScale, 0.001), 0.0, 1.0);
+        // Raw height = 1.0 + displacement; extract displacement and normalize by scale
+        float displacement = rawHeight - 1.0;
+        float normalizedHeight = clamp(displacement / max(heightScale, 0.001), 0.0, 1.0);
 
         float temperature = computeTemperature(dir, normalizedHeight);
         float moisture = computeMoisture(dir, normalizedHeight, seed + 50u);

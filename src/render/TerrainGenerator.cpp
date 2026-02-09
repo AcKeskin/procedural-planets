@@ -321,8 +321,11 @@ std::vector<glm::vec4> TerrainGenerator::GenerateShadingData(const std::vector<g
     _shadingBuffer.Allocate(vertexCount);
     _vertexBuffer.Bind(0);
     _shadingBuffer.Bind(1);
-    // Height buffer not available in synchronous path, bind empty
-    // Climate model will use zero heights as fallback
+    // Bind sea-level height buffer for climate model (elevation data unavailable in sync path)
+    GpuBuffer<float> zeroHeightBuffer;
+    std::vector<float> seaLevelHeights(vertexCount, 1.0f);
+    zeroHeightBuffer.Upload(seaLevelHeights);
+    zeroHeightBuffer.Bind(2);
 
     SetShadingUniforms(seed, vertexCount, settings, FallbackHeightScale);
 
