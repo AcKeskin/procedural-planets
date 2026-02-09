@@ -108,20 +108,9 @@ shaders/
 
 ## References
 
-This project draws on established techniques from computer graphics and earth science:
-
-| Technique | Source |
-|-----------|--------|
-| Simplex Noise | Ken Perlin, "Noise Hardware" (2001) — basis for all procedural noise |
-| Atmospheric Scattering | Rayleigh and Mie scattering — physically-based light transport through atmosphere |
-| Interleaved Gradient Noise | Jorge Jimenez (2014) — blue noise dithering for banding reduction |
-| Triplanar Mapping | Ben Golus, [Normal Mapping for a Triplanar Shader](https://medium.com/@bgolus/normal-mapping-for-a-triplanar-shader-10bf39dca05a) |
-| Normal Blending | [Blending in Detail](https://blog.selfshadow.com/publications/blending-in-detail/) — reoriented normal mapping |
-| Ridge Noise | Inversion of simplex noise for sharp mountain ridges, based on Musgrave's techniques |
-| Biome Classification | Whittaker biome diagram — temperature and moisture-driven classification |
-| Climate Model | Hadley cell circulation — Gaussian approximation of atmospheric circulation bands |
-| Tectonic Plates | Spherical Voronoi tessellation for continental and oceanic plate boundaries |
-| Project Inspiration | [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-System) — studied for compute-based terrain workflows |
+- [Sebastian Lague — Solar System](https://github.com/SebLague/Solar-System) — studied for compute-based terrain generation approach
+- [Inigo Quilez — Smooth Min/Max](https://iquilezles.org/articles/smin/) — polynomial smooth blending functions
+- [Ben Golus — Triplanar Shader](https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a) — triplanar mapping with reoriented normal blending
 
 ## License
 
