@@ -41,8 +41,7 @@ std::string CaptureManager::GenerateFilename(const std::string& extension) const
 
     std::ostringstream oss;
     oss << CaptureDefaults::Directory << "/" << CaptureDefaults::FilenamePrefix
-        << std::put_time(&localTime, CaptureDefaults::TimestampFormat)
-        << extension;
+        << std::put_time(&localTime, CaptureDefaults::TimestampFormat) << extension;
 
     return oss.str();
 }
@@ -72,8 +71,8 @@ bool CaptureManager::CaptureScreenshot(int width, int height)
     _lastCapturePath = GenerateFilename(CaptureDefaults::PngExtension);
 
     const int stride = width * CaptureDefaults::RgbChannels;
-    const int success = stbi_write_png(_lastCapturePath.c_str(), width, height,
-        CaptureDefaults::RgbChannels, _pixelBuffer.data(), stride);
+    const int success = stbi_write_png(
+        _lastCapturePath.c_str(), width, height, CaptureDefaults::RgbChannels, _pixelBuffer.data(), stride);
 
     if (success)
     {
