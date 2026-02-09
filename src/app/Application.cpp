@@ -113,13 +113,13 @@ void Application::Run()
     while (!_window.ShouldClose())
     {
         float currentTime = static_cast<float>(glfwGetTime());
-        float deltaTime = currentTime - _lastTime;
+        _deltaTime = currentTime - _lastTime;
         _lastTime = currentTime;
 
         _window.PollEvents();
         _input.Update();
 
-        ProcessInput(deltaTime);
+        ProcessInput(_deltaTime);
 
         // Handle window resize
         int currentWidth = _window.GetWidth();
@@ -149,11 +149,49 @@ void Application::Shutdown()
 
 void Application::ProcessInput(float deltaTime)
 {
-    if (_input.IsKeyDown(Key::Escape))
-        _window.SetShouldClose(true);
-
     // Suppress keybinds only while an ImGui text input is active
     bool guiWantsKeyboard = ImGui::GetIO().WantTextInput;
+
+    // ESC: context-aware (stop cinematic or exit)
+    if (_input.IsKeyDown(Key::Escape))
+    {
+        if (_cinematicController.IsPlaying())
+        {
+            _cinematicController.Stop();
+            _guiVisible = true;
+            _camera.SetMode(core::CameraMode::FreeFly);
+        }
+        else
+        {
+            _window.SetShouldClose(true);
+        }
+    }
+
+    // Tab: toggle GUI visibility
+    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::Tab))
+        _guiVisible = !_guiVisible;
+
+    // F5: toggle cinematic playback
+    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::F5))
+    {
+        if (_cinematicController.IsPlaying())
+        {
+            _cinematicController.Stop();
+            _guiVisible = true;
+            _camera.SetMode(core::CameraMode::FreeFly);
+        }
+        else
+        {
+            _camera.SetOrbitTarget(glm::vec3(0.0f));
+            _camera.SetMode(core::CameraMode::Orbit);
+            _cinematicController.Start(_cinematicSettings, _lodConfig.planetRadius, _camera);
+            _guiVisible = false;
+        }
+    }
+
+    // F12: screenshot (deferred to capture point in Render)
+    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::F12))
+        _screenshotRequested = true;
 
     if (!guiWantsKeyboard && _input.IsKeyPressed(Key::G))
     {
@@ -174,6 +212,20 @@ void Application::ProcessInput(float deltaTime)
 
     if (!guiWantsKeyboard && _input.IsKeyPressed(Key::R))
         ShuffleTerrain();
+
+    // Cinematic update: takes priority over all camera controls
+    if (_cinematicController.IsPlaying())
+    {
+        _cinematicController.Update(deltaTime, _camera);
+
+        // Auto-stop check: controller sets state to Idle when done
+        if (!_cinematicController.IsPlaying())
+        {
+            _guiVisible = true;
+            _camera.SetMode(core::CameraMode::FreeFly);
+        }
+        return;
+    }
 
     // Auto-orbit: rotate around planet, skip manual controls
     if (_autoOrbit)
@@ -338,6 +390,13 @@ void Application::Render()
         _postProcessor.RenderQuad();
     }
 
+    // Capture point: scene fully rendered, before GUI overlay
+    if (_screenshotRequested)
+    {
+        _captureManager.CaptureScreenshot(_window.GetWidth(), _window.GetHeight());
+        _screenshotRequested = false;
+    }
+
     RenderGui();
 }
 
@@ -345,51 +404,67 @@ void Application::RenderGui()
 {
     _guiManager.BeginFrame();
 
-    auto& visibility = _guiManager.GetVisibility();
-
-    _scenePanel.Draw(_sceneSettings, visibility.scene);
-
-    // Update terrain stats before drawing panel
-    _terrainStats.patchCount = _quadTree.GetActiveLeafCount();
-    _terrainStats.visiblePatchCount = _quadTree.GetVisiblePatchCount();
-    _terrainStats.vertexCount = 0;
-
-    bool randomize = false;
-    bool needsRegen = _terrainPanel.Draw(
-        _genConfig, _terrainSettings, _lodConfig, _terrainStats, _planet, visibility.terrain, randomize);
-
-    if (randomize)
+    if (_guiVisible)
     {
-        render::RandomizeEarthParameters(_terrainSettings,
-                                         _shadingSettings,
-                                         _biomeSettings,
-                                         _sceneSettings,
-                                         _atmosphereSettings,
-                                         _oceanSettings,
-                                         _genConfig.seed);
-        needsRegen = true;
-    }
+        auto& visibility = _guiManager.GetVisibility();
 
-    // Sync CPU planet settings back to generation config
-    if (!_genConfig.useGpu)
-    {
-        _genConfig.subdivisions = _planet.GetSettings().subdivisions;
-        _genConfig.seed = _planet.GetSettings().seed;
-    }
+        _scenePanel.Draw(_sceneSettings, visibility.scene);
 
-    needsRegen |= _surfacePanel.Draw(
-        _biomeSettings, _earthColors, _shadingSettings, _oceanSettings, _seaLevel, visibility.surface);
-    _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
-    _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
+        // Update terrain stats before drawing panel
+        _terrainStats.patchCount = _quadTree.GetActiveLeafCount();
+        _terrainStats.visiblePatchCount = _quadTree.GetVisiblePatchCount();
+        _terrainStats.vertexCount = 0;
 
-    if (needsRegen)
-    {
-        if (_lodConfig.enabled && _genConfig.useGpu)
-            RegenerateLodSystem();
-        else if (_genConfig.useGpu)
-            RegeneratePlanetGpu();
-        else
-            RegeneratePlanetCpu();
+        bool randomize = false;
+        bool needsRegen = _terrainPanel.Draw(
+            _genConfig, _terrainSettings, _lodConfig, _terrainStats, _planet, visibility.terrain, randomize);
+
+        if (randomize)
+        {
+            render::RandomizeEarthParameters(_terrainSettings,
+                                             _shadingSettings,
+                                             _biomeSettings,
+                                             _sceneSettings,
+                                             _atmosphereSettings,
+                                             _oceanSettings,
+                                             _genConfig.seed);
+            needsRegen = true;
+        }
+
+        // Sync CPU planet settings back to generation config
+        if (!_genConfig.useGpu)
+        {
+            _genConfig.subdivisions = _planet.GetSettings().subdivisions;
+            _genConfig.seed = _planet.GetSettings().seed;
+        }
+
+        needsRegen |= _surfacePanel.Draw(
+            _biomeSettings, _earthColors, _shadingSettings, _oceanSettings, _seaLevel, visibility.surface);
+        _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
+        _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
+
+        // Cinematic panel: only when not playing
+        bool cinematicVisible = true;
+        bool playRequested = false;
+        _cinematicPanel.Draw(_cinematicSettings, _lodConfig.planetRadius, playRequested, cinematicVisible);
+
+        if (playRequested)
+        {
+            _camera.SetOrbitTarget(glm::vec3(0.0f));
+            _camera.SetMode(core::CameraMode::Orbit);
+            _cinematicController.Start(_cinematicSettings, _lodConfig.planetRadius, _camera);
+            _guiVisible = false;
+        }
+
+        if (needsRegen)
+        {
+            if (_lodConfig.enabled && _genConfig.useGpu)
+                RegenerateLodSystem();
+            else if (_genConfig.useGpu)
+                RegeneratePlanetGpu();
+            else
+                RegeneratePlanetCpu();
+        }
     }
 
     _guiManager.EndFrame();

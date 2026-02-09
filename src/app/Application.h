@@ -24,6 +24,10 @@
 #include "settings/SurfaceSettings.h"
 #include "settings/OceanSettings.h"
 #include "settings/AtmosphereSettings.h"
+#include "settings/CinematicSettings.h"
+#include "cinematic/CinematicController.h"
+#include "cinematic/CaptureManager.h"
+#include "gui/CinematicPanel.h"
 #include "math/Camera.h"
 #include "generation/Planet.h"
 
@@ -102,7 +106,6 @@ private:
     render::SurfacePanel _surfacePanel;
     render::AtmospherePanel _atmospherePanel;
     render::DebugPanel _debugPanel;
-
     // Settings (Application owns all)
     render::SceneSettings _sceneSettings;
     render::EarthTerrainSettings _terrainSettings;
@@ -122,11 +125,20 @@ private:
     bool _autoOrbit = false;
     float _autoOrbitSpeed = AppDefaults::AutoOrbitSpeed;
 
+    // Cinematic
+    render::CinematicController _cinematicController;
+    render::CinematicPanel _cinematicPanel;
+    render::CinematicSettings _cinematicSettings;
+    render::CaptureManager _captureManager;
+    bool _guiVisible = true;
+    bool _screenshotRequested = false;
+
     // CPU fallback
     core::Planet _planet;
 
     // Frame state
     float _lastTime;
+    float _deltaTime = 0.0f;
     int _previousWidth;
     int _previousHeight;
 };
