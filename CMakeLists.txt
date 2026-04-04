@@ -90,5 +90,6 @@ find_package(OpenGL REQUIRED)
 
 # Subdirectories
 add_subdirectory(src/core)
+add_subdirectory(libplanetgen)
 add_subdirectory(src/render)
 add_subdirectory(src/app)
