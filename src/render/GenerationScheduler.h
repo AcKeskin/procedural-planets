@@ -3,6 +3,7 @@
 #include "GlFence.h"
 #include "GpuBuffer.h"
 #include "TerrainGenerator.h"
+#include "CelestialBody.h"
 #include "lod/SpherePatch.h"
 #include "settings/TerrainSettings.h"
 #include "settings/SurfaceSettings.h"
@@ -70,14 +71,11 @@ public:
     GenerationScheduler& operator=(const GenerationScheduler&) = delete;
 
     void Initialize(TerrainGenerator& terrainGen,
-                    const EarthTerrainSettings& terrainSettings,
-                    const EarthShadingSettings& shadingSettings,
+                    const CelestialBody& body,
                     uint32_t seed);
 
-    // Update settings without full reinit (e.g. parameter slider change)
-    void SetSettings(const EarthTerrainSettings& terrainSettings,
-                     const EarthShadingSettings& shadingSettings,
-                     uint32_t seed);
+    // Update body reference without full reinit (e.g. parameter slider change)
+    void SetBody(const CelestialBody& body, uint32_t seed);
 
     void Enqueue(GenerationRequest request);
 
@@ -103,8 +101,7 @@ private:
     std::vector<CompletedGeneration> _completed;
 
     TerrainGenerator* _terrainGen = nullptr;
-    const EarthTerrainSettings* _terrainSettings = nullptr;
-    const EarthShadingSettings* _shadingSettings = nullptr;
+    const CelestialBody* _body = nullptr;
     uint32_t _seed = 0;
 };
 

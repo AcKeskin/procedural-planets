@@ -364,6 +364,45 @@ void TerrainGenerator::DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
                                             GpuBuffer<float>& heightBuffer,
                                             GpuBuffer<float>& normalBuffer,
                                             size_t vertexCount,
+                                            const CelestialBody& body,
+                                            uint32_t seed)
+{
+    vertexBuffer.Bind(0);
+    heightBuffer.Bind(1);
+    normalBuffer.Bind(2);
+
+    // Body type sets its own uniforms
+    body.SetShapeUniforms(_computeShader, seed);
+    _computeShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
+
+    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + HeightWorkgroupSize - 1) / HeightWorkgroupSize;
+    _computeShader.Dispatch(groupCount);
+}
+
+void TerrainGenerator::DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
+                                            GpuBuffer<glm::vec4>& shadingBuffer,
+                                            GpuBuffer<float>& heightBuffer,
+                                            size_t vertexCount,
+                                            const CelestialBody& body,
+                                            uint32_t seed)
+{
+    vertexBuffer.Bind(0);
+    shadingBuffer.Bind(1);
+    heightBuffer.Bind(2);
+
+    // Body type sets its own uniforms
+    body.SetShadingUniforms(_shadingShader, seed);
+    _shadingShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
+
+    unsigned int groupCount =
+        (static_cast<unsigned int>(vertexCount) + ShadingWorkgroupSize - 1) / ShadingWorkgroupSize;
+    _shadingShader.Dispatch(groupCount);
+}
+
+void TerrainGenerator::DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
+                                            GpuBuffer<float>& heightBuffer,
+                                            GpuBuffer<float>& normalBuffer,
+                                            size_t vertexCount,
                                             uint32_t seed,
                                             const EarthTerrainSettings& settings)
 {

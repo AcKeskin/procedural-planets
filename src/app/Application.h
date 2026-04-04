@@ -25,6 +25,8 @@
 #include "settings/OceanSettings.h"
 #include "settings/AtmosphereSettings.h"
 #include "settings/CinematicSettings.h"
+#include "BiomePalette.h"
+#include "Earth.h"
 #include "cinematic/CinematicController.h"
 #include "cinematic/CaptureManager.h"
 #include "gui/CinematicPanel.h"
@@ -78,6 +80,9 @@ private:
     void StartCinematic();
     void StopCinematic();
 
+    // Sync loose Application settings into the Earth body
+    void SyncEarthSettings();
+
     // Build QuadTreeConfig from current LodConfig
     render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
 
@@ -119,6 +124,8 @@ private:
     render::EarthColors _earthColors;
     render::effects::OceanSettings _oceanSettings;
     render::effects::AtmosphereSettings _atmosphereSettings;
+    render::BiomePalette _biomePalette;
+    render::GpuBuffer<render::BiomeEntry> _paletteBuffer;
     float _seaLevel;
 
     // Camera
@@ -135,6 +142,9 @@ private:
     bool _guiVisible = true;
     bool _cinematicPanelVisible = true;
     bool _screenshotRequested = false;
+
+    // Active celestial body (Earth for now)
+    render::Earth _earth;
 
     // CPU fallback
     core::Planet _planet;

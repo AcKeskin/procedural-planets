@@ -1,6 +1,8 @@
 #pragma once
 
+#include "BiomePalette.h"
 #include <cstdint>
+#include <string>
 
 namespace planets::render
 {
@@ -8,7 +10,7 @@ namespace planets::render
 class ComputeShader; // Forward declaration
 
 // Abstract base for all celestial body types (planets, moons, asteroids, etc.)
-// Defines common physical properties and shader binding interface
+// Each body type owns its shader set, biome palette, and rendering contract
 class CelestialBody
 {
 public:
@@ -24,11 +26,23 @@ public:
     float GetAtmosphereHeight() const { return _atmosphereHeight; }
     float GetAtmosphereRadius() const { return _radius * (1.0f + _atmosphereHeight); }
 
-    // Subclass implements shape generation parameters
-    virtual void SetShapeUniforms(ComputeShader& shader, uint32_t seed) const = 0;
+    // Shader paths — body type declares which shaders to use
+    virtual std::string GetHeightShaderPath() const = 0;
+    virtual std::string GetShadingShaderPath() const = 0;
+    virtual std::string GetVertexShaderPath() const = 0;
+    virtual std::string GetFragmentShaderPath() const = 0;
 
-    // Subclass implements surface shading parameters (biomes, colors, etc.)
+    // Uniform binding — body type configures its own compute shaders
+    virtual void SetShapeUniforms(ComputeShader& shader, uint32_t seed) const = 0;
     virtual void SetShadingUniforms(ComputeShader& shader, uint32_t seed) const = 0;
+
+    // Data-driven biome palette
+    virtual BiomePalette LoadBiomePalette() const = 0;
+
+    // Body type metadata
+    virtual std::string GetTypeName() const = 0;
+    virtual bool HasSolidSurface() const = 0;
+    virtual bool HasAtmosphere() const = 0;
 
 protected:
     float _radius = 10.0f;

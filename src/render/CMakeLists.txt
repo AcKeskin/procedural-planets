@@ -18,6 +18,7 @@ add_library(render STATIC
     GenerationScheduler.cpp
     CelestialBody.cpp
     Earth.cpp
+    BiomePalette.cpp
     Framebuffer.cpp
     PostProcessor.cpp
     lod/SpherePatch.cpp
@@ -50,4 +51,5 @@ target_link_libraries(render PUBLIC
     core
     glfw
     OpenGL::GL
+    nlohmann_json::nlohmann_json
 )

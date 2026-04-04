@@ -1,4 +1,5 @@
 #include "GenerationScheduler.h"
+#include "Earth.h"
 #include "lod/QuadTreeNode.h"
 #include <algorithm>
 #include <iostream>
@@ -7,23 +8,18 @@ namespace planets::render
 {
 
 void GenerationScheduler::Initialize(TerrainGenerator& terrainGen,
-                                     const EarthTerrainSettings& terrainSettings,
-                                     const EarthShadingSettings& shadingSettings,
+                                     const CelestialBody& body,
                                      uint32_t seed)
 {
     CancelAll();
     _terrainGen = &terrainGen;
-    _terrainSettings = &terrainSettings;
-    _shadingSettings = &shadingSettings;
+    _body = &body;
     _seed = seed;
 }
 
-void GenerationScheduler::SetSettings(const EarthTerrainSettings& terrainSettings,
-                                      const EarthShadingSettings& shadingSettings,
-                                      uint32_t seed)
+void GenerationScheduler::SetBody(const CelestialBody& body, uint32_t seed)
 {
-    _terrainSettings = &terrainSettings;
-    _shadingSettings = &shadingSettings;
+    _body = &body;
     _seed = seed;
 }
 
@@ -91,21 +87,23 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
 
     // Dispatch height compute (also computes analytical normals)
     _terrainGen->DispatchHeightsAsync(
-        task.vertexBuffer, task.heightBuffer, task.normalBuffer, task.vertexCount, _seed, *_terrainSettings);
+        task.vertexBuffer, task.heightBuffer, task.normalBuffer, task.vertexCount, *_body, _seed);
 
-    // Erosion iterations (requires barrier between height and each iteration)
-    if (_terrainSettings->enableErosion && _terrainGen->IsErosionReady())
+    // Erosion iterations (Earth-specific, requires terrain settings)
+    const auto* earth = dynamic_cast<const Earth*>(_body);
+    if (earth && earth->GetTerrainSettings().enableErosion && _terrainGen->IsErosionReady())
     {
+        const auto& terrainSettings = earth->GetTerrainSettings();
         int gridRes = task.request.patch->GetResolution();
         task.erosionScratchBuffer.Allocate(task.vertexCount);
 
         GpuBuffer<float>* readBuf = &task.heightBuffer;
         GpuBuffer<float>* writeBuf = &task.erosionScratchBuffer;
 
-        for (int i = 0; i < _terrainSettings->erosionIterations; ++i)
+        for (int i = 0; i < terrainSettings.erosionIterations; ++i)
         {
             ComputeShader::WaitForCompletion();
-            _terrainGen->DispatchErosionAsync(*readBuf, *writeBuf, task.vertexCount, gridRes, *_terrainSettings);
+            _terrainGen->DispatchErosionAsync(*readBuf, *writeBuf, task.vertexCount, gridRes, terrainSettings);
             std::swap(readBuf, writeBuf);
         }
 
@@ -125,9 +123,8 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
                                           task.shadingBuffer,
                                           task.heightBuffer,
                                           task.vertexCount,
-                                          _seed,
-                                          *_shadingSettings,
-                                          _terrainSettings->heightScale);
+                                          *_body,
+                                          _seed);
     }
 
     // Single fence covers all dispatches

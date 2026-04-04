@@ -2,6 +2,7 @@
 
 #include "ComputeShader.h"
 #include "GpuBuffer.h"
+#include "CelestialBody.h"
 #include <glm/glm.hpp>
 #include <vector>
 #include <cstdint>
@@ -64,7 +65,23 @@ public:
     std::vector<glm::vec4>
     GenerateShadingData(const std::vector<glm::vec3>& vertices, uint32_t seed, const EarthShadingSettings& settings);
 
-    // Dispatch height compute to caller-owned buffers (no barrier, no readback)
+    // Abstract dispatch: body type sets its own uniforms
+    void DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
+                              GpuBuffer<float>& heightBuffer,
+                              GpuBuffer<float>& normalBuffer,
+                              size_t vertexCount,
+                              const CelestialBody& body,
+                              uint32_t seed);
+
+    // Abstract dispatch: body type sets its own uniforms
+    void DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
+                              GpuBuffer<glm::vec4>& shadingBuffer,
+                              GpuBuffer<float>& heightBuffer,
+                              size_t vertexCount,
+                              const CelestialBody& body,
+                              uint32_t seed);
+
+    // Earth-specific dispatch (legacy, used by synchronous paths)
     void DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
                               GpuBuffer<float>& heightBuffer,
                               GpuBuffer<float>& normalBuffer,
@@ -72,7 +89,7 @@ public:
                               uint32_t seed,
                               const EarthTerrainSettings& settings);
 
-    // Dispatch shading compute to caller-owned buffers (no barrier, no readback)
+    // Earth-specific dispatch (legacy, used by synchronous paths)
     void DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
                               GpuBuffer<glm::vec4>& shadingBuffer,
                               GpuBuffer<float>& heightBuffer,

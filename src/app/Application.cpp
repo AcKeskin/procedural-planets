@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "GpuConstants.h"
 #include "MeshGenerator.h"
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
@@ -54,7 +55,7 @@ bool Application::Initialize()
         return false;
     }
 
-    if (!_planetShader.LoadFromFiles("shaders/planet.vert", "shaders/planet.frag"))
+    if (!_planetShader.LoadFromFiles("shaders/earth/planet_earth.vert", "shaders/earth/planet_earth.frag"))
     {
         std::cerr << "Failed to load planet shader" << std::endl;
         return false;
@@ -80,8 +81,14 @@ bool Application::Initialize()
     // Initialize async generation scheduler
     if (_genConfig.useGpu)
     {
-        _generationScheduler.Initialize(_terrainGenerator, _terrainSettings, _shadingSettings, _genConfig.seed);
+        SyncEarthSettings();
+        _generationScheduler.Initialize(_terrainGenerator, _earth, _genConfig.seed);
     }
+
+    // Load biome palette
+    _biomePalette = render::BiomePalette::LoadFromJson("data/palettes/earth.json");
+    if (_biomePalette.IsValid())
+        _biomePalette.UploadToGpu(_paletteBuffer);
 
     // CPU fallback planet
     core::PlanetSettings planetSettings;
@@ -331,6 +338,13 @@ void Application::Render()
     _planetShader.SetFloat("uHazeStrength", _sceneSettings.lighting.hazeStrength);
     _planetShader.SetVec3("uHazeColor", _sceneSettings.lighting.hazeColor);
 
+    // Biome palette SSBO
+    if (_paletteBuffer.IsValid())
+    {
+        _paletteBuffer.Bind(render::BiomePaletteBindingPoint);
+        _planetShader.SetInt("uPaletteSize", _biomePalette.GetEntryCount());
+    }
+
     if (_lodConfig.enabled && _genConfig.useGpu)
     {
         // Async pipeline: process scheduler, apply results, then update + render
@@ -454,6 +468,14 @@ void Application::RenderGui()
     _guiManager.EndFrame();
 }
 
+void Application::SyncEarthSettings()
+{
+    _earth.GetTerrainSettings() = _terrainSettings;
+    _earth.GetShadingSettings() = _shadingSettings;
+    _earth.GetBiomeSettings() = _biomeSettings;
+    _earth.GetColors() = _earthColors;
+}
+
 void Application::ShuffleTerrain()
 {
     render::RandomizeEarthParameters(_terrainSettings,
@@ -551,7 +573,8 @@ void Application::RegenerateLodSystem()
 
     // Cancel all in-flight async work before rebuilding
     _generationScheduler.CancelAll();
-    _generationScheduler.SetSettings(_terrainSettings, _shadingSettings, _genConfig.seed);
+    SyncEarthSettings();
+    _generationScheduler.SetBody(_earth, _genConfig.seed);
 
     auto qtConfig = BuildQuadTreeConfig();
 
