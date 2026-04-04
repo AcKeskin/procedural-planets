@@ -1,11 +1,12 @@
 {
     "name": "Crystalline",
     "entries": [
-        { "color": [0.10, 0.08, 0.18], "parameter": 0.0,  "label": "deep_amethyst" },
-        { "color": [0.20, 0.15, 0.35], "parameter": 0.2,  "label": "crystal_base" },
-        { "color": [0.35, 0.50, 0.65], "parameter": 0.4,  "label": "ice_crystal" },
-        { "color": [0.55, 0.70, 0.80], "parameter": 0.6,  "label": "light_crystal" },
-        { "color": [0.75, 0.85, 0.95], "parameter": 0.8,  "label": "crystal_peak" },
-        { "color": [0.90, 0.95, 1.00], "parameter": 1.0,  "label": "crystal_tip" }
+        { "color": [0.08, 0.04, 0.15], "parameter": 0.0,  "label": "deep_amethyst" },
+        { "color": [0.15, 0.08, 0.30], "parameter": 0.15, "label": "crystal_base" },
+        { "color": [0.25, 0.30, 0.55], "parameter": 0.3,  "label": "sapphire" },
+        { "color": [0.40, 0.55, 0.70], "parameter": 0.5,  "label": "ice_crystal" },
+        { "color": [0.60, 0.75, 0.85], "parameter": 0.7,  "label": "light_quartz" },
+        { "color": [0.85, 0.90, 0.98], "parameter": 0.85, "label": "crystal_peak" },
+        { "color": [0.95, 0.92, 1.00], "parameter": 1.0,  "label": "diamond_tip" }
     ]
 }

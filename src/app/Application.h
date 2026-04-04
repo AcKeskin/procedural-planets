@@ -26,7 +26,10 @@
 #include "settings/AtmosphereSettings.h"
 #include "settings/CinematicSettings.h"
 #include "BiomePalette.h"
+#include "CelestialBody.h"
 #include "Earth.h"
+#include "GenericBody.h"
+#include <memory>
 #include "cinematic/CinematicController.h"
 #include "cinematic/CaptureManager.h"
 #include "gui/CinematicPanel.h"
@@ -80,8 +83,11 @@ private:
     void StartCinematic();
     void StopCinematic();
 
-    // Sync loose Application settings into the Earth body
-    void SyncEarthSettings();
+    // Sync loose Application settings into an Earth body
+    void SyncEarthSettings(render::Earth& earth);
+
+    // Switch active body type, reload shaders/palette, regenerate terrain
+    void SwitchBody(std::unique_ptr<render::CelestialBody> newBody);
 
     // Build QuadTreeConfig from current LodConfig
     render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
@@ -143,8 +149,9 @@ private:
     bool _cinematicPanelVisible = true;
     bool _screenshotRequested = false;
 
-    // Active celestial body (Earth for now)
-    render::Earth _earth;
+    // Active celestial body
+    std::unique_ptr<render::CelestialBody> _activeBody;
+    int _selectedBodyType = 0; // GUI selector index
 
     // CPU fallback
     core::Planet _planet;
