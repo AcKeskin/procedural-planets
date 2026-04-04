@@ -324,6 +324,13 @@ void Application::Render()
     _planetShader.SetFloat("uFresnelStrengthFar", AppDefaults::FresnelStrengthFar);
     _planetShader.SetFloat("uFresnelPow", AppDefaults::FresnelPower);
 
+    // Visual quality: detail fade, coastal gradient, AO, atmospheric perspective
+    _planetShader.SetFloat("uDetailFadeStart", _sceneSettings.lighting.detailFadeStart);
+    _planetShader.SetFloat("uCoastalDepthRange", _biomeSettings.coastalDepthRange);
+    _planetShader.SetFloat("uAOStrength", _biomeSettings.aoStrength);
+    _planetShader.SetFloat("uHazeStrength", _sceneSettings.lighting.hazeStrength);
+    _planetShader.SetVec3("uHazeColor", _sceneSettings.lighting.hazeColor);
+
     if (_lodConfig.enabled && _genConfig.useGpu)
     {
         // Async pipeline: process scheduler, apply results, then update + render

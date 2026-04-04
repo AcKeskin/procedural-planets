@@ -12,6 +12,13 @@ struct LightingSettings
     float ambientLight = 0.15f;
     float specularStrength = 0.0f;
     float specularPower = 32.0f;
+
+    // Distance in planet radii where detail noise begins fading
+    float detailFadeStart = 2.0f;
+
+    // Atmospheric perspective haze
+    float hazeStrength = 0.15f;
+    glm::vec3 hazeColor = glm::vec3(0.6f, 0.7f, 0.9f);
 };
 
 // Scene-level settings: sun, stars, lighting

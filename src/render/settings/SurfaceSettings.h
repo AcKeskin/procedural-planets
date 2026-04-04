@@ -19,6 +19,12 @@ struct BiomeSettings
     float snowLine = 0.85f;
 
     float shoreHeight = 0.08f;
+
+    // Shallow water gradient width (height units below sea level)
+    float coastalDepthRange = 0.04f;
+
+    // Curvature-based ambient occlusion intensity
+    float aoStrength = 0.35f;
 };
 
 // Earth terrain color palette with gradient pairs

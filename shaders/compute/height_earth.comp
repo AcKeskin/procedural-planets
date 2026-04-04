@@ -262,6 +262,11 @@ layout(std430, binding = 1) writeonly buffer Heights
     float heights[];
 };
 
+layout(std430, binding = 2) writeonly buffer Normals
+{
+    float normals[];  // Packed as nx0,ny0,nz0, nx1,ny1,nz1, ...
+};
+
 uniform uint numVertices;
 uniform uint seed;
 
@@ -339,17 +344,15 @@ uniform int abyssalOctaves;
 uniform float abyssalScale;
 uniform float abyssalStrength;
 
-void main()
+// Finite-difference step for analytical normal computation
+uniform float normalEpsilon;
+
+// ============================================================================
+// Height evaluation for any unit-sphere direction
+// ============================================================================
+
+float evaluateHeight(vec3 dir)
 {
-    uint id = gl_GlobalInvocationID.x;
-    if (id >= numVertices) return;
-
-    // Read vertex from packed float array (3 floats per vertex)
-    uint baseIdx = id * 3u;
-    vec3 pos = vec3(vertexData[baseIdx], vertexData[baseIdx + 1u], vertexData[baseIdx + 2u]);
-    vec3 dir = normalize(pos);
-
-    // Apply global frequency to all scales
     float contScale = continentScale * globalFrequency;
     float mtnScale = mountainScale * globalFrequency;
     float mskScale = maskScale * globalFrequency;
@@ -360,64 +363,47 @@ void main()
 
     if (useTectonics != 0)
     {
-        // Tectonic plate-driven continent shapes
         vec4 voronoi = sphericalVoronoi(dir, numPlates, seed + 500u);
         float nearDist = voronoi.x;
         float secondDist = voronoi.y;
         int nearId = int(voronoi.z);
         int secondId = int(voronoi.w);
 
-        // Boundary proximity: 0 at plate center, 1 at boundary edge
         float boundaryDist = secondDist - nearDist;
         float boundaryProximity = 1.0 - smoothstep(0.0, boundaryWidth, boundaryDist);
 
-        // Plate type determines base elevation
         bool nearContinental = isPlateContinental(nearId, seed, continentalFraction);
         bool secondContinental = isPlateContinental(secondId, seed, continentalFraction);
         float nearBaseElev = nearContinental ? 0.5 : -0.5;
         float secondBaseElev = secondContinental ? 0.5 : -0.5;
 
-        // Smooth elevation transition at plate boundary
-        // boundaryBlend ramps from 0 (plate interior) to ~0.5 at the boundary midpoint
         float boundaryBlend = boundaryProximity * 0.5;
         float baseElevation = mix(nearBaseElev, secondBaseElev, boundaryBlend);
 
-        // Interior plate noise (reuses continental FBM as detail)
         float interiorNoise = fbm(dir, continentOffset, continentLayers, contScale,
                                    continentPersistence, continentLacunarity,
                                    plateElevationNoise, seed);
 
-        // Coastline perturbation at plate boundary
         float coastPerturb = fbm(dir, vec3(3000.0), 4, contScale * 1.5,
                                   0.5, 2.0, coastlineNoise, seed + 3u);
 
-        // Boundary classification between nearest plates
         float bType = boundaryType(nearId, secondId, seed);
-
-        // Convergent boundary: mountain ridges
         float convergentEffect = max(0.0, bType) * boundaryProximity * convergentMountainScale;
-
-        // Divergent boundary: rift valleys
         float divergentEffect = max(0.0, -bType) * boundaryProximity * divergentRiftDepth;
 
-        // Final tectonic shape
         continentShape = baseElevation + interiorNoise + coastPerturb * boundaryProximity
                          + convergentEffect - divergentEffect;
         continentShape += continentBaseLevel;
 
-        // Mountain mask driven by convergent plate boundaries
         mountainMask = max(0.0, bType) * boundaryProximity;
-        // Also allow mountains on elevated terrain
         mountainMask = max(mountainMask, Blend(0.0, mountainBlend, continentShape));
     }
     else
     {
-        // Original FBM-based continental shape
         continentShape = fbm(dir, continentOffset, continentLayers, contScale,
                               continentPersistence, continentLacunarity, continentMultiplier, seed);
         continentShape += continentBaseLevel;
 
-        // Original mask: elevation + noise
         float maskNoise = fbm(dir, maskOffset, maskLayers, mskScale,
                                maskPersistence, maskLacunarity, maskMultiplier, seed + 2u);
         float elevationMask = Blend(0.0, mountainBlend, continentShape);
@@ -425,41 +411,30 @@ void main()
         mountainMask = elevationMask * noiseMask;
     }
 
-    // Ocean floor topology or simple clamping
     if (useOceanFloor != 0 && continentShape < 0.0)
     {
-        // Continental shelf: gradual slope near coastline
         float shelfFactor = smoothstep(-shelfWidth, 0.0, continentShape);
-
-        // Abyssal plain base depth
         float abyssalBase = -oceanFloorDepth;
 
-        // Mid-ocean ridges
         float ridgeVal = ridgeNoise(dir, vec3(4000.0), oceanRidgeOctaves,
                                      oceanRidgeScale * globalFrequency,
                                      0.5, 2.0, oceanRidgeStrength,
                                      oceanRidgePower, oceanRidgeGain, seed + 20u);
 
-        // Oceanic trenches (inverted ridge noise at different scale)
         float trenchVal = ridgeNoise(dir, vec3(5000.0), trenchOctaves,
                                       trenchScale * globalFrequency,
                                       0.5, 2.5, trenchDepth,
                                       2.5, 0.8, seed + 21u);
 
-        // Abyssal detail undulations
         float abyssalDetail = fbm(dir, vec3(6000.0), abyssalOctaves,
                                    abyssalScale * globalFrequency,
                                    0.5, 2.0, abyssalStrength, seed + 22u);
 
-        // Deep ocean: ridges + trenches + subtle detail
         float deepOcean = abyssalBase + ridgeVal - trenchVal + abyssalDetail;
-
-        // Blend between shelf (near coast) and deep ocean features
         continentShape = mix(deepOcean, continentShape, shelfFactor);
     }
     else
     {
-        // Original simple ocean floor clamping
         continentShape = smoothMax(continentShape, -oceanFloorDepth, oceanFloorSmoothing);
 
         if (continentShape < 0.0)
@@ -468,15 +443,12 @@ void main()
         }
     }
 
-    // Mountain ridges (fine-scale detail on landmasses)
     float ridges = smoothedRidgeNoise(dir, mountainOffset, mountainLayers, mtnScale,
                                       mountainPersistence, mountainLacunarity, mountainMultiplier,
                                       mountainPower, mountainGain, mountainSmooth, seed + 1u);
 
-    // Base terrain height
     float terrainHeight = (continentShape + ridges * mountainMask) * heightScale;
 
-    // Height-dependent perturbation: mountains get rougher, plains get smoother
     float baseTerrainHeight = continentShape + ridges * mountainMask;
     float heightFactor = smoothstep(detailLowThreshold, detailHighThreshold, baseTerrainHeight);
     float effectiveStrength = mix(perturbStrengthLow, perturbStrengthHigh, heightFactor);
@@ -493,8 +465,49 @@ void main()
     }
     float perturbation = perturbNoise * effectiveStrength;
 
-    // Final height: base (1.0) + terrain displacement + perturbation
-    float finalHeight = 1.0 + terrainHeight + perturbation;
+    return 1.0 + terrainHeight + perturbation;
+}
 
-    heights[id] = finalHeight;
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= numVertices) return;
+
+    // Read vertex from packed float array (3 floats per vertex)
+    uint baseIdx = id * 3u;
+    vec3 pos = vec3(vertexData[baseIdx], vertexData[baseIdx + 1u], vertexData[baseIdx + 2u]);
+    vec3 dir = normalize(pos);
+
+    float h = evaluateHeight(dir);
+    heights[id] = h;
+
+    // Compute analytical normal via finite differences on the sphere tangent plane
+    vec3 tangentA = cross(dir, vec3(0.0, 1.0, 0.0));
+    if (dot(tangentA, tangentA) < 0.001)
+        tangentA = cross(dir, vec3(1.0, 0.0, 0.0));
+    tangentA = normalize(tangentA);
+    vec3 tangentB = cross(dir, tangentA);
+
+    float eps = normalEpsilon;
+    vec3 dirA = normalize(dir + tangentA * eps);
+    vec3 dirB = normalize(dir + tangentB * eps);
+
+    float hA = evaluateHeight(dirA);
+    float hB = evaluateHeight(dirB);
+
+    // Surface positions at center and offset samples
+    vec3 pCenter = dir * h;
+    vec3 pA = dirA * hA;
+    vec3 pB = dirB * hB;
+
+    vec3 n = normalize(cross(pA - pCenter, pB - pCenter));
+
+    // Ensure normal points outward
+    if (dot(n, dir) < 0.0)
+        n = -n;
+
+    uint nIdx = id * 3u;
+    normals[nIdx]      = n.x;
+    normals[nIdx + 1u] = n.y;
+    normals[nIdx + 2u] = n.z;
 }

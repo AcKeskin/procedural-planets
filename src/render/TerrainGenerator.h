@@ -43,9 +43,11 @@ public:
                     const std::string& shadingShaderPath,
                     const std::string& erosionShaderPath);
 
-    // Generate heights using EarthTerrainSettings
-    std::vector<float>
-    GenerateHeights(const std::vector<glm::vec3>& vertices, uint32_t seed, const EarthTerrainSettings& settings);
+    // Generate heights and analytical normals using EarthTerrainSettings
+    std::vector<float> GenerateHeights(const std::vector<glm::vec3>& vertices,
+                                       uint32_t seed,
+                                       const EarthTerrainSettings& settings,
+                                       std::vector<glm::vec3>* outNormals = nullptr);
 
     // Generate heights on GPU (legacy API)
     std::vector<float> GenerateHeights(const std::vector<glm::vec3>& vertices,
@@ -65,6 +67,7 @@ public:
     // Dispatch height compute to caller-owned buffers (no barrier, no readback)
     void DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
                               GpuBuffer<float>& heightBuffer,
+                              GpuBuffer<float>& normalBuffer,
                               size_t vertexCount,
                               uint32_t seed,
                               const EarthTerrainSettings& settings);
@@ -99,6 +102,7 @@ private:
     ComputeShader _erosionShader;
     GpuBuffer<float> _vertexBuffer;
     GpuBuffer<float> _heightBuffer;
+    GpuBuffer<float> _normalBuffer;
     GpuBuffer<glm::vec4> _shadingBuffer;
 };
 

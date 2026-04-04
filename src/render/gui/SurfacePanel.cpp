@@ -68,6 +68,17 @@ void SurfacePanel::DrawBiomeContent(BiomeSettings& settings)
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Latitude for polar snow");
         ImGui::SliderFloat("Snow Blend", &settings.snowBlend, 0.05f, 0.15f, "%.2f");
+
+        ImGui::Separator();
+        ImGui::Text("Visual Quality");
+
+        ImGui::SliderFloat("Coastal Range", &settings.coastalDepthRange, 0.01f, 0.08f, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Shallow water gradient width near coastlines");
+
+        ImGui::SliderFloat("AO Strength", &settings.aoStrength, 0.0f, 0.6f, "%.2f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Valley darkening from curvature-based ambient occlusion");
     }
 }
 

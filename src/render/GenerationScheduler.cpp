@@ -87,9 +87,11 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
 
     task.vertexBuffer.Upload(packedVertices);
     task.heightBuffer.Allocate(task.vertexCount);
+    task.normalBuffer.Allocate(task.vertexCount * 3);
 
-    // Dispatch height compute
-    _terrainGen->DispatchHeightsAsync(task.vertexBuffer, task.heightBuffer, task.vertexCount, _seed, *_terrainSettings);
+    // Dispatch height compute (also computes analytical normals)
+    _terrainGen->DispatchHeightsAsync(
+        task.vertexBuffer, task.heightBuffer, task.normalBuffer, task.vertexCount, _seed, *_terrainSettings);
 
     // Erosion iterations (requires barrier between height and each iteration)
     if (_terrainSettings->enableErosion && _terrainGen->IsErosionReady())
@@ -138,6 +140,15 @@ void GenerationScheduler::CompleteTask(GenerationTask& task)
     std::vector<float> heights;
     task.heightBuffer.Download(heights);
 
+    // Readback analytical normals from GPU
+    std::vector<float> packedNormals;
+    task.normalBuffer.Download(packedNormals);
+    std::vector<glm::vec3> computedNormals(task.vertexCount);
+    for (size_t i = 0; i < task.vertexCount; ++i)
+    {
+        computedNormals[i] = glm::vec3(packedNormals[i * 3], packedNormals[i * 3 + 1], packedNormals[i * 3 + 2]);
+    }
+
     // Readback shading data from GPU
     std::vector<glm::vec4> shadingData;
     if (task.shadingBuffer.IsValid())
@@ -149,8 +160,8 @@ void GenerationScheduler::CompleteTask(GenerationTask& task)
         shadingData.resize(task.vertexCount, glm::vec4(0.0f));
     }
 
-    // Build mesh on the patch (CPU: normals, skirts, upload VAO)
-    task.request.patch->GenerateMesh(heights, shadingData);
+    // Build mesh on the patch using GPU-computed analytical normals
+    task.request.patch->GenerateMesh(heights, shadingData, computedNormals);
 
     // Move to completed results
     _completed.push_back({task.request.targetNode, task.request.type, std::move(task.request.patch)});

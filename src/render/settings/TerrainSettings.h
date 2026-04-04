@@ -77,6 +77,9 @@ struct EarthTerrainSettings
     float heightScale = 0.04f;
     float globalFrequency = 1.0f;
 
+    // Finite-difference step for GPU analytical normal computation
+    float normalEpsilon = 0.0001f;
+
     // Height-dependent detail (mountains rougher, plains smoother)
     float detailLowThreshold = -0.1f;
     float detailHighThreshold = 0.3f;

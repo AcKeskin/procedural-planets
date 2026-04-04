@@ -42,6 +42,7 @@ struct GenerationTask
     // Per-task GPU buffers so multiple dispatches can coexist
     GpuBuffer<float> vertexBuffer;
     GpuBuffer<float> heightBuffer;
+    GpuBuffer<float> normalBuffer;
     GpuBuffer<float> erosionScratchBuffer;
     GpuBuffer<glm::vec4> shadingBuffer;
 

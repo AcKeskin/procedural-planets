@@ -49,8 +49,25 @@ uniform float uFresnelStrengthNear;
 uniform float uFresnelStrengthFar;
 uniform float uFresnelPow;
 
+// Distance-adaptive detail noise fade
+uniform float uDetailFadeStart;
+
+// Coastal gradient
+uniform float uCoastalDepthRange;
+
+// Curvature-based ambient occlusion
+uniform float uAOStrength;
+
+// Atmospheric perspective
+uniform float uHazeStrength;
+uniform vec3 uHazeColor;
+
 const vec3 DEEP_OCEAN = vec3(0.02, 0.05, 0.15);
 const vec3 SHALLOW_OCEAN = vec3(0.05, 0.15, 0.35);
+const vec3 COASTAL = vec3(0.12, 0.45, 0.42);
+
+// Per-fragment detail fade (set in main, read by helper functions)
+float gDetailFade = 1.0;
 
 // 0 = flat, 1 = vertical cliff
 float calcSteepness(vec3 worldPos, vec3 normal)
@@ -107,9 +124,9 @@ vec3 getWhittakerBiome(float temperature, float moisture, float detailNoise, flo
     const vec3 TUNDRA        = vec3(0.48, 0.50, 0.40);
     const vec3 ICE           = vec3(0.92, 0.94, 0.97);
 
-    // Per-channel detail variation (green varies most for vegetation density)
-    float dBase = detailNoise - 0.5;
-    vec3 dVar = vec3(dBase * 0.08, dBase * 0.12, dBase * 0.04);
+    // Subtle detail variation scaled by distance
+    float dBase = (detailNoise - 0.5) * gDetailFade;
+    vec3 dVar = vec3(dBase * 0.03, dBase * 0.04, dBase * 0.02);
 
     // Color for each temperature band
     vec3 tropical  = biomeByMoisture(moisture, TROPICAL_DRY, TROPICAL_MID, TROPICAL_WET, dVar);
@@ -126,9 +143,9 @@ vec3 getWhittakerBiome(float temperature, float moisture, float detailNoise, flo
     float wSum = wTropical + wTemperate + wBoreal + wPolar;
     vec3 color = (tropical * wTropical + temperate * wTemperate + boreal * wBoreal + polar * wPolar) / wSum;
 
-    // Micro-variation from small noise (subtle surface texture breakup)
-    float micro = (smallNoise - 0.5) * 0.04;
-    color += vec3(micro * 0.5, micro, micro * 0.3);
+    // Micro-variation from small noise, faded at distance
+    float micro = (smallNoise - 0.5) * 0.015 * gDetailFade;
+    color += vec3(micro);
 
     return clamp(color, 0.0, 1.0);
 }
@@ -150,26 +167,30 @@ vec3 getTerrainColor(vec3 worldPos, vec3 normal, float height)
         float detailNoise = vShadingData.z;
         float smallNoise = vShadingData.w;
 
-        // Noise-perturbed biome boundaries to break visual banding
-        float perturbedTemp = clamp(temperature + (detailNoise - 0.5) * 0.12, 0.0, 1.0);
-        float perturbedMoist = clamp(moisture + (smallNoise - 0.5) * 0.15, 0.0, 1.0);
+        // Noise-perturbed biome boundaries, faded at distance
+        float perturbedTemp = clamp(temperature + (detailNoise - 0.5) * 0.06 * gDetailFade, 0.0, 1.0);
+        float perturbedMoist = clamp(moisture + (smallNoise - 0.5) * 0.08 * gDetailFade, 0.0, 1.0);
 
         flatColor = getWhittakerBiome(perturbedTemp, perturbedMoist, detailNoise, smallNoise);
 
         // Temperature-aware shore: warm sandy beaches, cold rocky coasts
-        float shoreBoundary = uShoreHeight + (detailNoise - 0.5) * uShoreHeight * 0.5;
+        float shoreBoundary = uShoreHeight + (detailNoise - 0.5) * uShoreHeight * 0.2 * gDetailFade;
         float shoreBlend = smoothstep(shoreBoundary * 1.5, 0.0, h);
         shoreBlend *= (1.0 - smoothstep(0.2, 0.4, steepness));
-        vec3 warmShore = mix(uShoreLow, uShoreHigh, h + (detailNoise - 0.5) * 0.2);
+        vec3 warmShore = mix(uShoreLow, uShoreHigh, h + (detailNoise - 0.5) * 0.08 * gDetailFade);
         vec3 coldShore = mix(vec3(0.45, 0.42, 0.38), vec3(0.35, 0.33, 0.30), h);
         vec3 shoreColor = mix(coldShore, warmShore, smoothstep(0.2, 0.5, temperature));
         flatColor = mix(flatColor, shoreColor, shoreBlend);
 
-        // Snow: combined altitude + temperature model
-        float effectiveSnowLine = uSnowLine - (1.0 - temperature) * 0.12;
-        float snowBlend = smoothstep(effectiveSnowLine - 0.08, effectiveSnowLine, h);
+        // Snow: altitude + temperature + slope model with wide transitions
+        float snowNoisePerturbation = (detailNoise - 0.5) * 0.04 * gDetailFade;
+        float effectiveSnowLine = uSnowLine - (1.0 - temperature) * 0.12 + snowNoisePerturbation;
+        float snowBlend = smoothstep(effectiveSnowLine - 0.15, effectiveSnowLine + 0.02, h);
         float coldSnow = smoothstep(0.06, 0.01, temperature) * 0.4;
         snowBlend = max(snowBlend, coldSnow);
+        // Steep slopes shed snow
+        float slopeShed = 1.0 - smoothstep(0.25, 0.55, steepness);
+        snowBlend *= slopeShed;
         flatColor = mix(flatColor, uSnowColor, snowBlend);
     }
     else
@@ -278,11 +299,29 @@ void main()
     vec3 halfDir = normalize(lightDir + viewDir);
     float spec = pow(max(dot(normal, halfDir), 0.0), uSpecularPower) * uSpecularStrength;
 
+    // Distance metrics (shared by detail fade, fresnel, and haze)
+    float camDist = length(uCameraPos - vWorldPos);
+    float distRadii = camDist / uPlanetScale;
+
+    // Detail noise fades out at orbital distance
+    gDetailFade = 1.0 - smoothstep(uDetailFadeStart, uDetailFadeStart * 2.0, distRadii);
+
     vec3 terrainColor;
     if (vHeight < uSeaLevel)
     {
-        float oceanDepth = remap01(vHeight, uSeaLevel - 0.1, uSeaLevel);
-        terrainColor = mix(DEEP_OCEAN, SHALLOW_OCEAN, oceanDepth);
+        // Coastal gradient: deep ocean → shallow → turquoise near shore
+        float depthBelow = uSeaLevel - vHeight;
+        float deepThreshold = uCoastalDepthRange * 3.0;
+        float t = 1.0 - clamp(depthBelow / max(deepThreshold, 0.001), 0.0, 1.0);
+
+        if (t < 0.4)
+        {
+            terrainColor = mix(DEEP_OCEAN, SHALLOW_OCEAN, t / 0.4);
+        }
+        else
+        {
+            terrainColor = mix(SHALLOW_OCEAN, COASTAL, (t - 0.4) / 0.6);
+        }
     }
     else if (uUseBiomes)
     {
@@ -293,19 +332,28 @@ void main()
         terrainColor = getTerrainColorLegacy(vHeight);
     }
 
-    vec3 color = terrainColor * (uAmbientLight + diff * uSunIntensity) + vec3(spec);
+    // Curvature-based ambient occlusion: valleys receive less ambient light
+    vec3 sphereNormal = normalize(vWorldPos);
+    float normalAlignment = dot(normal, sphereNormal);
+    float aoFactor = clamp(mix(1.0, normalAlignment, uAOStrength), 0.3, 1.0);
+
+    vec3 color = terrainColor * (uAmbientLight * aoFactor + diff * uSunIntensity) + vec3(spec);
 
     // Distance-adaptive fresnel rim (fades near surface, strong from orbit)
-    float camDist = length(uCameraPos - vWorldPos);
     float camRadiiFromSurface = (camDist - uPlanetScale) / uPlanetScale;
     float fresnelT = smoothstep(0.0, 1.0, camRadiiFromSurface);
     float fresStrength = mix(uFresnelStrengthNear, uFresnelStrengthFar, fresnelT);
 
-    vec3 sphereNormal = normalize(vWorldPos);
     float fresnelDot = 1.0 + dot(normalize(vWorldPos - uCameraPos), sphereNormal);
     float fresnel = clamp(fresStrength * pow(max(fresnelDot, 0.0), uFresnelPow), 0.0, 1.0);
 
     color += vec3(0.4, 0.6, 1.0) * fresnel * 0.3;
+
+    // Atmospheric perspective: distant terrain fades toward haze color
+    float hazeRadii = max(camRadiiFromSurface, 0.0);
+    float hazeFactor = smoothstep(0.0, 4.0, hazeRadii) * uHazeStrength;
+    float hazeLighting = uAmbientLight + max(dot(normal, lightDir), 0.0) * uSunIntensity * 0.5;
+    color = mix(color, uHazeColor * hazeLighting, hazeFactor);
 
     FragColor = vec4(color, 1.0);
 }

@@ -148,11 +148,15 @@ void SpherePatch::GenerateGridIndices(int resolution, std::vector<uint32_t>& ind
     }
 }
 
-void SpherePatch::GenerateMesh(const std::vector<float>& heights, const std::vector<glm::vec4>& shadingData)
+void SpherePatch::GenerateMesh(const std::vector<float>& heights,
+                               const std::vector<glm::vec4>& shadingData,
+                               const std::vector<glm::vec3>& computedNormals)
 {
     // Apply heights and scale to planet radius
     MeshData meshData;
     meshData.vertices.resize(_vertices.size());
+
+    bool hasComputedNormals = computedNormals.size() == _vertices.size();
 
     for (size_t i = 0; i < _vertices.size(); ++i)
     {
@@ -160,7 +164,7 @@ void SpherePatch::GenerateMesh(const std::vector<float>& heights, const std::vec
         glm::vec3 pos = _vertices[i] * _planetRadius * h;
 
         meshData.vertices[i].position = pos;
-        meshData.vertices[i].normal = glm::vec3(0.0f); // Will be calculated below
+        meshData.vertices[i].normal = hasComputedNormals ? computedNormals[i] : glm::vec3(0.0f);
         meshData.vertices[i].uv = glm::vec2(h, 0.0f);  // Store height in UV.x for shader access
         meshData.vertices[i].shadingData = (i < shadingData.size()) ? shadingData[i] : glm::vec4(0.0f);
     }
@@ -168,8 +172,11 @@ void SpherePatch::GenerateMesh(const std::vector<float>& heights, const std::vec
     // Generate indices
     GenerateGridIndices(_resolution, meshData.indices);
 
-    // Calculate normals using MeshData's built-in method
-    meshData.RecalculateNormals();
+    // Only fall back to geometric normals if analytical normals were not provided
+    if (!hasComputedNormals)
+    {
+        meshData.RecalculateNormals();
+    }
 
     // Append skirt geometry to hide cracks between LOD levels
     AppendSkirtGeometry(meshData, heights, shadingData);

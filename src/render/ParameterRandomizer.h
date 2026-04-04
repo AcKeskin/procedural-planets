@@ -153,6 +153,8 @@ inline void RandomizeEarthParameters(EarthTerrainSettings& terrain,
     biomes.snowBlend = randFloat(0.05f, 0.15f);
     biomes.snowLine = randFloat(0.70f, 0.95f);
     biomes.shoreHeight = randFloat(0.04f, 0.15f);
+    biomes.coastalDepthRange = randFloat(0.01f, 0.08f);
+    biomes.aoStrength = randFloat(0.1f, 0.5f);
 
     // --- Shading noise ---
     shading.largeNoiseScale = randFloat(0.2f, 0.7f);

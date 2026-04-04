@@ -153,6 +153,9 @@ void TerrainGenerator::SetHeightUniforms(uint32_t seed, size_t vertexCount, cons
     _computeShader.SetInt("abyssalOctaves", settings.abyssalOctaves);
     _computeShader.SetFloat("abyssalScale", settings.abyssalScale);
     _computeShader.SetFloat("abyssalStrength", settings.abyssalStrength);
+
+    // Finite-difference epsilon for analytical normal computation
+    _computeShader.SetFloat("normalEpsilon", settings.normalEpsilon);
 }
 
 void TerrainGenerator::SetShadingUniforms(uint32_t seed,
@@ -184,7 +187,8 @@ void TerrainGenerator::SetShadingUniforms(uint32_t seed,
 
 std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3>& vertices,
                                                      uint32_t seed,
-                                                     const EarthTerrainSettings& settings)
+                                                     const EarthTerrainSettings& settings,
+                                                     std::vector<glm::vec3>* outNormals)
 {
     if (!_computeShader.IsValid())
         return {};
@@ -204,8 +208,10 @@ std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3
 
     _vertexBuffer.Upload(packedVertices);
     _heightBuffer.Allocate(vertexCount);
+    _normalBuffer.Allocate(vertexCount * 3);
     _vertexBuffer.Bind(0);
     _heightBuffer.Bind(1);
+    _normalBuffer.Bind(2);
 
     SetHeightUniforms(seed, vertexCount, settings);
 
@@ -215,6 +221,18 @@ std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3
 
     std::vector<float> heights;
     _heightBuffer.Download(heights);
+
+    if (outNormals)
+    {
+        std::vector<float> packedNormals;
+        _normalBuffer.Download(packedNormals);
+        outNormals->resize(vertexCount);
+        for (size_t i = 0; i < vertexCount; ++i)
+        {
+            (*outNormals)[i] = glm::vec3(packedNormals[i * 3], packedNormals[i * 3 + 1], packedNormals[i * 3 + 2]);
+        }
+    }
+
     return heights;
 }
 
@@ -249,12 +267,15 @@ std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3
 
     _vertexBuffer.Upload(packedVertices);
     _heightBuffer.Allocate(vertexCount);
+    _normalBuffer.Allocate(vertexCount * 3);
     _vertexBuffer.Bind(0);
     _heightBuffer.Bind(1);
+    _normalBuffer.Bind(2);
 
     _computeShader.Use();
     _computeShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
     _computeShader.SetUint("seed", seed);
+    _computeShader.SetFloat("normalEpsilon", 0.0001f);
 
     _computeShader.SetVec3("continentOffset", continentParams.offset);
     _computeShader.SetInt("continentLayers", continentParams.numLayers);
@@ -341,12 +362,14 @@ std::vector<glm::vec4> TerrainGenerator::GenerateShadingData(const std::vector<g
 
 void TerrainGenerator::DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
                                             GpuBuffer<float>& heightBuffer,
+                                            GpuBuffer<float>& normalBuffer,
                                             size_t vertexCount,
                                             uint32_t seed,
                                             const EarthTerrainSettings& settings)
 {
     vertexBuffer.Bind(0);
     heightBuffer.Bind(1);
+    normalBuffer.Bind(2);
 
     SetHeightUniforms(seed, vertexCount, settings);
 
