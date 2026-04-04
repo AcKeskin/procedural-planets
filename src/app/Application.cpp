@@ -265,6 +265,11 @@ void Application::Render()
     _planetShader.SetVec3("uCameraPos", _camera.GetPosition());
     _planetShader.SetFloat("uSeaLevel", _seaLevel);
 
+    // Sync Application-owned settings into the active body before rendering
+    auto* earth = dynamic_cast<render::Earth*>(_activeBody.get());
+    if (earth)
+        SyncEarthSettings(*earth);
+
     // Body-specific render uniforms (biomes, colors, height range, etc.)
     if (_activeBody)
         _activeBody->SetRenderUniforms(_planetShader);
