@@ -27,7 +27,7 @@ constexpr float HeightRangeMultiplier = 1.5f;
 Earth::Earth()
 {
     _radius = 10.0f;
-    _seaLevel = 0.4f;
+    _seaLevel = 0.995f;
     _atmosphereHeight = 0.08f;
 }
 

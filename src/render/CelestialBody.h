@@ -57,7 +57,7 @@ public:
 
 protected:
     float _radius = 10.0f;
-    float _seaLevel = 0.4f;
+    float _seaLevel = 0.995f;
     float _atmosphereHeight = 0.08f; // Fraction of radius
 };
 
