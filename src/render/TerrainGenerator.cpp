@@ -451,6 +451,22 @@ void TerrainGenerator::DispatchErosionAsync(GpuBuffer<float>& inputBuffer,
                                             GpuBuffer<float>& outputBuffer,
                                             size_t vertexCount,
                                             int gridResolution,
+                                            const CelestialBody& body)
+{
+    inputBuffer.Bind(0);
+    outputBuffer.Bind(1);
+
+    body.SetErosionUniforms(_erosionShader, vertexCount, gridResolution);
+
+    unsigned int groupCount =
+        (static_cast<unsigned int>(vertexCount) + ErosionWorkgroupSize - 1) / ErosionWorkgroupSize;
+    _erosionShader.Dispatch(groupCount);
+}
+
+void TerrainGenerator::DispatchErosionAsync(GpuBuffer<float>& inputBuffer,
+                                            GpuBuffer<float>& outputBuffer,
+                                            size_t vertexCount,
+                                            int gridResolution,
                                             const EarthTerrainSettings& settings)
 {
     inputBuffer.Bind(0);

@@ -1,5 +1,4 @@
 #include "GenerationScheduler.h"
-#include "Earth.h"
 #include "lod/QuadTreeNode.h"
 #include <algorithm>
 #include <iostream>
@@ -89,21 +88,20 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
     _terrainGen->DispatchHeightsAsync(
         task.vertexBuffer, task.heightBuffer, task.normalBuffer, task.vertexCount, *_body, _seed);
 
-    // Erosion iterations (Earth-specific, requires terrain settings)
-    const auto* earth = dynamic_cast<const Earth*>(_body);
-    if (earth && earth->GetTerrainSettings().enableErosion && _terrainGen->IsErosionReady())
+    // Erosion iterations (any body type that supports erosion)
+    if (_body->SupportsErosion() && _terrainGen->IsErosionReady())
     {
-        const auto& terrainSettings = earth->GetTerrainSettings();
         int gridRes = task.request.patch->GetResolution();
+        int iterations = _body->GetErosionIterations();
         task.erosionScratchBuffer.Allocate(task.vertexCount);
 
         GpuBuffer<float>* readBuf = &task.heightBuffer;
         GpuBuffer<float>* writeBuf = &task.erosionScratchBuffer;
 
-        for (int i = 0; i < terrainSettings.erosionIterations; ++i)
+        for (int i = 0; i < iterations; ++i)
         {
             ComputeShader::WaitForCompletion();
-            _terrainGen->DispatchErosionAsync(*readBuf, *writeBuf, task.vertexCount, gridRes, terrainSettings);
+            _terrainGen->DispatchErosionAsync(*readBuf, *writeBuf, task.vertexCount, gridRes, *_body);
             std::swap(readBuf, writeBuf);
         }
 

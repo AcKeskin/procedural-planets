@@ -74,6 +74,7 @@ public:
     // Uniform binding
     void SetShapeUniforms(ComputeShader& shader, uint32_t seed) const override;
     void SetShadingUniforms(ComputeShader& shader, uint32_t seed) const override;
+    void SetRenderUniforms(Shader& shader) const override;
 
     // Palette
     BiomePalette LoadBiomePalette() const override;
@@ -82,6 +83,7 @@ public:
     std::string GetTypeName() const override { return _config.name; }
     bool HasSolidSurface() const override { return _config.hasSolidSurface; }
     bool HasAtmosphere() const override { return _config.hasAtmosphere; }
+    float GetHeightScale() const override { return _config.heightScale; }
 
 private:
     GenericBodyConfig _config;

@@ -34,14 +34,19 @@ public:
     // Shader paths
     std::string GetHeightShaderPath() const override;
     std::string GetShadingShaderPath() const override;
+    std::string GetErosionShaderPath() const override;
     std::string GetVertexShaderPath() const override;
     std::string GetFragmentShaderPath() const override;
 
-    // Bind shape generation parameters to compute shader
+    // Uniform binding
     void SetShapeUniforms(ComputeShader& shader, uint32_t seed) const override;
-
-    // Bind surface shading parameters
     void SetShadingUniforms(ComputeShader& shader, uint32_t seed) const override;
+    void SetRenderUniforms(Shader& shader) const override;
+
+    // Erosion
+    bool SupportsErosion() const override;
+    void SetErosionUniforms(ComputeShader& shader, size_t vertexCount, int gridResolution) const override;
+    int GetErosionIterations() const override;
 
     // Biome palette
     BiomePalette LoadBiomePalette() const override;
@@ -50,6 +55,7 @@ public:
     std::string GetTypeName() const override { return "Earth"; }
     bool HasSolidSurface() const override { return true; }
     bool HasAtmosphere() const override { return true; }
+    float GetHeightScale() const override { return _terrainSettings.heightScale; }
 
 private:
     EarthTerrainSettings _terrainSettings;

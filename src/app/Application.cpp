@@ -265,37 +265,11 @@ void Application::Render()
     _planetShader.SetVec3("uCameraPos", _camera.GetPosition());
     _planetShader.SetFloat("uSeaLevel", _seaLevel);
 
-    // Biome uniforms
-    _planetShader.SetInt("uUseBiomes", _biomeSettings.enabled ? 1 : 0);
-    _planetShader.SetFloat("uSteepnessThreshold", _biomeSettings.steepnessThreshold);
-    _planetShader.SetFloat("uFlatToSteepBlend", _biomeSettings.flatToSteepBlend);
-    _planetShader.SetFloat("uSnowLatitude", _biomeSettings.snowLatitude);
-    _planetShader.SetFloat("uSnowBlend", _biomeSettings.snowBlend);
-    _planetShader.SetFloat("uSnowLine", _biomeSettings.snowLine);
-    _planetShader.SetFloat("uShoreHeight", _biomeSettings.shoreHeight);
-    _planetShader.SetInt("uUseClimateModel", _shadingSettings.useClimateModel ? 1 : 0);
+    // Body-specific render uniforms (biomes, colors, height range, etc.)
+    if (_activeBody)
+        _activeBody->SetRenderUniforms(_planetShader);
 
-    // Earth colors
-    _planetShader.SetVec3("uShoreLow", _earthColors.shoreLow);
-    _planetShader.SetVec3("uShoreHigh", _earthColors.shoreHigh);
-    _planetShader.SetVec3("uFlatLowA", _earthColors.flatLowA);
-    _planetShader.SetVec3("uFlatHighA", _earthColors.flatHighA);
-    _planetShader.SetVec3("uFlatLowB", _earthColors.flatLowB);
-    _planetShader.SetVec3("uFlatHighB", _earthColors.flatHighB);
-    _planetShader.SetVec3("uSteepLow", _earthColors.steepLow);
-    _planetShader.SetVec3("uSteepHigh", _earthColors.steepHigh);
-    _planetShader.SetVec3("uSnowColor", _earthColors.snow);
-
-    // Shading parameters
-    _planetShader.SetFloat("uFlatColBlend", _shadingSettings.flatColBlend);
-    _planetShader.SetFloat("uFlatColBlendNoise", _shadingSettings.flatColBlendNoise);
-
-    // Height range (auto-computed from terrain scale)
-    float heightMin = 1.0f - _terrainSettings.heightScale * AppDefaults::HeightRangeMultiplier;
-    float heightMax = 1.0f + _terrainSettings.heightScale * AppDefaults::HeightRangeMultiplier;
-    _planetShader.SetVec2("uHeightMinMax", glm::vec2(heightMin, heightMax));
-
-    // Lighting
+    // Shared lighting uniforms (all body types)
     _planetShader.SetFloat("uSunIntensity", _sceneSettings.lighting.sunIntensity);
     _planetShader.SetFloat("uAmbientLight", _sceneSettings.lighting.ambientLight);
     _planetShader.SetFloat("uSpecularStrength", _sceneSettings.lighting.specularStrength);
@@ -307,9 +281,8 @@ void Application::Render()
     _planetShader.SetFloat("uFresnelStrengthFar", AppDefaults::FresnelStrengthFar);
     _planetShader.SetFloat("uFresnelPow", AppDefaults::FresnelPower);
 
-    // Visual quality: detail fade, coastal gradient, AO, atmospheric perspective
+    // Visual quality
     _planetShader.SetFloat("uDetailFadeStart", _sceneSettings.lighting.detailFadeStart);
-    _planetShader.SetFloat("uCoastalDepthRange", _biomeSettings.coastalDepthRange);
     _planetShader.SetFloat("uAOStrength", _biomeSettings.aoStrength);
     _planetShader.SetFloat("uHazeStrength", _sceneSettings.lighting.hazeStrength);
     _planetShader.SetVec3("uHazeColor", _sceneSettings.lighting.hazeColor);
@@ -501,8 +474,11 @@ void Application::SwitchBody(std::unique_ptr<render::CelestialBody> newBody)
     }
 
     // Load compute shaders
+    std::string erosionPath = _activeBody->GetErosionShaderPath();
+    if (erosionPath.empty())
+        erosionPath = "shaders/compute/erosion_earth.comp"; // Fallback for bodies without erosion
     _genConfig.useGpu = _terrainGenerator.Initialize(
-        _activeBody->GetHeightShaderPath(), _activeBody->GetShadingShaderPath(), "shaders/compute/erosion_earth.comp");
+        _activeBody->GetHeightShaderPath(), _activeBody->GetShadingShaderPath(), erosionPath);
     _terrainStats.gpuAvailable = _genConfig.useGpu;
 
     // Load palette

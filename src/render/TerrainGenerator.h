@@ -98,7 +98,14 @@ public:
                               const EarthShadingSettings& settings,
                               float heightScale);
 
-    // Dispatch one erosion iteration on the height buffer (no barrier, no readback)
+    // Abstract erosion dispatch: body sets its own uniforms
+    void DispatchErosionAsync(GpuBuffer<float>& inputBuffer,
+                              GpuBuffer<float>& outputBuffer,
+                              size_t vertexCount,
+                              int gridResolution,
+                              const CelestialBody& body);
+
+    // Earth-specific erosion dispatch (legacy)
     void DispatchErosionAsync(GpuBuffer<float>& inputBuffer,
                               GpuBuffer<float>& outputBuffer,
                               size_t vertexCount,

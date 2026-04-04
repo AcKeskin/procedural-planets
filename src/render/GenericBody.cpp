@@ -1,5 +1,6 @@
 #include "GenericBody.h"
 #include "ComputeShader.h"
+#include "Shader.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <iostream>
@@ -185,6 +186,11 @@ void GenericBody::SetShadingUniforms(ComputeShader& shader, uint32_t seed) const
     shader.SetInt("detailNoiseOctaves", _config.detailNoiseOctaves);
     shader.SetInt("smallNoiseOctaves", _config.smallNoiseOctaves);
     shader.SetFloat("warpStrength", _config.warpStrength);
+}
+
+void GenericBody::SetRenderUniforms(Shader& /*shader*/) const
+{
+    // Generic bodies use palette SSBO only — no body-specific fragment uniforms needed
 }
 
 } // namespace planets::render
