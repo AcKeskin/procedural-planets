@@ -19,6 +19,7 @@ add_library(render STATIC
     CelestialBody.cpp
     Earth.cpp
     BiomePalette.cpp
+    GenericBody.cpp
     Framebuffer.cpp
     PostProcessor.cpp
     lod/SpherePatch.cpp

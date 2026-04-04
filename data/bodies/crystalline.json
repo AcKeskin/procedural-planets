@@ -1,0 +1,34 @@
+{
+    "name": "Crystalline World",
+    "radius": 12.0,
+    "seaLevel": 0.0,
+    "atmosphereHeight": 0.0,
+    "hasSolidSurface": true,
+    "hasAtmosphere": false,
+    "palette": "data/palettes/crystalline.json",
+    "terrain": {
+        "heightScale": 0.08,
+        "oceanDepthMultiplier": 0.0,
+        "oceanFloorDepth": 0.0,
+        "mountainBlend": 0.4,
+        "continent": {
+            "scale": 0.8,
+            "octaves": 3,
+            "persistence": 0.4,
+            "lacunarity": 2.5,
+            "strength": 0.6
+        },
+        "mountain": {
+            "scale": 5.0,
+            "octaves": 4,
+            "persistence": 0.45,
+            "lacunarity": 2.8,
+            "strength": 1.5
+        }
+    },
+    "shading": {
+        "detailNoiseScale": 3.0,
+        "smallNoiseScale": 25.0,
+        "warpStrength": 0.2
+    }
+}
