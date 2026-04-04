@@ -165,7 +165,7 @@ void SpherePatch::GenerateMesh(const std::vector<float>& heights,
 
         meshData.vertices[i].position = pos;
         meshData.vertices[i].normal = hasComputedNormals ? computedNormals[i] : glm::vec3(0.0f);
-        meshData.vertices[i].uv = glm::vec2(h, 0.0f);  // Store height in UV.x for shader access
+        meshData.vertices[i].uv = glm::vec2(h, 0.0f); // Store height in UV.x for shader access
         meshData.vertices[i].shadingData = (i < shadingData.size()) ? shadingData[i] : glm::vec4(0.0f);
     }
 
