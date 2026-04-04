@@ -3,6 +3,7 @@
 #include "ComputeShader.h"
 #include "GpuBuffer.h"
 #include "CelestialBody.h"
+#include <planetgen/planetgen.h>
 #include <glm/glm.hpp>
 #include <vector>
 #include <cstdint>
@@ -27,6 +28,7 @@ struct ComputeNoiseParams
 };
 
 // GPU-accelerated terrain height generation
+// Synchronous paths delegate to libplanetgen; async dispatch uses direct GL for LOD pipeline.
 class TerrainGenerator
 {
 public:
@@ -44,7 +46,10 @@ public:
                     const std::string& shadingShaderPath,
                     const std::string& erosionShaderPath);
 
-    // Generate heights and analytical normals using EarthTerrainSettings
+    // Initialize libplanetgen context (uses existing GL context on calling thread)
+    bool InitializeLibrary();
+
+    // Generate heights and analytical normals via libplanetgen
     std::vector<float> GenerateHeights(const std::vector<glm::vec3>& vertices,
                                        uint32_t seed,
                                        const EarthTerrainSettings& settings,
@@ -61,11 +66,11 @@ public:
                                        float oceanFloorSmoothing,
                                        float mountainBlend);
 
-    // Generate shading data (biome, detail, temperature, moisture)
+    // Generate shading data via libplanetgen
     std::vector<glm::vec4>
     GenerateShadingData(const std::vector<glm::vec3>& vertices, uint32_t seed, const EarthShadingSettings& settings);
 
-    // Abstract dispatch: body type sets its own uniforms
+    // Abstract dispatch: body type sets its own uniforms (async LOD path)
     void DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
                               GpuBuffer<float>& heightBuffer,
                               GpuBuffer<float>& normalBuffer,
@@ -73,7 +78,7 @@ public:
                               const CelestialBody& body,
                               uint32_t seed);
 
-    // Abstract dispatch: body type sets its own uniforms
+    // Abstract dispatch: body type sets its own uniforms (async LOD path)
     void DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
                               GpuBuffer<glm::vec4>& shadingBuffer,
                               GpuBuffer<float>& heightBuffer,
@@ -112,15 +117,22 @@ public:
                               int gridResolution,
                               const EarthTerrainSettings& settings);
 
-    bool IsReady() const { return _computeShader.IsValid(); }
-    bool IsShadingReady() const { return _shadingShader.IsValid(); }
+    bool IsReady() const { return _computeShader.IsValid() || _pgContext != nullptr; }
+    bool IsShadingReady() const { return _shadingShader.IsValid() || _pgContext != nullptr; }
     bool IsErosionReady() const { return _erosionShader.IsValid(); }
+    bool IsLibraryReady() const { return _pgContext != nullptr; }
 
 private:
     void SetHeightUniforms(uint32_t seed, size_t vertexCount, const EarthTerrainSettings& settings);
     void SetShadingUniforms(uint32_t seed, size_t vertexCount, const EarthShadingSettings& settings, float heightScale);
     void SetErosionUniforms(size_t vertexCount, int gridResolution, const EarthTerrainSettings& settings);
 
+    // Convert EarthTerrainSettings to PgBodyDesc
+    static PgBodyDesc ToPgBodyDesc(const EarthTerrainSettings& settings);
+    // Convert EarthShadingSettings to PgShadingDesc
+    static PgShadingDesc ToPgShadingDesc(const EarthShadingSettings& settings, float heightScale);
+
+    // Direct GL shaders (async LOD path)
     ComputeShader _computeShader;
     ComputeShader _shadingShader;
     ComputeShader _erosionShader;
@@ -128,6 +140,9 @@ private:
     GpuBuffer<float> _heightBuffer;
     GpuBuffer<float> _normalBuffer;
     GpuBuffer<glm::vec4> _shadingBuffer;
+
+    // libplanetgen handles (synchronous path)
+    PgContext _pgContext = nullptr;
 };
 
 } // namespace planets::render

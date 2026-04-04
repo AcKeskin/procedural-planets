@@ -37,6 +37,9 @@ bool Application::Initialize()
     _renderer.Initialize();
     _guiManager.Initialize(_window.GetHandle());
 
+    // Initialize libplanetgen with the app's existing GL context (embedded shaders)
+    _terrainGenerator.InitializeLibrary();
+
     if (!_sceneFbo.Create(_window.GetWidth(), _window.GetHeight()))
     {
         std::cerr << "Failed to create scene framebuffer" << std::endl;

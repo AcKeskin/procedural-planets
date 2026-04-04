@@ -24,7 +24,13 @@ OpenGLBackend::~OpenGLBackend()
 
 bool OpenGLBackend::InitWithExistingContext()
 {
-    // Assume gl3w is already initialized by the host application
+    // gl3w function pointers are per-module on Windows — must init even with existing context
+    if (gl3wInit())
+    {
+        std::cerr << "[planetgen] gl3w init failed (existing context)" << std::endl;
+        return false;
+    }
+
     _ownsContext = false;
     return true;
 }
