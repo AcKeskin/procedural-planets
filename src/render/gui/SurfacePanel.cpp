@@ -2,12 +2,17 @@
 #include "../settings/SurfaceSettings.h"
 #include "../settings/TerrainSettings.h"
 #include "../settings/OceanSettings.h"
+#include "../CelestialBody.h"
+#include "../Earth.h"
+#include "../GenericBody.h"
+#include "../BiomePalette.h"
 #include <imgui.h>
 
 namespace planets::render
 {
 
-bool SurfacePanel::Draw(BiomeSettings& biomes,
+bool SurfacePanel::Draw(CelestialBody* activeBody,
+                        BiomeSettings& biomes,
                         EarthColors& colors,
                         EarthShadingSettings& shading,
                         effects::OceanSettings& ocean,
@@ -20,17 +25,31 @@ bool SurfacePanel::Draw(BiomeSettings& biomes,
     bool regen = false;
     ImGui::Begin("Surface", &visible);
 
-    if (ImGui::CollapsingHeader("Biomes", ImGuiTreeNodeFlags_DefaultOpen))
-        DrawBiomeContent(biomes);
+    auto* earth = dynamic_cast<Earth*>(activeBody);
+    auto* generic = dynamic_cast<GenericBody*>(activeBody);
 
-    if (ImGui::CollapsingHeader("Colors"))
-        DrawEarthColorsContent(colors);
+    if (earth)
+    {
+        if (ImGui::CollapsingHeader("Biomes", ImGuiTreeNodeFlags_DefaultOpen))
+            DrawBiomeContent(biomes);
 
-    if (ImGui::CollapsingHeader("Shading Noise"))
-        regen |= DrawShadingContent(shading);
+        if (ImGui::CollapsingHeader("Colors"))
+            DrawEarthColorsContent(colors);
 
-    if (ImGui::CollapsingHeader("Ocean"))
-        DrawOceanContent(ocean, seaLevel);
+        if (ImGui::CollapsingHeader("Shading Noise"))
+            regen |= DrawShadingContent(shading);
+    }
+    else if (generic)
+    {
+        if (ImGui::CollapsingHeader("Surface", ImGuiTreeNodeFlags_DefaultOpen))
+            regen |= DrawGenericSurfaceContent(*generic);
+    }
+
+    if (activeBody && activeBody->HasSolidSurface())
+    {
+        if (ImGui::CollapsingHeader("Ocean"))
+            DrawOceanContent(ocean, seaLevel);
+    }
 
     ImGui::End();
     return regen;
@@ -211,6 +230,38 @@ bool SurfacePanel::DrawShadingContent(EarthShadingSettings& settings)
             ImGui::SetTooltip(
                 "Moisture effect of distance from coast\n0 = none, higher = drier interiors, wetter coasts");
     }
+
+    return needsRegeneration;
+}
+
+bool SurfacePanel::DrawGenericSurfaceContent(GenericBody& body)
+{
+    bool needsRegeneration = false;
+    auto& cfg = body.GetConfig();
+
+    ImGui::Text("Body: %s", cfg.name.c_str());
+    ImGui::Separator();
+
+    ImGui::Text("Shading Noise");
+    ImGui::SliderFloat("Detail Scale", &cfg.detailNoiseScale, 0.5f, 8.0f);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+
+    ImGui::SliderFloat("Small Scale", &cfg.smallNoiseScale, 5.0f, 40.0f);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+
+    ImGui::SliderInt("Detail Octaves", &cfg.detailNoiseOctaves, 1, 6);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+
+    ImGui::SliderInt("Small Octaves", &cfg.smallNoiseOctaves, 2, 8);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+
+    ImGui::SliderFloat("Warp Strength", &cfg.warpStrength, 0.0f, 1.0f);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
 
     return needsRegeneration;
 }

@@ -437,7 +437,8 @@ void Application::RenderGui()
         }
 
         needsRegen |= _surfacePanel.Draw(
-            _biomeSettings, _earthColors, _shadingSettings, _oceanSettings, _seaLevel, visibility.surface);
+            _activeBody.get(), _biomeSettings, _earthColors, _shadingSettings, _oceanSettings, _seaLevel,
+            visibility.surface);
         _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
         _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
 
