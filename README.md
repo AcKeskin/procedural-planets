@@ -1,6 +1,6 @@
 # Procedural Planets
 
-A GPU-accelerated procedural planet renderer built with C++17 and OpenGL. Generates realistic, Earth-like planets with terrain, atmosphere, oceans, and biomes — all driven by compute shaders and procedural noise.
+A GPU-accelerated procedural planet renderer built with C++17 and OpenGL. Generates realistic celestial bodies — Earth-like planets, volcanic worlds, crystalline moons — with terrain, atmosphere, oceans, and biomes, all driven by compute shaders and procedural noise.
 
 <p align="center">
   <img src="docs/videos/spedup_cinematic_updated.gif" alt="Procedural planet cinematic" width="600">
@@ -13,14 +13,17 @@ Inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-S
 - **GPU Compute Terrain** — Height and shading generated in two compute shader passes, entirely on the GPU
 - **Async Generation** — Non-blocking terrain generation with a priority scheduler and GPU fence synchronization
 - **Icosahedron LOD** — Subdivided into patches with 4 detail levels, switching based on camera distance
+- **Multi-Body Types** — Earth-like planets, volcanic worlds, crystalline moons — each with type-specific shaders, palettes, and GUI
+- **libplanetgen** — Standalone shared library (DLL) with C API for terrain generation, usable from Unity, Unreal, or any C/C++ consumer
+- **Climate Model** — Whittaker biome classification from latitude, elevation, and Hadley circulation for Earth-like bodies
+- **Data-Driven Palettes** — JSON-defined color palettes per body type, blended by height in the fragment shader
 - **Atmospheric Scattering** — Rayleigh scattering with wavelength-dependent coloring and angle-based glow
 - **Ocean Rendering** — Depth-based shallow-to-deep color blending, animated procedural wave normals, and specular highlights
-- **Fresnel Rim** — Distance-adaptive rim lighting that scales with camera distance for a sense of planetary scale
-- **Biome System** — Classification by temperature, moisture, and height with triplanar texturing
+- **Tectonic Plates** — Voronoi-based plate boundaries with convergent mountains and divergent rifts
 - **Multi-Layer Noise** — Simplex and fractal noise with octaves, lacunarity, persistence, and ridge noise
 - **Parameter Randomizer** — One-click randomization of all planet parameters within Earth-like constraints
-- **Camera Modes** — FreeFly and Orbit cameras
-- **Live Tweaking** — ImGui debug panels for all parameters
+- **Cinematic System** — Turntable camera with keyframe animation and screenshot/GIF capture
+- **Live Tweaking** — Body-type-aware ImGui panels for all parameters
 
 <p align="center">
   <img src="docs/images/with_atmosphere_0.png" alt="Planet with atmospheric scattering" width="400">
@@ -29,7 +32,7 @@ Inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-S
 
 ## Building
 
-You'll need CMake 3.20+, a C++17 compiler, and OpenGL 4.3+ support. All dependencies are pulled in automatically — no manual setup needed.
+You'll need CMake 3.20+, a C++17 compiler, and OpenGL 4.5+ support. All dependencies are pulled in automatically — no manual setup needed.
 
 ```bash
 git clone https://github.com/AcKeskin/procedural-planets.git
@@ -38,7 +41,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
-The executable ends up in `build/bin/Release/`.
+The executable ends up in `build/bin/Release/`. The `planetgen.dll` shared library is built alongside.
 
 ## Dependencies
 
@@ -51,6 +54,7 @@ Everything is handled through CMake FetchContent, so you don't need to install a
 | [ImGui](https://github.com/ocornut/imgui) | docking | Debug GUI |
 | [gl3w](https://github.com/skaslev/gl3w) | latest | OpenGL loader |
 | [stb](https://github.com/nothings/stb) | latest | Image loading |
+| [nlohmann/json](https://github.com/nlohmann/json) | 3.11.3 | JSON parsing |
 
 ## Controls
 
@@ -68,7 +72,7 @@ Everything is handled through CMake FetchContent, so you don't need to install a
 | `F12` | Take screenshot (PNG) |
 | `Esc` | Stop cinematic / quit |
 
-All terrain, atmosphere, ocean, and scene parameters are exposed in ImGui panels on the left side of the viewport. Screenshots are saved to the `captures/` directory.
+All terrain, atmosphere, ocean, and scene parameters are exposed in ImGui panels. The Surface panel adapts to the active body type — Earth shows biome/climate controls, generic bodies show palette and noise parameters.
 
 ## Project Structure
 
@@ -77,33 +81,69 @@ src/
 ├── core/               Platform-independent logic
 │   ├── math/           Camera system
 │   ├── noise/          Simplex and fractal noise
-│   └── generation/     Planet model, noise layers, terrain generation
+│   └── generation/     Planet model, noise layers
 ├── render/             GPU rendering pipeline
 │   ├── lod/            Icosahedron patch LOD system
 │   ├── effects/        Atmosphere and ocean renderers
-│   ├── settings/       Typed configuration (terrain, ocean, surface, scene, atmosphere)
-│   ├── gui/            ImGui debug panels
+│   ├── settings/       Typed configuration structs
+│   ├── gui/            Body-type-aware ImGui panels
+│   ├── Earth            Earth body (Whittaker climate, tectonic plates)
+│   ├── GenericBody      Data-driven body from JSON config
 │   ├── GenerationScheduler   Async compute dispatch with GPU fence sync
-│   └── ParameterRandomizer   Constrained Earth-like parameter generation
+│   └── TerrainGenerator      GPU terrain generation (delegates to libplanetgen)
 └── app/                Application entry, input handling
 
+libplanetgen/           Standalone terrain generation library (DLL)
+├── include/planetgen/  Public C API + C++ RAII wrapper
+├── src/api/            C API implementation
+├── src/backend/        Compute backend abstraction
+│   └── opengl/         OpenGL 4.5 compute implementation
+└── cmake/              Shader embedding build tools
+
 shaders/
-├── compute/            GPU terrain generation (height + shading passes)
-├── includes/           Shared GLSL libraries (noise, math, triplanar)
-├── planet.*            Planet surface rendering
+├── compute/            GPU terrain generation (height, shading, erosion)
+├── includes/           Shared GLSL libraries (noise, math, lighting)
+├── earth/              Earth-specific surface rendering
+├── generic/            Palette-based surface rendering
 ├── atmosphere.*        Atmospheric scattering
 ├── ocean.*             Ocean surface
 └── space.*             Background rendering
+
+data/
+├── bodies/             Body type configs (volcanic.json, crystalline.json)
+└── palettes/           Color palettes per body type (earth.json, volcanic.json, etc.)
 ```
 
-## How It Works
+## Architecture
+
+### Body Type System
+
+Each celestial body type (`Earth`, `GenericBody`) inherits from `CelestialBody` and declares:
+- Which compute shaders to use for height/shading/erosion
+- Which fragment shader to use for rendering
+- How to set uniforms for its specific noise model
+- A biome palette loaded from JSON
+
+New body types are added by creating a JSON config + palette file. No code changes required for data-driven bodies.
+
+### libplanetgen
+
+A standalone shared library that extracts the GPU compute terrain pipeline into a reusable DLL:
+- **C API** (`planetgen.h`) — opaque handles for context, body, and result; designed for C# P/Invoke
+- **Embedded shaders** — compute shaders baked into the DLL at build time, no runtime file dependencies
+- **Backend abstraction** — `IComputeBackend` interface allows future Vulkan support without API changes
+- **Dual context mode** — reuses host app's GL context or creates a headless GLFW window
+
+The main application's `TerrainGenerator` delegates synchronous generation to libplanetgen while keeping the async LOD dispatch path (direct GL with fences) for the streaming pipeline.
+
+### Generation Pipeline
 
 1. **Patch Generation** — An icosahedron is subdivided into spherical patches projected onto a unit sphere
-2. **Async Scheduling** — Patches are queued into a priority scheduler that dispatches compute work across frames with GPU fence synchronization, keeping the UI responsive
-3. **Height Pass** — A compute shader generates terrain elevation from layered noise (continents, mountains, ocean masks)
-4. **Shading Pass** — Another compute shader classifies biomes and surface detail from height, temperature, and moisture
+2. **Async Scheduling** — Patches are queued into a priority scheduler that dispatches compute work across frames with GPU fence synchronization
+3. **Height Pass** — A compute shader generates terrain elevation from layered noise (continents, mountains, tectonic plates, ocean floor topology)
+4. **Shading Pass** — Another compute shader computes per-vertex climate data (temperature, moisture) or palette parameters
 5. **LOD Selection** — Each frame, patches pick their detail level based on distance and get culled if outside the view
-6. **Surface Rendering** — The displaced mesh is rendered with triplanar texturing, biome-driven coloring, and distance-adaptive fresnel rim
+6. **Surface Rendering** — Body-type-specific fragment shaders apply biome colors (Earth) or palette gradients (generic) with lighting, fresnel, and haze
 7. **Effects** — Atmospheric scattering and ocean with depth coloring and wave animation are composited as post-processing passes
 
 ## References
