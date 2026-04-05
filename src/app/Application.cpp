@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "GpuConstants.h"
 #include "MeshGenerator.h"
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
@@ -36,6 +37,9 @@ bool Application::Initialize()
     _renderer.Initialize();
     _guiManager.Initialize(_window.GetHandle());
 
+    // Initialize libplanetgen with the app's existing GL context (embedded shaders)
+    _terrainGenerator.InitializeLibrary();
+
     if (!_sceneFbo.Create(_window.GetWidth(), _window.GetHeight()))
     {
         std::cerr << "Failed to create scene framebuffer" << std::endl;
@@ -54,34 +58,16 @@ bool Application::Initialize()
         return false;
     }
 
-    if (!_planetShader.LoadFromFiles("shaders/planet.vert", "shaders/planet.frag"))
-    {
-        std::cerr << "Failed to load planet shader" << std::endl;
-        return false;
-    }
-
     if (!_spaceShader.LoadFromFiles("shaders/space.vert", "shaders/space.frag"))
     {
         std::cerr << "Failed to load space shader" << std::endl;
         return false;
     }
 
-    // GPU terrain generator
-    _genConfig.useGpu = _terrainGenerator.Initialize("shaders/compute/height_earth.comp",
-                                                     "shaders/compute/shading_earth.comp",
-                                                     "shaders/compute/erosion_earth.comp");
-    _terrainStats.gpuAvailable = _genConfig.useGpu;
-
-    if (_genConfig.useGpu)
-        std::cout << "[TerrainGenerator] GPU compute shaders loaded successfully" << std::endl;
-    else
-        std::cout << "[TerrainGenerator] GPU compute shaders not available, using CPU" << std::endl;
-
-    // Initialize async generation scheduler
-    if (_genConfig.useGpu)
-    {
-        _generationScheduler.Initialize(_terrainGenerator, _terrainSettings, _shadingSettings, _genConfig.seed);
-    }
+    // Create initial Earth body and load its shaders/palette
+    auto earth = std::make_unique<render::Earth>();
+    SyncEarthSettings(*earth);
+    SwitchBody(std::move(earth));
 
     // CPU fallback planet
     core::PlanetSettings planetSettings;
@@ -282,37 +268,16 @@ void Application::Render()
     _planetShader.SetVec3("uCameraPos", _camera.GetPosition());
     _planetShader.SetFloat("uSeaLevel", _seaLevel);
 
-    // Biome uniforms
-    _planetShader.SetInt("uUseBiomes", _biomeSettings.enabled ? 1 : 0);
-    _planetShader.SetFloat("uSteepnessThreshold", _biomeSettings.steepnessThreshold);
-    _planetShader.SetFloat("uFlatToSteepBlend", _biomeSettings.flatToSteepBlend);
-    _planetShader.SetFloat("uSnowLatitude", _biomeSettings.snowLatitude);
-    _planetShader.SetFloat("uSnowBlend", _biomeSettings.snowBlend);
-    _planetShader.SetFloat("uSnowLine", _biomeSettings.snowLine);
-    _planetShader.SetFloat("uShoreHeight", _biomeSettings.shoreHeight);
-    _planetShader.SetInt("uUseClimateModel", _shadingSettings.useClimateModel ? 1 : 0);
+    // Sync Application-owned settings into the active body before rendering
+    auto* earth = dynamic_cast<render::Earth*>(_activeBody.get());
+    if (earth)
+        SyncEarthSettings(*earth);
 
-    // Earth colors
-    _planetShader.SetVec3("uShoreLow", _earthColors.shoreLow);
-    _planetShader.SetVec3("uShoreHigh", _earthColors.shoreHigh);
-    _planetShader.SetVec3("uFlatLowA", _earthColors.flatLowA);
-    _planetShader.SetVec3("uFlatHighA", _earthColors.flatHighA);
-    _planetShader.SetVec3("uFlatLowB", _earthColors.flatLowB);
-    _planetShader.SetVec3("uFlatHighB", _earthColors.flatHighB);
-    _planetShader.SetVec3("uSteepLow", _earthColors.steepLow);
-    _planetShader.SetVec3("uSteepHigh", _earthColors.steepHigh);
-    _planetShader.SetVec3("uSnowColor", _earthColors.snow);
+    // Body-specific render uniforms (biomes, colors, height range, etc.)
+    if (_activeBody)
+        _activeBody->SetRenderUniforms(_planetShader);
 
-    // Shading parameters
-    _planetShader.SetFloat("uFlatColBlend", _shadingSettings.flatColBlend);
-    _planetShader.SetFloat("uFlatColBlendNoise", _shadingSettings.flatColBlendNoise);
-
-    // Height range (auto-computed from terrain scale)
-    float heightMin = 1.0f - _terrainSettings.heightScale * AppDefaults::HeightRangeMultiplier;
-    float heightMax = 1.0f + _terrainSettings.heightScale * AppDefaults::HeightRangeMultiplier;
-    _planetShader.SetVec2("uHeightMinMax", glm::vec2(heightMin, heightMax));
-
-    // Lighting
+    // Shared lighting uniforms (all body types)
     _planetShader.SetFloat("uSunIntensity", _sceneSettings.lighting.sunIntensity);
     _planetShader.SetFloat("uAmbientLight", _sceneSettings.lighting.ambientLight);
     _planetShader.SetFloat("uSpecularStrength", _sceneSettings.lighting.specularStrength);
@@ -324,12 +289,18 @@ void Application::Render()
     _planetShader.SetFloat("uFresnelStrengthFar", AppDefaults::FresnelStrengthFar);
     _planetShader.SetFloat("uFresnelPow", AppDefaults::FresnelPower);
 
-    // Visual quality: detail fade, coastal gradient, AO, atmospheric perspective
+    // Visual quality
     _planetShader.SetFloat("uDetailFadeStart", _sceneSettings.lighting.detailFadeStart);
-    _planetShader.SetFloat("uCoastalDepthRange", _biomeSettings.coastalDepthRange);
     _planetShader.SetFloat("uAOStrength", _biomeSettings.aoStrength);
     _planetShader.SetFloat("uHazeStrength", _sceneSettings.lighting.hazeStrength);
     _planetShader.SetVec3("uHazeColor", _sceneSettings.lighting.hazeColor);
+
+    // Biome palette SSBO
+    if (_paletteBuffer.IsValid())
+    {
+        _paletteBuffer.Bind(render::BiomePaletteBindingPoint);
+        _planetShader.SetInt("uPaletteSize", _biomePalette.GetEntryCount());
+    }
 
     if (_lodConfig.enabled && _genConfig.useGpu)
     {
@@ -338,8 +309,11 @@ void Application::Render()
         _quadTree.ApplyCompletedPatches();
         _quadTree.Update(_camera.GetPosition(), viewProjection);
         _quadTree.Render(_planetShader);
-        _oceanRenderer.Render(
-            view, projection, _camera.GetPosition(), _sceneSettings.lightDir, _lastTime, _oceanSettings);
+        if (_activeBody && _seaLevel > 0.0f)
+        {
+            _oceanRenderer.Render(
+                view, projection, _camera.GetPosition(), _sceneSettings.lightDir, _lastTime, _oceanSettings);
+        }
     }
     else
     {
@@ -398,6 +372,40 @@ void Application::RenderGui()
     {
         auto& visibility = _guiManager.GetVisibility();
 
+        // Body type selector
+        if (ImGui::Begin("Body Type"))
+        {
+            const char* bodyTypes[] = {"Earth", "Volcanic World", "Crystalline World"};
+            int prevSelected = _selectedBodyType;
+            ImGui::Combo("Type", &_selectedBodyType, bodyTypes, IM_ARRAYSIZE(bodyTypes));
+
+            if (_selectedBodyType != prevSelected)
+            {
+                std::unique_ptr<render::CelestialBody> newBody;
+                switch (_selectedBodyType)
+                {
+                case 0: {
+                    auto earth = std::make_unique<render::Earth>();
+                    SyncEarthSettings(*earth);
+                    newBody = std::move(earth);
+                    break;
+                }
+                case 1:
+                    newBody = render::GenericBody::LoadFromJson("data/bodies/volcanic.json");
+                    break;
+                case 2:
+                    newBody = render::GenericBody::LoadFromJson("data/bodies/crystalline.json");
+                    break;
+                }
+                if (newBody)
+                    SwitchBody(std::move(newBody));
+            }
+
+            if (_activeBody)
+                ImGui::Text("Active: %s", _activeBody->GetTypeName().c_str());
+        }
+        ImGui::End();
+
         _scenePanel.Draw(_sceneSettings, visibility.scene);
 
         // Update terrain stats before drawing panel
@@ -429,7 +437,8 @@ void Application::RenderGui()
         }
 
         needsRegen |= _surfacePanel.Draw(
-            _biomeSettings, _earthColors, _shadingSettings, _oceanSettings, _seaLevel, visibility.surface);
+            _activeBody.get(), _biomeSettings, _earthColors, _shadingSettings, _oceanSettings, _seaLevel,
+            visibility.surface);
         _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
         _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
 
@@ -452,6 +461,70 @@ void Application::RenderGui()
     }
 
     _guiManager.EndFrame();
+}
+
+void Application::SyncEarthSettings(render::Earth& earth)
+{
+    earth.GetTerrainSettings() = _terrainSettings;
+    earth.GetShadingSettings() = _shadingSettings;
+    earth.GetBiomeSettings() = _biomeSettings;
+    earth.GetColors() = _earthColors;
+}
+
+void Application::SwitchBody(std::unique_ptr<render::CelestialBody> newBody)
+{
+    _activeBody = std::move(newBody);
+
+    // Load body-specific shaders
+    if (!_planetShader.LoadFromFiles(_activeBody->GetVertexShaderPath(), _activeBody->GetFragmentShaderPath()))
+    {
+        std::cerr << "[SwitchBody] Failed to load planet shader for " << _activeBody->GetTypeName() << std::endl;
+        return;
+    }
+
+    // Load compute shaders
+    std::string erosionPath = _activeBody->GetErosionShaderPath();
+    if (erosionPath.empty())
+        erosionPath = "shaders/compute/erosion_earth.comp"; // Fallback for bodies without erosion
+    _genConfig.useGpu = _terrainGenerator.Initialize(
+        _activeBody->GetHeightShaderPath(), _activeBody->GetShadingShaderPath(), erosionPath);
+    _terrainStats.gpuAvailable = _genConfig.useGpu;
+
+    // Load palette
+    _biomePalette = _activeBody->LoadBiomePalette();
+    if (_biomePalette.IsValid())
+        _biomePalette.UploadToGpu(_paletteBuffer);
+
+    // Update physical properties
+    _lodConfig.planetRadius = _activeBody->GetRadius();
+    _seaLevel = _activeBody->GetSeaLevel();
+
+    // Toggle atmosphere based on body type
+    _atmosphereSettings.enabled = _activeBody->HasAtmosphere();
+
+    // Initialize scheduler and regenerate
+    if (_genConfig.useGpu)
+    {
+        _generationScheduler.Initialize(_terrainGenerator, *_activeBody, _genConfig.seed);
+        if (_lodConfig.enabled)
+            RegenerateLodSystem();
+        else
+            RegeneratePlanetGpu();
+    }
+    else
+    {
+        RegeneratePlanetCpu();
+    }
+
+    // Reposition camera for new body size
+    float camDist = _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier;
+    _camera.SetPosition(glm::vec3(0.0f, 0.0f, camDist));
+    float farPlane =
+        (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
+    _camera.SetFarPlane(farPlane);
+
+    std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << _lodConfig.planetRadius
+              << ")" << std::endl;
 }
 
 void Application::ShuffleTerrain()
@@ -551,7 +624,13 @@ void Application::RegenerateLodSystem()
 
     // Cancel all in-flight async work before rebuilding
     _generationScheduler.CancelAll();
-    _generationScheduler.SetSettings(_terrainSettings, _shadingSettings, _genConfig.seed);
+
+    // Sync settings if active body is Earth
+    auto* earth = dynamic_cast<render::Earth*>(_activeBody.get());
+    if (earth)
+        SyncEarthSettings(*earth);
+
+    _generationScheduler.SetBody(*_activeBody, _genConfig.seed);
 
     auto qtConfig = BuildQuadTreeConfig();
 

@@ -1,6 +1,7 @@
 #version 450 core
 
 #include "math.glsl"
+#include "lighting.glsl"
 
 in vec3 vNormal;
 in vec3 vWorldPos;
@@ -62,6 +63,30 @@ uniform float uAOStrength;
 uniform float uHazeStrength;
 uniform vec3 uHazeColor;
 
+// Biome palette SSBO (loaded from JSON)
+// Must match BiomePaletteBindingPoint in GpuConstants.h
+#define BIOME_PALETTE_BINDING 3
+
+// Indices: 0-2 tropical (wet/mid/dry), 3-5 temperate, 6-8 boreal, 9 tundra, 10 ice
+#define BIOME_TROPICAL_WET  0
+#define BIOME_TROPICAL_MID  1
+#define BIOME_TROPICAL_DRY  2
+#define BIOME_TEMPERATE_WET 3
+#define BIOME_TEMPERATE_MID 4
+#define BIOME_TEMPERATE_DRY 5
+#define BIOME_BOREAL_WET    6
+#define BIOME_BOREAL_MID    7
+#define BIOME_BOREAL_DRY    8
+#define BIOME_TUNDRA        9
+#define BIOME_ICE           10
+
+layout(std430, binding = BIOME_PALETTE_BINDING) readonly buffer BiomePaletteBuffer
+{
+    vec4 paletteEntries[]; // xyz=color, w=parameter
+};
+
+uniform int uPaletteSize;
+
 const vec3 DEEP_OCEAN = vec3(0.02, 0.05, 0.15);
 const vec3 SHALLOW_OCEAN = vec3(0.05, 0.15, 0.35);
 const vec3 COASTAL = vec3(0.12, 0.45, 0.42);
@@ -108,21 +133,21 @@ vec3 biomeByMoisture(float moisture, vec3 dry, vec3 mid, vec3 wet, vec3 detailVa
 // Overlapping weight-based blending eliminates hard band boundaries
 vec3 getWhittakerBiome(float temperature, float moisture, float detailNoise, float smallNoise)
 {
-    // Earth-referenced biome palette
-    const vec3 TROPICAL_WET  = vec3(0.05, 0.28, 0.03);
-    const vec3 TROPICAL_MID  = vec3(0.28, 0.40, 0.12);
-    const vec3 TROPICAL_DRY  = vec3(0.76, 0.62, 0.35);
+    // Biome colors from palette SSBO (fallback to defaults if not loaded)
+    vec3 TROPICAL_WET  = (uPaletteSize > BIOME_TROPICAL_WET)  ? paletteEntries[BIOME_TROPICAL_WET].xyz  : vec3(0.05, 0.28, 0.03);
+    vec3 TROPICAL_MID  = (uPaletteSize > BIOME_TROPICAL_MID)  ? paletteEntries[BIOME_TROPICAL_MID].xyz  : vec3(0.28, 0.40, 0.12);
+    vec3 TROPICAL_DRY  = (uPaletteSize > BIOME_TROPICAL_DRY)  ? paletteEntries[BIOME_TROPICAL_DRY].xyz  : vec3(0.76, 0.62, 0.35);
 
-    const vec3 TEMPERATE_WET = vec3(0.12, 0.35, 0.08);
-    const vec3 TEMPERATE_MID = vec3(0.32, 0.42, 0.18);
-    const vec3 TEMPERATE_DRY = vec3(0.65, 0.55, 0.30);
+    vec3 TEMPERATE_WET = (uPaletteSize > BIOME_TEMPERATE_WET) ? paletteEntries[BIOME_TEMPERATE_WET].xyz : vec3(0.12, 0.35, 0.08);
+    vec3 TEMPERATE_MID = (uPaletteSize > BIOME_TEMPERATE_MID) ? paletteEntries[BIOME_TEMPERATE_MID].xyz : vec3(0.32, 0.42, 0.18);
+    vec3 TEMPERATE_DRY = (uPaletteSize > BIOME_TEMPERATE_DRY) ? paletteEntries[BIOME_TEMPERATE_DRY].xyz : vec3(0.65, 0.55, 0.30);
 
-    const vec3 BOREAL_WET    = vec3(0.06, 0.20, 0.08);
-    const vec3 BOREAL_MID    = vec3(0.22, 0.28, 0.16);
-    const vec3 BOREAL_DRY    = vec3(0.42, 0.40, 0.32);
+    vec3 BOREAL_WET    = (uPaletteSize > BIOME_BOREAL_WET)    ? paletteEntries[BIOME_BOREAL_WET].xyz    : vec3(0.06, 0.20, 0.08);
+    vec3 BOREAL_MID    = (uPaletteSize > BIOME_BOREAL_MID)    ? paletteEntries[BIOME_BOREAL_MID].xyz    : vec3(0.22, 0.28, 0.16);
+    vec3 BOREAL_DRY    = (uPaletteSize > BIOME_BOREAL_DRY)    ? paletteEntries[BIOME_BOREAL_DRY].xyz    : vec3(0.42, 0.40, 0.32);
 
-    const vec3 TUNDRA        = vec3(0.48, 0.50, 0.40);
-    const vec3 ICE           = vec3(0.92, 0.94, 0.97);
+    vec3 TUNDRA        = (uPaletteSize > BIOME_TUNDRA)         ? paletteEntries[BIOME_TUNDRA].xyz        : vec3(0.48, 0.50, 0.40);
+    vec3 ICE           = (uPaletteSize > BIOME_ICE)            ? paletteEntries[BIOME_ICE].xyz           : vec3(0.92, 0.94, 0.97);
 
     // Subtle detail variation scaled by distance
     float dBase = (detailNoise - 0.5) * gDetailFade;
@@ -291,17 +316,12 @@ void main()
     float normalLen = length(vNormal);
     vec3 normal = normalLen > 0.001 ? vNormal / normalLen : normalize(vWorldPos);
     vec3 lightDir = -normalize(uLightDir);
-
-    float diff = max(dot(normal, lightDir), 0.0);
-
-    // Blinn-Phong specular
     vec3 viewDir = normalize(uCameraPos - vWorldPos);
-    vec3 halfDir = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(normal, halfDir), 0.0), uSpecularPower) * uSpecularStrength;
+    vec3 sphereNormal = normalize(vWorldPos);
 
     // Distance metrics (shared by detail fade, fresnel, and haze)
     float camDist = length(uCameraPos - vWorldPos);
-    float distRadii = camDist / uPlanetScale;
+    float distRadii = calcDistanceRadii(vWorldPos, uCameraPos, uPlanetScale);
 
     // Detail noise fades out at orbital distance
     gDetailFade = 1.0 - smoothstep(uDetailFadeStart, uDetailFadeStart * 2.0, distRadii);
@@ -309,7 +329,7 @@ void main()
     vec3 terrainColor;
     if (vHeight < uSeaLevel)
     {
-        // Coastal gradient: deep ocean → shallow → turquoise near shore
+        // Coastal gradient: deep ocean -> shallow -> turquoise near shore
         float depthBelow = uSeaLevel - vHeight;
         float deepThreshold = uCoastalDepthRange * 3.0;
         float t = 1.0 - clamp(depthBelow / max(deepThreshold, 0.001), 0.0, 1.0);
@@ -332,28 +352,20 @@ void main()
         terrainColor = getTerrainColorLegacy(vHeight);
     }
 
-    // Curvature-based ambient occlusion: valleys receive less ambient light
-    vec3 sphereNormal = normalize(vWorldPos);
-    float normalAlignment = dot(normal, sphereNormal);
-    float aoFactor = clamp(mix(1.0, normalAlignment, uAOStrength), 0.3, 1.0);
+    // Lighting via shared functions
+    float aoFactor = calcSphericalAO(normal, sphereNormal, uAOStrength);
+    vec3 color = applyLighting(terrainColor, normal, lightDir, viewDir,
+                               uSunIntensity, uAmbientLight, aoFactor,
+                               uSpecularPower, uSpecularStrength);
 
-    vec3 color = terrainColor * (uAmbientLight * aoFactor + diff * uSunIntensity) + vec3(spec);
+    // Fresnel rim
+    color += calcFresnel(vWorldPos, uCameraPos, sphereNormal,
+                         uPlanetScale, uFresnelStrengthNear, uFresnelStrengthFar, uFresnelPow);
 
-    // Distance-adaptive fresnel rim (fades near surface, strong from orbit)
-    float camRadiiFromSurface = (camDist - uPlanetScale) / uPlanetScale;
-    float fresnelT = smoothstep(0.0, 1.0, camRadiiFromSurface);
-    float fresStrength = mix(uFresnelStrengthNear, uFresnelStrengthFar, fresnelT);
-
-    float fresnelDot = 1.0 + dot(normalize(vWorldPos - uCameraPos), sphereNormal);
-    float fresnel = clamp(fresStrength * pow(max(fresnelDot, 0.0), uFresnelPow), 0.0, 1.0);
-
-    color += vec3(0.4, 0.6, 1.0) * fresnel * 0.3;
-
-    // Atmospheric perspective: distant terrain fades toward haze color
-    float hazeRadii = max(camRadiiFromSurface, 0.0);
-    float hazeFactor = smoothstep(0.0, 4.0, hazeRadii) * uHazeStrength;
-    float hazeLighting = uAmbientLight + max(dot(normal, lightDir), 0.0) * uSunIntensity * 0.5;
-    color = mix(color, uHazeColor * hazeLighting, hazeFactor);
+    // Atmospheric perspective
+    color = applyHaze(color, uHazeColor, normal, lightDir,
+                      camDist, uPlanetScale, uHazeStrength,
+                      uAmbientLight, uSunIntensity);
 
     FragColor = vec4(color, 1.0);
 }

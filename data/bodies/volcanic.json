@@ -1,0 +1,34 @@
+{
+    "name": "Volcanic World",
+    "radius": 8.0,
+    "seaLevel": 0.0,
+    "atmosphereHeight": 0.0,
+    "hasSolidSurface": true,
+    "hasAtmosphere": false,
+    "palette": "data/palettes/volcanic.json",
+    "terrain": {
+        "heightScale": 0.06,
+        "oceanDepthMultiplier": 0.0,
+        "oceanFloorDepth": 0.0,
+        "mountainBlend": 0.7,
+        "continent": {
+            "scale": 1.2,
+            "octaves": 5,
+            "persistence": 0.55,
+            "lacunarity": 2.2,
+            "strength": 0.8
+        },
+        "mountain": {
+            "scale": 3.0,
+            "octaves": 6,
+            "persistence": 0.6,
+            "lacunarity": 2.0,
+            "strength": 1.2
+        }
+    },
+    "shading": {
+        "detailNoiseScale": 4.0,
+        "smallNoiseScale": 20.0,
+        "warpStrength": 0.5
+    }
+}

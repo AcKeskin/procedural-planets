@@ -15,7 +15,12 @@ constexpr float FallbackHeightScale = 0.04f;
 } // namespace
 
 TerrainGenerator::TerrainGenerator() = default;
-TerrainGenerator::~TerrainGenerator() = default;
+
+TerrainGenerator::~TerrainGenerator()
+{
+    if (_pgContext)
+        pg_context_destroy(_pgContext);
+}
 
 bool TerrainGenerator::Initialize(const std::string& shaderPath)
 {
@@ -53,6 +58,418 @@ bool TerrainGenerator::Initialize(const std::string& heightShaderPath,
 
     return success;
 }
+
+bool TerrainGenerator::InitializeLibrary()
+{
+    if (_pgContext)
+        return true; // Already initialized
+
+    PgContextDesc desc{};
+    desc.use_existing_context = 1; // Reuse app's GL context
+    _pgContext = pg_context_create(&desc);
+
+    if (!_pgContext)
+    {
+        std::cerr << "[TerrainGenerator] Failed to initialize libplanetgen context" << std::endl;
+        return false;
+    }
+
+    PgError err = pg_context_get_error(_pgContext);
+    if (err != PG_SUCCESS)
+    {
+        std::cerr << "[TerrainGenerator] libplanetgen context created with errors (code " << err << ")" << std::endl;
+    }
+
+    std::cout << "[TerrainGenerator] libplanetgen context initialized (embedded shaders)" << std::endl;
+    return true;
+}
+
+// ============================================================================
+// Settings conversion helpers
+// ============================================================================
+
+PgBodyDesc TerrainGenerator::ToPgBodyDesc(const EarthTerrainSettings& settings)
+{
+    PgBodyDesc desc{};
+    pg_body_desc_defaults(&desc);
+
+    desc.continent_noise.scale = settings.continentScale;
+    desc.continent_noise.octaves = settings.continentOctaves;
+    desc.continent_noise.persistence = settings.continentPersistence;
+    desc.continent_noise.lacunarity = settings.continentLacunarity;
+    desc.continent_noise.strength = settings.continentStrength;
+
+    desc.mountain_noise.scale = settings.mountainScale;
+    desc.mountain_noise.octaves = settings.mountainOctaves;
+    desc.mountain_noise.persistence = settings.mountainPersistence;
+    desc.mountain_noise.lacunarity = settings.mountainLacunarity;
+    desc.mountain_noise.strength = settings.mountainStrength;
+
+    desc.mask_noise.scale = settings.maskScale;
+    desc.mask_noise.octaves = settings.maskOctaves;
+    desc.mask_noise.persistence = settings.maskPersistence;
+    desc.mask_noise.lacunarity = settings.maskLacunarity;
+    desc.mask_noise.strength = DefaultMaskMultiplier;
+
+    desc.height_scale = settings.heightScale;
+    desc.ocean_depth_multiplier = settings.oceanDepthMultiplier;
+    desc.ocean_floor_depth = settings.oceanFloorDepth;
+    desc.ocean_floor_smoothing = settings.oceanFloorSmoothing;
+    desc.mountain_blend = settings.mountainBlend;
+    desc.continent_base_level = settings.continentBaseLevel;
+    desc.global_frequency = settings.globalFrequency;
+    desc.normal_epsilon = settings.normalEpsilon;
+
+    desc.mountain_power = settings.mountainPower;
+    desc.mountain_gain = settings.mountainGain;
+    desc.mountain_smoothing = settings.mountainSmoothing;
+
+    desc.use_tectonics = settings.useTectonics ? 1 : 0;
+    desc.num_plates = settings.numPlates;
+    desc.continental_fraction = settings.continentalFraction;
+    desc.boundary_width = settings.boundaryWidth;
+    desc.convergent_mountain_scale = settings.convergentMountainScale;
+    desc.divergent_rift_depth = settings.divergentRiftDepth;
+    desc.coastline_noise = settings.coastlineNoise;
+    desc.plate_elevation_noise = settings.plateElevationNoise;
+
+    desc.use_ocean_floor = settings.useOceanFloor ? 1 : 0;
+    desc.shelf_width = settings.shelfWidth;
+    desc.ocean_ridge_octaves = settings.oceanRidgeOctaves;
+    desc.ocean_ridge_scale = settings.oceanRidgeScale;
+    desc.ocean_ridge_strength = settings.oceanRidgeStrength;
+    desc.ocean_ridge_power = settings.oceanRidgePower;
+    desc.ocean_ridge_gain = settings.oceanRidgeGain;
+    desc.trench_octaves = settings.trenchOctaves;
+    desc.trench_scale = settings.trenchScale;
+    desc.trench_depth = settings.trenchDepth;
+    desc.abyssal_octaves = settings.abyssalOctaves;
+    desc.abyssal_scale = settings.abyssalScale;
+    desc.abyssal_strength = settings.abyssalStrength;
+
+    desc.detail_low_threshold = settings.detailLowThreshold;
+    desc.detail_high_threshold = settings.detailHighThreshold;
+    desc.perturb_strength_low = settings.perturbStrengthLow;
+    desc.perturb_strength_high = settings.perturbStrengthHigh;
+    desc.detail_octaves_low = settings.detailOctavesLow;
+    desc.detail_octaves_high = settings.detailOctavesHigh;
+    desc.detail_persistence = settings.detailPersistence;
+    desc.detail_lacunarity = settings.detailLacunarity;
+    desc.perturb_scale = settings.perturbScale;
+
+    return desc;
+}
+
+PgShadingDesc TerrainGenerator::ToPgShadingDesc(const EarthShadingSettings& settings, float heightScale)
+{
+    PgShadingDesc desc{};
+    pg_shading_desc_defaults(&desc);
+
+    desc.detail_noise_scale = settings.detailNoiseScale;
+    desc.small_noise_scale = settings.smallNoiseScale;
+    desc.small_noise_octaves = settings.smallNoiseOctaves;
+    desc.warp_strength = settings.warpStrength;
+
+    desc.use_climate_model = settings.useClimateModel ? 1 : 0;
+    desc.large_noise_scale = settings.largeNoiseScale;
+    desc.large_noise_octaves = settings.largeNoiseOctaves;
+    desc.temperature_lapse_rate = settings.temperatureLapseRate;
+    desc.temperature_exponent = settings.temperatureExponent;
+    desc.moisture_noise_scale = settings.moistureNoiseScale;
+    desc.moisture_noise_strength = settings.moistureNoiseStrength;
+    desc.hadley_intensity = settings.hadleyIntensity;
+    desc.continentality_strength = settings.continentalityStrength;
+    desc.height_scale = heightScale;
+
+    return desc;
+}
+
+// ============================================================================
+// Synchronous generation — delegates to libplanetgen
+// ============================================================================
+
+std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3>& vertices,
+                                                     uint32_t seed,
+                                                     const EarthTerrainSettings& settings,
+                                                     std::vector<glm::vec3>* outNormals)
+{
+    // Prefer libplanetgen if initialized
+    if (_pgContext)
+    {
+        size_t vertexCount = vertices.size();
+        if (vertexCount == 0)
+            return {};
+
+        PgBodyDesc bodyDesc = ToPgBodyDesc(settings);
+        PgBody body = pg_body_create(_pgContext, &bodyDesc);
+        if (!body)
+            return {};
+
+        // Pack vertices as flat float array
+        std::vector<float> packedVertices;
+        packedVertices.reserve(vertexCount * 3);
+        for (const auto& v : vertices)
+        {
+            packedVertices.push_back(v.x);
+            packedVertices.push_back(v.y);
+            packedVertices.push_back(v.z);
+        }
+
+        PgResult result = pg_generate_heights(body, packedVertices.data(),
+                                               static_cast<uint32_t>(vertexCount), seed);
+        pg_body_destroy(body);
+
+        if (!result)
+            return {};
+
+        // Copy heights
+        const float* heightData = pg_result_get_heights(result);
+        uint32_t count = pg_result_get_count(result);
+        std::vector<float> heights(heightData, heightData + count);
+
+        // Copy normals if requested
+        if (outNormals)
+        {
+            const float* normalData = pg_result_get_normals(result);
+            if (normalData)
+            {
+                outNormals->resize(count);
+                for (uint32_t i = 0; i < count; ++i)
+                {
+                    (*outNormals)[i] = glm::vec3(normalData[i * 3],
+                                                  normalData[i * 3 + 1],
+                                                  normalData[i * 3 + 2]);
+                }
+            }
+        }
+
+        pg_result_destroy(result);
+        return heights;
+    }
+
+    // Fallback to direct GL dispatch
+    if (!_computeShader.IsValid())
+        return {};
+
+    size_t vertexCount = vertices.size();
+    if (vertexCount == 0)
+        return {};
+
+    std::vector<float> packedVertices;
+    packedVertices.reserve(vertexCount * 3);
+    for (const auto& v : vertices)
+    {
+        packedVertices.push_back(v.x);
+        packedVertices.push_back(v.y);
+        packedVertices.push_back(v.z);
+    }
+
+    _vertexBuffer.Upload(packedVertices);
+    _heightBuffer.Allocate(vertexCount);
+    _normalBuffer.Allocate(vertexCount * 3);
+    _vertexBuffer.Bind(0);
+    _heightBuffer.Bind(1);
+    _normalBuffer.Bind(2);
+
+    SetHeightUniforms(seed, vertexCount, settings);
+
+    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + HeightWorkgroupSize - 1) / HeightWorkgroupSize;
+    _computeShader.Dispatch(groupCount);
+    ComputeShader::WaitForCompletion();
+
+    std::vector<float> heights;
+    _heightBuffer.Download(heights);
+
+    if (outNormals)
+    {
+        std::vector<float> packedNormals;
+        _normalBuffer.Download(packedNormals);
+        outNormals->resize(vertexCount);
+        for (size_t i = 0; i < vertexCount; ++i)
+        {
+            (*outNormals)[i] = glm::vec3(packedNormals[i * 3], packedNormals[i * 3 + 1], packedNormals[i * 3 + 2]);
+        }
+    }
+
+    return heights;
+}
+
+std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3>& vertices,
+                                                     uint32_t seed,
+                                                     const ComputeNoiseParams& continentParams,
+                                                     const ComputeNoiseParams& mountainParams,
+                                                     const ComputeNoiseParams& maskParams,
+                                                     float oceanDepthMultiplier,
+                                                     float oceanFloorDepth,
+                                                     float oceanFloorSmoothing,
+                                                     float mountainBlend)
+{
+    if (!_computeShader.IsValid())
+    {
+        std::cerr << "[TerrainGenerator] Compute shader not initialized" << std::endl;
+        return {};
+    }
+
+    size_t vertexCount = vertices.size();
+    if (vertexCount == 0)
+        return {};
+
+    std::vector<float> packedVertices;
+    packedVertices.reserve(vertexCount * 3);
+    for (const auto& v : vertices)
+    {
+        packedVertices.push_back(v.x);
+        packedVertices.push_back(v.y);
+        packedVertices.push_back(v.z);
+    }
+
+    _vertexBuffer.Upload(packedVertices);
+    _heightBuffer.Allocate(vertexCount);
+    _normalBuffer.Allocate(vertexCount * 3);
+    _vertexBuffer.Bind(0);
+    _heightBuffer.Bind(1);
+    _normalBuffer.Bind(2);
+
+    _computeShader.Use();
+    _computeShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
+    _computeShader.SetUint("seed", seed);
+    _computeShader.SetFloat("normalEpsilon", 0.0001f);
+
+    _computeShader.SetVec3("continentOffset", continentParams.offset);
+    _computeShader.SetInt("continentLayers", continentParams.numLayers);
+    _computeShader.SetFloat("continentScale", continentParams.scale);
+    _computeShader.SetFloat("continentPersistence", continentParams.persistence);
+    _computeShader.SetFloat("continentLacunarity", continentParams.lacunarity);
+    _computeShader.SetFloat("continentMultiplier", continentParams.multiplier);
+
+    _computeShader.SetVec3("mountainOffset", mountainParams.offset);
+    _computeShader.SetInt("mountainLayers", mountainParams.numLayers);
+    _computeShader.SetFloat("mountainScale", mountainParams.scale);
+    _computeShader.SetFloat("mountainPersistence", mountainParams.persistence);
+    _computeShader.SetFloat("mountainLacunarity", mountainParams.lacunarity);
+    _computeShader.SetFloat("mountainMultiplier", mountainParams.multiplier);
+    _computeShader.SetFloat("mountainPower", mountainParams.power);
+    _computeShader.SetFloat("mountainGain", mountainParams.gain);
+    _computeShader.SetFloat("mountainSmooth", mountainParams.smoothOffset);
+
+    _computeShader.SetVec3("maskOffset", maskParams.offset);
+    _computeShader.SetInt("maskLayers", maskParams.numLayers);
+    _computeShader.SetFloat("maskScale", maskParams.scale);
+    _computeShader.SetFloat("maskPersistence", maskParams.persistence);
+    _computeShader.SetFloat("maskLacunarity", maskParams.lacunarity);
+    _computeShader.SetFloat("maskMultiplier", maskParams.multiplier);
+
+    _computeShader.SetFloat("oceanDepthMultiplier", oceanDepthMultiplier);
+    _computeShader.SetFloat("oceanFloorDepth", oceanFloorDepth);
+    _computeShader.SetFloat("oceanFloorSmoothing", oceanFloorSmoothing);
+    _computeShader.SetFloat("mountainBlend", mountainBlend);
+
+    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + 511) / 512;
+    _computeShader.Dispatch(groupCount);
+    ComputeShader::WaitForCompletion();
+
+    std::vector<float> heights;
+    _heightBuffer.Download(heights);
+    return heights;
+}
+
+std::vector<glm::vec4> TerrainGenerator::GenerateShadingData(const std::vector<glm::vec3>& vertices,
+                                                             uint32_t seed,
+                                                             const EarthShadingSettings& settings)
+{
+    // Prefer libplanetgen if initialized
+    if (_pgContext)
+    {
+        size_t vertexCount = vertices.size();
+        if (vertexCount == 0)
+            return {};
+
+        // Need a body for the shading call (uses Earth defaults for terrain desc)
+        PgBodyDesc bodyDesc{};
+        pg_body_desc_defaults(&bodyDesc);
+        PgBody body = pg_body_create(_pgContext, &bodyDesc);
+        if (!body)
+            return {};
+
+        std::vector<float> packedVertices;
+        packedVertices.reserve(vertexCount * 3);
+        for (const auto& v : vertices)
+        {
+            packedVertices.push_back(v.x);
+            packedVertices.push_back(v.y);
+            packedVertices.push_back(v.z);
+        }
+
+        // Provide sea-level heights since we don't have real height data in this sync path
+        std::vector<float> seaLevelHeights(vertexCount, 1.0f);
+
+        PgShadingDesc shadingDesc = ToPgShadingDesc(settings, FallbackHeightScale);
+        PgResult result = pg_generate_shading(body, packedVertices.data(),
+                                               seaLevelHeights.data(),
+                                               static_cast<uint32_t>(vertexCount),
+                                               seed, &shadingDesc);
+        pg_body_destroy(body);
+
+        if (!result)
+            return {};
+
+        const float* data = pg_result_get_shading(result);
+        uint32_t count = pg_result_get_count(result);
+        std::vector<glm::vec4> shadingData(count);
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            shadingData[i] = glm::vec4(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
+        }
+
+        pg_result_destroy(result);
+        return shadingData;
+    }
+
+    // Fallback to direct GL dispatch
+    if (!_shadingShader.IsValid())
+    {
+        std::cerr << "[TerrainGenerator] Shading compute shader not initialized" << std::endl;
+        return {};
+    }
+
+    size_t vertexCount = vertices.size();
+    if (vertexCount == 0)
+        return {};
+
+    std::vector<float> packedVertices;
+    packedVertices.reserve(vertexCount * 3);
+    for (const auto& v : vertices)
+    {
+        packedVertices.push_back(v.x);
+        packedVertices.push_back(v.y);
+        packedVertices.push_back(v.z);
+    }
+
+    _vertexBuffer.Upload(packedVertices);
+    _shadingBuffer.Allocate(vertexCount);
+    _vertexBuffer.Bind(0);
+    _shadingBuffer.Bind(1);
+    // Bind sea-level height buffer for climate model (elevation data unavailable in sync path)
+    GpuBuffer<float> zeroHeightBuffer;
+    std::vector<float> seaLevelHeights(vertexCount, 1.0f);
+    zeroHeightBuffer.Upload(seaLevelHeights);
+    zeroHeightBuffer.Bind(2);
+
+    SetShadingUniforms(seed, vertexCount, settings, FallbackHeightScale);
+
+    unsigned int groupCount =
+        (static_cast<unsigned int>(vertexCount) + ShadingWorkgroupSize - 1) / ShadingWorkgroupSize;
+    _shadingShader.Dispatch(groupCount);
+    ComputeShader::WaitForCompletion();
+
+    std::vector<glm::vec4> shadingData;
+    _shadingBuffer.Download(shadingData);
+    return shadingData;
+}
+
+// ============================================================================
+// Uniform helpers (used by direct GL paths)
+// ============================================================================
 
 void TerrainGenerator::SetHeightUniforms(uint32_t seed, size_t vertexCount, const EarthTerrainSettings& settings)
 {
@@ -185,179 +602,47 @@ void TerrainGenerator::SetShadingUniforms(uint32_t seed,
     _shadingShader.SetFloat("heightScale", heightScale);
 }
 
-std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3>& vertices,
-                                                     uint32_t seed,
-                                                     const EarthTerrainSettings& settings,
-                                                     std::vector<glm::vec3>* outNormals)
+// ============================================================================
+// Async dispatch paths (direct GL — unchanged, used by LOD pipeline)
+// ============================================================================
+
+void TerrainGenerator::DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
+                                            GpuBuffer<float>& heightBuffer,
+                                            GpuBuffer<float>& normalBuffer,
+                                            size_t vertexCount,
+                                            const CelestialBody& body,
+                                            uint32_t seed)
 {
-    if (!_computeShader.IsValid())
-        return {};
+    vertexBuffer.Bind(0);
+    heightBuffer.Bind(1);
+    normalBuffer.Bind(2);
 
-    size_t vertexCount = vertices.size();
-    if (vertexCount == 0)
-        return {};
-
-    std::vector<float> packedVertices;
-    packedVertices.reserve(vertexCount * 3);
-    for (const auto& v : vertices)
-    {
-        packedVertices.push_back(v.x);
-        packedVertices.push_back(v.y);
-        packedVertices.push_back(v.z);
-    }
-
-    _vertexBuffer.Upload(packedVertices);
-    _heightBuffer.Allocate(vertexCount);
-    _normalBuffer.Allocate(vertexCount * 3);
-    _vertexBuffer.Bind(0);
-    _heightBuffer.Bind(1);
-    _normalBuffer.Bind(2);
-
-    SetHeightUniforms(seed, vertexCount, settings);
+    // Body type sets its own uniforms
+    body.SetShapeUniforms(_computeShader, seed);
+    _computeShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
 
     unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + HeightWorkgroupSize - 1) / HeightWorkgroupSize;
     _computeShader.Dispatch(groupCount);
-    ComputeShader::WaitForCompletion();
-
-    std::vector<float> heights;
-    _heightBuffer.Download(heights);
-
-    if (outNormals)
-    {
-        std::vector<float> packedNormals;
-        _normalBuffer.Download(packedNormals);
-        outNormals->resize(vertexCount);
-        for (size_t i = 0; i < vertexCount; ++i)
-        {
-            (*outNormals)[i] = glm::vec3(packedNormals[i * 3], packedNormals[i * 3 + 1], packedNormals[i * 3 + 2]);
-        }
-    }
-
-    return heights;
 }
 
-std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3>& vertices,
-                                                     uint32_t seed,
-                                                     const ComputeNoiseParams& continentParams,
-                                                     const ComputeNoiseParams& mountainParams,
-                                                     const ComputeNoiseParams& maskParams,
-                                                     float oceanDepthMultiplier,
-                                                     float oceanFloorDepth,
-                                                     float oceanFloorSmoothing,
-                                                     float mountainBlend)
+void TerrainGenerator::DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
+                                            GpuBuffer<glm::vec4>& shadingBuffer,
+                                            GpuBuffer<float>& heightBuffer,
+                                            size_t vertexCount,
+                                            const CelestialBody& body,
+                                            uint32_t seed)
 {
-    if (!_computeShader.IsValid())
-    {
-        std::cerr << "[TerrainGenerator] Compute shader not initialized" << std::endl;
-        return {};
-    }
+    vertexBuffer.Bind(0);
+    shadingBuffer.Bind(1);
+    heightBuffer.Bind(2);
 
-    size_t vertexCount = vertices.size();
-    if (vertexCount == 0)
-        return {};
-
-    std::vector<float> packedVertices;
-    packedVertices.reserve(vertexCount * 3);
-    for (const auto& v : vertices)
-    {
-        packedVertices.push_back(v.x);
-        packedVertices.push_back(v.y);
-        packedVertices.push_back(v.z);
-    }
-
-    _vertexBuffer.Upload(packedVertices);
-    _heightBuffer.Allocate(vertexCount);
-    _normalBuffer.Allocate(vertexCount * 3);
-    _vertexBuffer.Bind(0);
-    _heightBuffer.Bind(1);
-    _normalBuffer.Bind(2);
-
-    _computeShader.Use();
-    _computeShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
-    _computeShader.SetUint("seed", seed);
-    _computeShader.SetFloat("normalEpsilon", 0.0001f);
-
-    _computeShader.SetVec3("continentOffset", continentParams.offset);
-    _computeShader.SetInt("continentLayers", continentParams.numLayers);
-    _computeShader.SetFloat("continentScale", continentParams.scale);
-    _computeShader.SetFloat("continentPersistence", continentParams.persistence);
-    _computeShader.SetFloat("continentLacunarity", continentParams.lacunarity);
-    _computeShader.SetFloat("continentMultiplier", continentParams.multiplier);
-
-    _computeShader.SetVec3("mountainOffset", mountainParams.offset);
-    _computeShader.SetInt("mountainLayers", mountainParams.numLayers);
-    _computeShader.SetFloat("mountainScale", mountainParams.scale);
-    _computeShader.SetFloat("mountainPersistence", mountainParams.persistence);
-    _computeShader.SetFloat("mountainLacunarity", mountainParams.lacunarity);
-    _computeShader.SetFloat("mountainMultiplier", mountainParams.multiplier);
-    _computeShader.SetFloat("mountainPower", mountainParams.power);
-    _computeShader.SetFloat("mountainGain", mountainParams.gain);
-    _computeShader.SetFloat("mountainSmooth", mountainParams.smoothOffset);
-
-    _computeShader.SetVec3("maskOffset", maskParams.offset);
-    _computeShader.SetInt("maskLayers", maskParams.numLayers);
-    _computeShader.SetFloat("maskScale", maskParams.scale);
-    _computeShader.SetFloat("maskPersistence", maskParams.persistence);
-    _computeShader.SetFloat("maskLacunarity", maskParams.lacunarity);
-    _computeShader.SetFloat("maskMultiplier", maskParams.multiplier);
-
-    _computeShader.SetFloat("oceanDepthMultiplier", oceanDepthMultiplier);
-    _computeShader.SetFloat("oceanFloorDepth", oceanFloorDepth);
-    _computeShader.SetFloat("oceanFloorSmoothing", oceanFloorSmoothing);
-    _computeShader.SetFloat("mountainBlend", mountainBlend);
-
-    unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + 511) / 512;
-    _computeShader.Dispatch(groupCount);
-    ComputeShader::WaitForCompletion();
-
-    std::vector<float> heights;
-    _heightBuffer.Download(heights);
-    return heights;
-}
-
-std::vector<glm::vec4> TerrainGenerator::GenerateShadingData(const std::vector<glm::vec3>& vertices,
-                                                             uint32_t seed,
-                                                             const EarthShadingSettings& settings)
-{
-    if (!_shadingShader.IsValid())
-    {
-        std::cerr << "[TerrainGenerator] Shading compute shader not initialized" << std::endl;
-        return {};
-    }
-
-    size_t vertexCount = vertices.size();
-    if (vertexCount == 0)
-        return {};
-
-    std::vector<float> packedVertices;
-    packedVertices.reserve(vertexCount * 3);
-    for (const auto& v : vertices)
-    {
-        packedVertices.push_back(v.x);
-        packedVertices.push_back(v.y);
-        packedVertices.push_back(v.z);
-    }
-
-    _vertexBuffer.Upload(packedVertices);
-    _shadingBuffer.Allocate(vertexCount);
-    _vertexBuffer.Bind(0);
-    _shadingBuffer.Bind(1);
-    // Bind sea-level height buffer for climate model (elevation data unavailable in sync path)
-    GpuBuffer<float> zeroHeightBuffer;
-    std::vector<float> seaLevelHeights(vertexCount, 1.0f);
-    zeroHeightBuffer.Upload(seaLevelHeights);
-    zeroHeightBuffer.Bind(2);
-
-    SetShadingUniforms(seed, vertexCount, settings, FallbackHeightScale);
+    // Body type sets its own uniforms
+    body.SetShadingUniforms(_shadingShader, seed);
+    _shadingShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
 
     unsigned int groupCount =
         (static_cast<unsigned int>(vertexCount) + ShadingWorkgroupSize - 1) / ShadingWorkgroupSize;
     _shadingShader.Dispatch(groupCount);
-    ComputeShader::WaitForCompletion();
-
-    std::vector<glm::vec4> shadingData;
-    _shadingBuffer.Download(shadingData);
-    return shadingData;
 }
 
 void TerrainGenerator::DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
@@ -406,6 +691,22 @@ void TerrainGenerator::SetErosionUniforms(size_t vertexCount, int gridResolution
     _erosionShader.SetFloat("hydraulicRate", settings.hydraulicErosionRate);
     _erosionShader.SetFloat("depositionRate", settings.depositionRate);
     _erosionShader.SetFloat("evaporationRate", settings.evaporationRate);
+}
+
+void TerrainGenerator::DispatchErosionAsync(GpuBuffer<float>& inputBuffer,
+                                            GpuBuffer<float>& outputBuffer,
+                                            size_t vertexCount,
+                                            int gridResolution,
+                                            const CelestialBody& body)
+{
+    inputBuffer.Bind(0);
+    outputBuffer.Bind(1);
+
+    body.SetErosionUniforms(_erosionShader, vertexCount, gridResolution);
+
+    unsigned int groupCount =
+        (static_cast<unsigned int>(vertexCount) + ErosionWorkgroupSize - 1) / ErosionWorkgroupSize;
+    _erosionShader.Dispatch(groupCount);
 }
 
 void TerrainGenerator::DispatchErosionAsync(GpuBuffer<float>& inputBuffer,

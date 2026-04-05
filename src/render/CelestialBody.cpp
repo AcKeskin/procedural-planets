@@ -18,4 +18,9 @@ void CelestialBody::SetAtmosphereHeight(float height)
     _atmosphereHeight = height;
 }
 
+std::string CelestialBody::GetErosionShaderPath() const
+{
+    return "";
+}
+
 } // namespace planets::render
