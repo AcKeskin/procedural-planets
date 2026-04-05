@@ -6,9 +6,7 @@
 namespace planets::render
 {
 
-void GenerationScheduler::Initialize(TerrainGenerator& terrainGen,
-                                     const CelestialBody& body,
-                                     uint32_t seed)
+void GenerationScheduler::Initialize(TerrainGenerator& terrainGen, const CelestialBody& body, uint32_t seed)
 {
     CancelAll();
     _terrainGen = &terrainGen;
@@ -117,12 +115,8 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
     if (_terrainGen->IsShadingReady())
     {
         task.shadingBuffer.Allocate(task.vertexCount);
-        _terrainGen->DispatchShadingAsync(task.vertexBuffer,
-                                          task.shadingBuffer,
-                                          task.heightBuffer,
-                                          task.vertexCount,
-                                          *_body,
-                                          _seed);
+        _terrainGen->DispatchShadingAsync(
+            task.vertexBuffer, task.shadingBuffer, task.heightBuffer, task.vertexCount, *_body, _seed);
     }
 
     // Single fence covers all dispatches

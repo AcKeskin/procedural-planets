@@ -215,8 +215,7 @@ std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3
             packedVertices.push_back(v.z);
         }
 
-        PgResult result = pg_generate_heights(body, packedVertices.data(),
-                                               static_cast<uint32_t>(vertexCount), seed);
+        PgResult result = pg_generate_heights(body, packedVertices.data(), static_cast<uint32_t>(vertexCount), seed);
         pg_body_destroy(body);
 
         if (!result)
@@ -236,9 +235,7 @@ std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3
                 outNormals->resize(count);
                 for (uint32_t i = 0; i < count; ++i)
                 {
-                    (*outNormals)[i] = glm::vec3(normalData[i * 3],
-                                                  normalData[i * 3 + 1],
-                                                  normalData[i * 3 + 2]);
+                    (*outNormals)[i] = glm::vec3(normalData[i * 3], normalData[i * 3 + 1], normalData[i * 3 + 2]);
                 }
             }
         }
@@ -404,10 +401,12 @@ std::vector<glm::vec4> TerrainGenerator::GenerateShadingData(const std::vector<g
         std::vector<float> seaLevelHeights(vertexCount, 1.0f);
 
         PgShadingDesc shadingDesc = ToPgShadingDesc(settings, FallbackHeightScale);
-        PgResult result = pg_generate_shading(body, packedVertices.data(),
-                                               seaLevelHeights.data(),
-                                               static_cast<uint32_t>(vertexCount),
-                                               seed, &shadingDesc);
+        PgResult result = pg_generate_shading(body,
+                                              packedVertices.data(),
+                                              seaLevelHeights.data(),
+                                              static_cast<uint32_t>(vertexCount),
+                                              seed,
+                                              &shadingDesc);
         pg_body_destroy(body);
 
         if (!result)

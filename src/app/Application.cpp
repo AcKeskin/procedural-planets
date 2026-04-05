@@ -384,7 +384,8 @@ void Application::RenderGui()
                 std::unique_ptr<render::CelestialBody> newBody;
                 switch (_selectedBodyType)
                 {
-                case 0: {
+                case 0:
+                {
                     auto earth = std::make_unique<render::Earth>();
                     SyncEarthSettings(*earth);
                     newBody = std::move(earth);
@@ -436,9 +437,13 @@ void Application::RenderGui()
             _genConfig.seed = _planet.GetSettings().seed;
         }
 
-        needsRegen |= _surfacePanel.Draw(
-            _activeBody.get(), _biomeSettings, _earthColors, _shadingSettings, _oceanSettings, _seaLevel,
-            visibility.surface);
+        needsRegen |= _surfacePanel.Draw(_activeBody.get(),
+                                         _biomeSettings,
+                                         _earthColors,
+                                         _shadingSettings,
+                                         _oceanSettings,
+                                         _seaLevel,
+                                         visibility.surface);
         _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
         _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
 

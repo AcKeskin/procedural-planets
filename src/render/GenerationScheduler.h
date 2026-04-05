@@ -70,9 +70,7 @@ public:
     GenerationScheduler(const GenerationScheduler&) = delete;
     GenerationScheduler& operator=(const GenerationScheduler&) = delete;
 
-    void Initialize(TerrainGenerator& terrainGen,
-                    const CelestialBody& body,
-                    uint32_t seed);
+    void Initialize(TerrainGenerator& terrainGen, const CelestialBody& body, uint32_t seed);
 
     // Update body reference without full reinit (e.g. parameter slider change)
     void SetBody(const CelestialBody& body, uint32_t seed);

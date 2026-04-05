@@ -19,11 +19,16 @@ constexpr float DefaultMaskMultiplier = 1.0f;
 GenericNoiseLayer ParseNoiseLayer(const nlohmann::json& json, const GenericNoiseLayer& defaults)
 {
     GenericNoiseLayer layer = defaults;
-    if (json.contains("scale")) layer.scale = json["scale"].get<float>();
-    if (json.contains("octaves")) layer.octaves = json["octaves"].get<int>();
-    if (json.contains("persistence")) layer.persistence = json["persistence"].get<float>();
-    if (json.contains("lacunarity")) layer.lacunarity = json["lacunarity"].get<float>();
-    if (json.contains("strength")) layer.strength = json["strength"].get<float>();
+    if (json.contains("scale"))
+        layer.scale = json["scale"].get<float>();
+    if (json.contains("octaves"))
+        layer.octaves = json["octaves"].get<int>();
+    if (json.contains("persistence"))
+        layer.persistence = json["persistence"].get<float>();
+    if (json.contains("lacunarity"))
+        layer.lacunarity = json["lacunarity"].get<float>();
+    if (json.contains("strength"))
+        layer.strength = json["strength"].get<float>();
     return layer;
 }
 } // namespace
@@ -80,9 +85,12 @@ std::unique_ptr<GenericBody> GenericBody::LoadFromJson(const std::string& config
             cfg.oceanFloorDepth = t.value("oceanFloorDepth", cfg.oceanFloorDepth);
             cfg.mountainBlend = t.value("mountainBlend", cfg.mountainBlend);
 
-            if (t.contains("continent")) cfg.continentNoise = ParseNoiseLayer(t["continent"], cfg.continentNoise);
-            if (t.contains("mountain")) cfg.mountainNoise = ParseNoiseLayer(t["mountain"], cfg.mountainNoise);
-            if (t.contains("mask")) cfg.maskNoise = ParseNoiseLayer(t["mask"], cfg.maskNoise);
+            if (t.contains("continent"))
+                cfg.continentNoise = ParseNoiseLayer(t["continent"], cfg.continentNoise);
+            if (t.contains("mountain"))
+                cfg.mountainNoise = ParseNoiseLayer(t["mountain"], cfg.mountainNoise);
+            if (t.contains("mask"))
+                cfg.maskNoise = ParseNoiseLayer(t["mask"], cfg.maskNoise);
         }
 
         // Shading noise
@@ -106,10 +114,22 @@ std::unique_ptr<GenericBody> GenericBody::LoadFromJson(const std::string& config
     }
 }
 
-std::string GenericBody::GetHeightShaderPath() const { return _config.heightShaderPath; }
-std::string GenericBody::GetShadingShaderPath() const { return _config.shadingShaderPath; }
-std::string GenericBody::GetVertexShaderPath() const { return _config.vertexShaderPath; }
-std::string GenericBody::GetFragmentShaderPath() const { return _config.fragmentShaderPath; }
+std::string GenericBody::GetHeightShaderPath() const
+{
+    return _config.heightShaderPath;
+}
+std::string GenericBody::GetShadingShaderPath() const
+{
+    return _config.shadingShaderPath;
+}
+std::string GenericBody::GetVertexShaderPath() const
+{
+    return _config.vertexShaderPath;
+}
+std::string GenericBody::GetFragmentShaderPath() const
+{
+    return _config.fragmentShaderPath;
+}
 
 BiomePalette GenericBody::LoadBiomePalette() const
 {
