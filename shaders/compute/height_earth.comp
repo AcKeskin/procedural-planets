@@ -159,7 +159,6 @@ float smoothedRidgeNoise(vec3 pos, vec3 offset, int numLayers, float scale, floa
     return (s0 + s1 + s2 + s3 + s4) / 5.0;
 }
 
-// Polynomial smooth maximum (from Solar-System reference)
 float smoothMax(float a, float b, float k)
 {
     k = min(0.0, -k);
@@ -167,7 +166,6 @@ float smoothMax(float a, float b, float k)
     return a * h + b * (1.0 - h) - k * h * (1.0 - h);
 }
 
-// Polynomial smooth minimum
 float smoothMin(float a, float b, float k)
 {
     k = max(0.0, k);
@@ -175,7 +173,6 @@ float smoothMin(float a, float b, float k)
     return a * h + b * (1.0 - h) - k * h * (1.0 - h);
 }
 
-// Elevation-based smooth blend (from Solar-System)
 float Blend(float startHeight, float blendDst, float height)
 {
     return smoothstep(startHeight - blendDst * 0.5, startHeight + blendDst * 0.5, height);
@@ -185,13 +182,11 @@ float Blend(float startHeight, float blendDst, float height)
 // Tectonic Plate Functions
 // ============================================================================
 
-// Deterministic plate center on unit sphere from index and seed
 vec3 plateCenter(int plateIndex, uint seed)
 {
     uint h1 = hash(uint(plateIndex) * 7u + 3u, seed + 100u);
     uint h2 = hash(uint(plateIndex) * 13u + 7u, seed + 200u);
 
-    // Uniform sphere distribution via cosine-weighted latitude
     float theta = 2.0 * PI * float(h1) / float(0xFFFFFFFFu);
     float cosLat = 2.0 * float(h2) / float(0xFFFFFFFFu) - 1.0;
     float sinLat = sqrt(max(0.0, 1.0 - cosLat * cosLat));
@@ -199,14 +194,12 @@ vec3 plateCenter(int plateIndex, uint seed)
     return vec3(sinLat * cos(theta), cosLat, sinLat * sin(theta));
 }
 
-// Is this plate continental (true) or oceanic (false)?
 bool isPlateContinental(int plateId, uint seed, float continentalFraction)
 {
     uint h = hash(uint(plateId) * 31u + 17u, seed + 300u);
     return float(h) / float(0xFFFFFFFFu) < continentalFraction;
 }
 
-// Classify boundary between two plates: >0 convergent, <0 divergent, ~0 transform
 float boundaryType(int plate1, int plate2, uint seed)
 {
     uint minP = uint(min(plate1, plate2));
@@ -215,8 +208,6 @@ float boundaryType(int plate1, int plate2, uint seed)
     return float(h) / float(0xFFFFFFFFu) * 2.0 - 1.0;
 }
 
-// Spherical voronoi: find nearest and second-nearest plate
-// Returns: vec4(nearestDist, secondDist, nearestId, secondId)
 vec4 sphericalVoronoi(vec3 dir, int numPlates, uint seed)
 {
     float nearDist = 1e10;
@@ -227,7 +218,6 @@ vec4 sphericalVoronoi(vec3 dir, int numPlates, uint seed)
     for (int i = 0; i < numPlates; i++)
     {
         vec3 center = plateCenter(i, seed);
-        // Great-circle distance approximated by acos(dot) — cheaper than full acos for comparison
         float d = acos(clamp(dot(dir, center), -1.0, 1.0));
 
         if (d < nearDist)
@@ -248,13 +238,12 @@ vec4 sphericalVoronoi(vec3 dir, int numPlates, uint seed)
 }
 
 // ============================================================================
-// Main Compute Shader
+// SSBOs
 // ============================================================================
 
-// Use float array to avoid vec3 alignment issues in std430
 layout(std430, binding = 0) readonly buffer Vertices
 {
-    float vertexData[];  // Packed as x0,y0,z0, x1,y1,z1, ...
+    float vertexData[];
 };
 
 layout(std430, binding = 1) writeonly buffer Heights
@@ -264,91 +253,103 @@ layout(std430, binding = 1) writeonly buffer Heights
 
 layout(std430, binding = 2) writeonly buffer Normals
 {
-    float normals[];  // Packed as nx0,ny0,nz0, nx1,ny1,nz1, ...
+    float normals[];
 };
 
-uniform uint numVertices;
-uniform uint seed;
+// ============================================================================
+// Parameters UBO — matches HeightParams in ParamBlocks.h exactly
+// ============================================================================
 
-// Tectonic plate parameters
-uniform int useTectonics;
-uniform int numPlates;
-uniform float continentalFraction;
-uniform float boundaryWidth;
-uniform float convergentMountainScale;
-uniform float divergentRiftDepth;
-uniform float coastlineNoise;
-uniform float plateElevationNoise;
-
-// Continent noise parameters (interior plate detail when tectonics enabled)
-uniform vec3 continentOffset;
-uniform int continentLayers;
-uniform float continentScale;
-uniform float continentPersistence;
-uniform float continentLacunarity;
-uniform float continentMultiplier;
-
-// Mountain noise parameters
-uniform vec3 mountainOffset;
-uniform int mountainLayers;
-uniform float mountainScale;
-uniform float mountainPersistence;
-uniform float mountainLacunarity;
-uniform float mountainMultiplier;
-uniform float mountainPower;
-uniform float mountainGain;
-uniform float mountainSmooth;
-
-// Mask noise parameters
-uniform vec3 maskOffset;
-uniform int maskLayers;
-uniform float maskScale;
-uniform float maskPersistence;
-uniform float maskLacunarity;
-uniform float maskMultiplier;
-
-// Terrain parameters
-uniform float oceanDepthMultiplier;
-uniform float oceanFloorDepth;
-uniform float oceanFloorSmoothing;
-uniform float mountainBlend;
-uniform float heightScale;
-uniform float continentBaseLevel;  // Vertical shift - negative = more ocean
-
-// Height-dependent detail
-uniform float detailLowThreshold;
-uniform float detailHighThreshold;
-uniform float perturbStrengthLow;
-uniform float perturbStrengthHigh;
-uniform int detailOctavesLow;
-uniform int detailOctavesHigh;
-uniform float detailPersistence;
-uniform float detailLacunarity;
-uniform float perturbScale;
-
-// Global frequency multiplier (higher = more detail = planet feels larger)
-uniform float globalFrequency;
-
-// Ocean floor topology
-uniform int useOceanFloor;
-uniform float shelfWidth;
-uniform int oceanRidgeOctaves;
-uniform float oceanRidgeScale;
-uniform float oceanRidgeStrength;
-uniform float oceanRidgePower;
-uniform float oceanRidgeGain;
-uniform int trenchOctaves;
-uniform float trenchScale;
-uniform float trenchDepth;
-uniform int abyssalOctaves;
-uniform float abyssalScale;
-uniform float abyssalStrength;
-
-// Finite-difference step for analytical normal computation
-uniform float normalEpsilon;
+layout(std140, binding = 3) uniform HeightParamsBlock
+{
+    // Row 0
+    uint  numVertices;
+    uint  seed;
+    int   useTectonics;
+    int   numPlates;
+    // Row 1
+    float continentalFraction;
+    float boundaryWidth;
+    float convergentMountainScale;
+    float divergentRiftDepth;
+    // Row 2
+    float coastlineNoise;
+    float plateElevationNoise;
+    float oceanDepthMultiplier;
+    float oceanFloorDepth;
+    // Row 3
+    float oceanFloorSmoothing;
+    float mountainBlend;
+    float heightScale;
+    float continentBaseLevel;
+    // Row 4
+    float globalFrequency;
+    float normalEpsilon;
+    float mountainPower;
+    float mountainGain;
+    // Row 5
+    float mountainSmooth;
+    int   continentLayers;
+    float continentScale;
+    float continentPersistence;
+    // Row 6
+    float continentLacunarity;
+    float continentMultiplier;
+    int   mountainLayers;
+    float mountainScale;
+    // Row 7
+    float mountainPersistence;
+    float mountainLacunarity;
+    float mountainMultiplier;
+    int   maskLayers;
+    // Row 8
+    float maskScale;
+    float maskPersistence;
+    float maskLacunarity;
+    float maskMultiplier;
+    // Row 9 — continent offset (vec3 padded to 16 bytes)
+    vec3  continentOffset;
+    float _pad0;
+    // Row 10
+    vec3  mountainOffset;
+    float _pad1;
+    // Row 11
+    vec3  maskOffset;
+    float _pad2;
+    // Row 12
+    float detailLowThreshold;
+    float detailHighThreshold;
+    float perturbStrengthLow;
+    float perturbStrengthHigh;
+    // Row 13
+    int   detailOctavesLow;
+    int   detailOctavesHigh;
+    float detailPersistence;
+    float detailLacunarity;
+    // Row 14
+    float perturbScale;
+    int   useOceanFloor;
+    float shelfWidth;
+    int   oceanRidgeOctaves;
+    // Row 15
+    float oceanRidgeScale;
+    float oceanRidgeStrength;
+    float oceanRidgePower;
+    float oceanRidgeGain;
+    // Row 16
+    int   trenchOctaves;
+    float trenchScale;
+    float trenchDepth;
+    int   abyssalOctaves;
+    // Row 17
+    float abyssalScale;
+    float abyssalStrength;
+    float _pad3;
+    float _pad4;
+};
 
 // ============================================================================
-// Height evaluation for any unit-sphere direction
+// Height evaluation
 // ============================================================================
 
 float evaluateHeight(vec3 dir)
@@ -473,7 +474,6 @@ void main()
     uint id = gl_GlobalInvocationID.x;
     if (id >= numVertices) return;
 
-    // Read vertex from packed float array (3 floats per vertex)
     uint baseIdx = id * 3u;
     vec3 pos = vec3(vertexData[baseIdx], vertexData[baseIdx + 1u], vertexData[baseIdx + 2u]);
     vec3 dir = normalize(pos);
@@ -481,7 +481,6 @@ void main()
     float h = evaluateHeight(dir);
     heights[id] = h;
 
-    // Compute analytical normal via finite differences on the sphere tangent plane
     vec3 tangentA = cross(dir, vec3(0.0, 1.0, 0.0));
     if (dot(tangentA, tangentA) < 0.001)
         tangentA = cross(dir, vec3(1.0, 0.0, 0.0));
@@ -495,14 +494,12 @@ void main()
     float hA = evaluateHeight(dirA);
     float hB = evaluateHeight(dirB);
 
-    // Surface positions at center and offset samples
     vec3 pCenter = dir * h;
     vec3 pA = dirA * hA;
     vec3 pB = dirB * hB;
 
     vec3 n = normalize(cross(pA - pCenter, pB - pCenter));
 
-    // Ensure normal points outward
     if (dot(n, dir) < 0.0)
         n = -n;
 

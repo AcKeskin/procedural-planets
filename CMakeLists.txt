@@ -88,6 +88,9 @@ set(GL3W_SRC ${gl3w_BINARY_DIR}/src/gl3w.c)
 # OpenGL
 find_package(OpenGL REQUIRED)
 
+# Testing
+enable_testing()
+
 # Subdirectories
 add_subdirectory(src/core)
 add_subdirectory(libplanetgen)

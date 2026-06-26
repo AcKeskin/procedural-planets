@@ -11,13 +11,20 @@ layout(std430, binding = 1) buffer HeightsOut
     float heightsOut[];
 };
 
-uniform uint numVertices;
-uniform int gridResolution;
-uniform float thermalRate;
-uniform float thermalThreshold;
-uniform float hydraulicRate;
-uniform float depositionRate;
-uniform float evaporationRate;
+// Parameters UBO — matches ErosionParams in ParamBlocks.h exactly
+layout(std140, binding = 3) uniform ErosionParamsBlock
+{
+    // Row 0
+    uint  numVertices;
+    int   gridResolution;
+    float thermalRate;
+    float thermalThreshold;
+    // Row 1
+    float hydraulicRate;
+    float depositionRate;
+    float evaporationRate;
+    float _pad0;
+};
 
 void main()
 {
@@ -29,7 +36,6 @@ void main()
 
     float h = heightsIn[id];
 
-    // Gather neighbor heights (clamp at grid edges)
     int left  = max(0, gx - 1) + gy * gridResolution;
     int right = min(gridResolution - 1, gx + 1) + gy * gridResolution;
     int up    = gx + max(0, gy - 1) * gridResolution;
@@ -40,8 +46,7 @@ void main()
     float hU = heightsIn[up];
     float hD = heightsIn[down];
 
-    // ---- Thermal erosion ----
-    // Material moves downhill when slope exceeds threshold
+    // Thermal erosion
     float thermalDelta = 0.0;
     float maxSlope = 0.0;
     float totalExcess = 0.0;
@@ -62,8 +67,7 @@ void main()
         thermalDelta = -min(thermalRate * totalExcess, maxSlope * 0.5);
     }
 
-    // ---- Simplified hydraulic erosion ----
-    // Find steepest descent direction
+    // Simplified hydraulic erosion
     float hydraulicDelta = 0.0;
     float steepest = 0.0;
     for (int i = 0; i < 4; i++)
@@ -73,11 +77,8 @@ void main()
 
     if (steepest > 0.0)
     {
-        // Erode proportional to slope, deposit at lower elevation
         float erosion = hydraulicRate * steepest;
         hydraulicDelta = -erosion;
-
-        // Deposition happens naturally at neighbors (handled when they process)
     }
 
     heightsOut[id] = h + thermalDelta + hydraulicDelta;

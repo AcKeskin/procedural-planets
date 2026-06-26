@@ -24,15 +24,20 @@ layout(std430, binding = 2) readonly buffer Heights
     float heightData[];
 };
 
-uniform uint numVertices;
-uniform uint seed;
-
-uniform float heightScale;
-uniform float detailNoiseScale;
-uniform float smallNoiseScale;
-uniform int detailNoiseOctaves;
-uniform int smallNoiseOctaves;
-uniform float warpStrength;
+// Parameters UBO — matches ShadingGenericParams in ParamBlocks.h exactly
+layout(std140, binding = 3) uniform ShadingGenericParamsBlock
+{
+    // Row 0
+    uint  numVertices;
+    uint  seed;
+    float heightScale;
+    float detailNoiseScale;
+    // Row 1
+    float smallNoiseScale;
+    int   smallNoiseOctaves;
+    float warpStrength;
+    float _pad0;
+};
 
 const float PI = 3.14159265;
 
@@ -73,15 +78,12 @@ void main()
     vec3 pos = vec3(vertexData[baseIdx], vertexData[baseIdx + 1u], vertexData[baseIdx + 2u]);
     vec3 dir = normalize(pos);
 
-    // Normalized height from displacement
     float rawHeight = heightData[id];
     float displacement = rawHeight - 1.0;
     float normalizedHeight = clamp(displacement / max(heightScale, 0.001), 0.0, 1.0);
 
-    // Geographic latitude [0, 1] (0 = equator, 1 = pole)
     float latitude = abs(dir.y);
 
-    // Detail and small-scale noise
     float detailNoise = warpedNoise(dir, detailNoiseScale, warpStrength, seed + 1u);
     float smallNoise = multiOctaveNoise(dir, smallNoiseScale, smallNoiseOctaves, seed + 2u);
 

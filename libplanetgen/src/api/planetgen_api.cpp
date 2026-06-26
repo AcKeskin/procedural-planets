@@ -1,6 +1,8 @@
 #include "planetgen/planetgen.h"
 #include "InternalTypes.h"
-#include "../backend/opengl/OpenGLBackend.h"
+#include "../backend/opengl/WindowedGLBackend.h"
+#include "../backend/opengl/HeadlessGLBackend.h"
+#include "../backend/ParamBlocks.h"
 #include "EmbeddedShaders.h"
 #include <iostream>
 #include <fstream>
@@ -12,128 +14,133 @@
 namespace
 {
 
-constexpr uint32_t HeightWorkgroupSize = 512;
+constexpr uint32_t HeightWorkgroupSize  = 512;
 constexpr uint32_t ShadingWorkgroupSize = 256;
 constexpr uint32_t ErosionWorkgroupSize = 256;
+
+// UBO binding point for param structs — SSBOs use 0/1/2
+constexpr uint32_t ParamBinding = 3;
 
 uint32_t ComputeGroupCount(uint32_t count, uint32_t workgroupSize)
 {
     return (count + workgroupSize - 1) / workgroupSize;
 }
 
-// Set height generation uniforms on the backend
-void SetHeightUniforms(planetgen::IComputeBackend& gpu, const PgBodyDesc& desc, uint32_t seed, uint32_t vertexCount)
+// Fill HeightParams from the body descriptor and call-site seed/count
+planetgen::HeightParams MakeHeightParams(const PgBodyDesc& desc, uint32_t seed, uint32_t vertexCount)
 {
-    gpu.SetUint("numVertices", vertexCount);
-    gpu.SetUint("seed", seed);
-
-    // Continent noise
-    const float continentOffset[3] = {0.0f, 0.0f, 0.0f};
-    gpu.SetVec3("continentOffset", continentOffset);
-    gpu.SetInt("continentLayers", desc.continent_noise.octaves);
-    gpu.SetFloat("continentScale", desc.continent_noise.scale);
-    gpu.SetFloat("continentPersistence", desc.continent_noise.persistence);
-    gpu.SetFloat("continentLacunarity", desc.continent_noise.lacunarity);
-    gpu.SetFloat("continentMultiplier", desc.continent_noise.strength);
-
-    // Mountain noise
-    const float mountainOffset[3] = {1000.0f, 1000.0f, 1000.0f};
-    gpu.SetVec3("mountainOffset", mountainOffset);
-    gpu.SetInt("mountainLayers", desc.mountain_noise.octaves);
-    gpu.SetFloat("mountainScale", desc.mountain_noise.scale);
-    gpu.SetFloat("mountainPersistence", desc.mountain_noise.persistence);
-    gpu.SetFloat("mountainLacunarity", desc.mountain_noise.lacunarity);
-    gpu.SetFloat("mountainMultiplier", desc.mountain_noise.strength);
-    gpu.SetFloat("mountainPower", desc.mountain_power);
-    gpu.SetFloat("mountainGain", desc.mountain_gain);
-    gpu.SetFloat("mountainSmooth", desc.mountain_smoothing);
-
-    // Mask noise
-    const float maskOffset[3] = {2000.0f, 2000.0f, 2000.0f};
-    gpu.SetVec3("maskOffset", maskOffset);
-    gpu.SetInt("maskLayers", desc.mask_noise.octaves);
-    gpu.SetFloat("maskScale", desc.mask_noise.scale);
-    gpu.SetFloat("maskPersistence", desc.mask_noise.persistence);
-    gpu.SetFloat("maskLacunarity", desc.mask_noise.lacunarity);
-    gpu.SetFloat("maskMultiplier", 1.0f);
-
-    // Terrain parameters
-    gpu.SetFloat("oceanDepthMultiplier", desc.ocean_depth_multiplier);
-    gpu.SetFloat("oceanFloorDepth", desc.ocean_floor_depth);
-    gpu.SetFloat("oceanFloorSmoothing", desc.ocean_floor_smoothing);
-    gpu.SetFloat("mountainBlend", desc.mountain_blend);
-    gpu.SetFloat("heightScale", desc.height_scale);
-    gpu.SetFloat("continentBaseLevel", desc.continent_base_level);
-    gpu.SetFloat("globalFrequency", desc.global_frequency);
-    gpu.SetFloat("normalEpsilon", desc.normal_epsilon);
-
-    // Tectonics
-    gpu.SetInt("useTectonics", desc.use_tectonics);
-    gpu.SetInt("numPlates", desc.num_plates);
-    gpu.SetFloat("continentalFraction", desc.continental_fraction);
-    gpu.SetFloat("boundaryWidth", desc.boundary_width);
-    gpu.SetFloat("convergentMountainScale", desc.convergent_mountain_scale);
-    gpu.SetFloat("divergentRiftDepth", desc.divergent_rift_depth);
-    gpu.SetFloat("coastlineNoise", desc.coastline_noise);
-    gpu.SetFloat("plateElevationNoise", desc.plate_elevation_noise);
-
-    // Height-dependent detail
-    gpu.SetFloat("detailLowThreshold", desc.detail_low_threshold);
-    gpu.SetFloat("detailHighThreshold", desc.detail_high_threshold);
-    gpu.SetFloat("perturbStrengthLow", desc.perturb_strength_low);
-    gpu.SetFloat("perturbStrengthHigh", desc.perturb_strength_high);
-    gpu.SetInt("detailOctavesLow", desc.detail_octaves_low);
-    gpu.SetInt("detailOctavesHigh", desc.detail_octaves_high);
-    gpu.SetFloat("detailPersistence", desc.detail_persistence);
-    gpu.SetFloat("detailLacunarity", desc.detail_lacunarity);
-    gpu.SetFloat("perturbScale", desc.perturb_scale);
-
-    // Ocean floor topology
-    gpu.SetInt("useOceanFloor", desc.use_ocean_floor);
-    gpu.SetFloat("shelfWidth", desc.shelf_width);
-    gpu.SetInt("oceanRidgeOctaves", desc.ocean_ridge_octaves);
-    gpu.SetFloat("oceanRidgeScale", desc.ocean_ridge_scale);
-    gpu.SetFloat("oceanRidgeStrength", desc.ocean_ridge_strength);
-    gpu.SetFloat("oceanRidgePower", desc.ocean_ridge_power);
-    gpu.SetFloat("oceanRidgeGain", desc.ocean_ridge_gain);
-    gpu.SetInt("trenchOctaves", desc.trench_octaves);
-    gpu.SetFloat("trenchScale", desc.trench_scale);
-    gpu.SetFloat("trenchDepth", desc.trench_depth);
-    gpu.SetInt("abyssalOctaves", desc.abyssal_octaves);
-    gpu.SetFloat("abyssalScale", desc.abyssal_scale);
-    gpu.SetFloat("abyssalStrength", desc.abyssal_strength);
+    planetgen::HeightParams p{};
+    p.numVertices = vertexCount;
+    p.seed = seed;
+    p.useTectonics = desc.use_tectonics;
+    p.numPlates = desc.num_plates;
+    p.continentalFraction = desc.continental_fraction;
+    p.boundaryWidth = desc.boundary_width;
+    p.convergentMountainScale = desc.convergent_mountain_scale;
+    p.divergentRiftDepth = desc.divergent_rift_depth;
+    p.coastlineNoise = desc.coastline_noise;
+    p.plateElevationNoise = desc.plate_elevation_noise;
+    p.oceanDepthMultiplier = desc.ocean_depth_multiplier;
+    p.oceanFloorDepth = desc.ocean_floor_depth;
+    p.oceanFloorSmoothing = desc.ocean_floor_smoothing;
+    p.mountainBlend = desc.mountain_blend;
+    p.heightScale = desc.height_scale;
+    p.continentBaseLevel = desc.continent_base_level;
+    p.globalFrequency = desc.global_frequency;
+    p.normalEpsilon = desc.normal_epsilon;
+    p.mountainPower = desc.mountain_power;
+    p.mountainGain = desc.mountain_gain;
+    p.mountainSmooth = desc.mountain_smoothing;
+    p.continentLayers = desc.continent_noise.octaves;
+    p.continentScale = desc.continent_noise.scale;
+    p.continentPersistence = desc.continent_noise.persistence;
+    p.continentLacunarity = desc.continent_noise.lacunarity;
+    p.continentMultiplier = desc.continent_noise.strength;
+    p.mountainLayers = desc.mountain_noise.octaves;
+    p.mountainScale = desc.mountain_noise.scale;
+    p.mountainPersistence = desc.mountain_noise.persistence;
+    p.mountainLacunarity = desc.mountain_noise.lacunarity;
+    p.mountainMultiplier = desc.mountain_noise.strength;
+    p.maskLayers = desc.mask_noise.octaves;
+    p.maskScale = desc.mask_noise.scale;
+    p.maskPersistence = desc.mask_noise.persistence;
+    p.maskLacunarity = desc.mask_noise.lacunarity;
+    p.maskMultiplier = 1.0f; // always 1 (was hardcoded in old SetHeightUniforms)
+    // Offsets are fixed constants from the old implementation
+    p.continentOffsetX = 0.0f;    p.continentOffsetY = 0.0f;    p.continentOffsetZ = 0.0f;
+    p.mountainOffsetX  = 1000.0f; p.mountainOffsetY  = 1000.0f; p.mountainOffsetZ  = 1000.0f;
+    p.maskOffsetX      = 2000.0f; p.maskOffsetY      = 2000.0f; p.maskOffsetZ      = 2000.0f;
+    p.detailLowThreshold  = desc.detail_low_threshold;
+    p.detailHighThreshold = desc.detail_high_threshold;
+    p.perturbStrengthLow  = desc.perturb_strength_low;
+    p.perturbStrengthHigh = desc.perturb_strength_high;
+    p.detailOctavesLow    = desc.detail_octaves_low;
+    p.detailOctavesHigh   = desc.detail_octaves_high;
+    p.detailPersistence   = desc.detail_persistence;
+    p.detailLacunarity    = desc.detail_lacunarity;
+    p.perturbScale        = desc.perturb_scale;
+    p.useOceanFloor       = desc.use_ocean_floor;
+    p.shelfWidth          = desc.shelf_width;
+    p.oceanRidgeOctaves   = desc.ocean_ridge_octaves;
+    p.oceanRidgeScale     = desc.ocean_ridge_scale;
+    p.oceanRidgeStrength  = desc.ocean_ridge_strength;
+    p.oceanRidgePower     = desc.ocean_ridge_power;
+    p.oceanRidgeGain      = desc.ocean_ridge_gain;
+    p.trenchOctaves       = desc.trench_octaves;
+    p.trenchScale         = desc.trench_scale;
+    p.trenchDepth         = desc.trench_depth;
+    p.abyssalOctaves      = desc.abyssal_octaves;
+    p.abyssalScale        = desc.abyssal_scale;
+    p.abyssalStrength     = desc.abyssal_strength;
+    return p;
 }
 
-void SetShadingUniforms(planetgen::IComputeBackend& gpu, const PgShadingDesc& desc, uint32_t seed, uint32_t vertexCount)
+planetgen::ShadingEarthParams MakeShadingEarthParams(const PgShadingDesc& desc, uint32_t seed, uint32_t vertexCount)
 {
-    gpu.SetUint("numVertices", vertexCount);
-    gpu.SetUint("seed", seed);
-    gpu.SetFloat("detailNoiseScale", desc.detail_noise_scale);
-    gpu.SetFloat("smallNoiseScale", desc.small_noise_scale);
-    gpu.SetInt("smallNoiseOctaves", desc.small_noise_octaves);
-    gpu.SetFloat("warpStrength", desc.warp_strength);
-
-    gpu.SetInt("useClimateModel", desc.use_climate_model);
-    gpu.SetFloat("largeNoiseScale", desc.large_noise_scale);
-    gpu.SetInt("largeNoiseOctaves", desc.large_noise_octaves);
-    gpu.SetFloat("temperatureLapseRate", desc.temperature_lapse_rate);
-    gpu.SetFloat("temperatureExponent", desc.temperature_exponent);
-    gpu.SetFloat("moistureNoiseScale", desc.moisture_noise_scale);
-    gpu.SetFloat("moistureNoiseStrength", desc.moisture_noise_strength);
-    gpu.SetFloat("hadleyIntensity", desc.hadley_intensity);
-    gpu.SetFloat("continentalityStrength", desc.continentality_strength);
-    gpu.SetFloat("heightScale", desc.height_scale);
+    planetgen::ShadingEarthParams p{};
+    p.numVertices            = vertexCount;
+    p.seed                   = seed;
+    p.useClimateModel        = desc.use_climate_model;
+    p.largeNoiseOctaves      = desc.large_noise_octaves;
+    p.largeNoiseScale        = desc.large_noise_scale;
+    p.detailNoiseScale       = desc.detail_noise_scale;
+    p.smallNoiseScale        = desc.small_noise_scale;
+    p.smallNoiseOctaves      = desc.small_noise_octaves;
+    p.warpStrength           = desc.warp_strength;
+    p.temperatureLapseRate   = desc.temperature_lapse_rate;
+    p.temperatureExponent    = desc.temperature_exponent;
+    p.moistureNoiseScale     = desc.moisture_noise_scale;
+    p.moistureNoiseStrength  = desc.moisture_noise_strength;
+    p.hadleyIntensity        = desc.hadley_intensity;
+    p.continentalityStrength = desc.continentality_strength;
+    p.heightScale            = desc.height_scale;
+    return p;
 }
 
-void SetErosionUniforms(planetgen::IComputeBackend& gpu, const PgErosionDesc& desc, uint32_t vertexCount)
+planetgen::ShadingGenericParams MakeShadingGenericParams(const PgShadingDesc& desc, uint32_t seed, uint32_t vertexCount)
 {
-    gpu.SetUint("numVertices", vertexCount);
-    gpu.SetInt("gridResolution", desc.grid_resolution);
-    gpu.SetFloat("thermalRate", desc.thermal_rate);
-    gpu.SetFloat("thermalThreshold", desc.thermal_threshold);
-    gpu.SetFloat("hydraulicRate", desc.hydraulic_rate);
-    gpu.SetFloat("depositionRate", desc.deposition_rate);
-    gpu.SetFloat("evaporationRate", desc.evaporation_rate);
+    planetgen::ShadingGenericParams p{};
+    p.numVertices      = vertexCount;
+    p.seed             = seed;
+    p.heightScale      = desc.height_scale;
+    p.detailNoiseScale = desc.detail_noise_scale;
+    p.smallNoiseScale  = desc.small_noise_scale;
+    p.smallNoiseOctaves = desc.small_noise_octaves;
+    p.warpStrength     = desc.warp_strength;
+    return p;
+}
+
+planetgen::ErosionParams MakeErosionParams(const PgErosionDesc& desc, uint32_t vertexCount)
+{
+    planetgen::ErosionParams p{};
+    p.numVertices     = vertexCount;
+    p.gridResolution  = desc.grid_resolution;
+    p.thermalRate     = desc.thermal_rate;
+    p.thermalThreshold = desc.thermal_threshold;
+    p.hydraulicRate   = desc.hydraulic_rate;
+    p.depositionRate  = desc.deposition_rate;
+    p.evaporationRate = desc.evaporation_rate;
+    return p;
 }
 
 } // namespace
@@ -151,13 +158,21 @@ PgContext pg_context_create(const PgContextDesc* desc)
     if (!ctx)
         return nullptr;
 
-    auto backend = std::make_unique<planetgen::OpenGLBackend>();
+    std::unique_ptr<planetgen::IComputeBackend> backend;
+    bool ok = false;
 
-    bool ok;
     if (desc->use_existing_context)
-        ok = backend->InitWithExistingContext();
+    {
+        auto windowed = std::make_unique<planetgen::WindowedGLBackend>();
+        ok = windowed->Init();
+        backend = std::move(windowed);
+    }
     else
-        ok = backend->InitHeadless();
+    {
+        auto headless = std::make_unique<planetgen::HeadlessGLBackend>();
+        ok = headless->Init();
+        backend = std::move(headless);
+    }
 
     if (!ok)
     {
@@ -167,34 +182,30 @@ PgContext pg_context_create(const PgContextDesc* desc)
 
     ctx->backend = std::move(backend);
 
-    // Compile embedded shaders
-    ctx->heightShader = ctx->backend->CompileShader(planetgen::shaders::height_earth_comp);
-    if (!ctx->heightShader)
-    {
-        ctx->lastError = PG_ERROR_SHADER_COMPILE_FAILED;
-        std::cerr << "[planetgen] Failed to compile height shader" << std::endl;
-    }
+    // Wire the registry to the backend's compile/destroy routines
+    auto* backendPtr = ctx->backend.get();
+    ctx->registry.SetCompiler(
+        [backendPtr](const std::string& src) { return backendPtr->CompileShader(src); },
+        [backendPtr](uint32_t prog)           { backendPtr->DestroyShader(prog); }
+    );
 
-    ctx->shadingEarthShader = ctx->backend->CompileShader(planetgen::shaders::shading_earth_comp);
-    if (!ctx->shadingEarthShader)
+    // Compile and register all four built-in shaders
+    using BP = planetgen::BuiltinProgram;
+    auto reg = [&](BP id, const std::string& src, const char* label) -> bool
     {
-        ctx->lastError = PG_ERROR_SHADER_COMPILE_FAILED;
-        std::cerr << "[planetgen] Failed to compile earth shading shader" << std::endl;
-    }
+        if (!ctx->registry.RegisterProgram(id, src))
+        {
+            ctx->lastError = PG_ERROR_SHADER_COMPILE_FAILED;
+            std::cerr << "[planetgen] Failed to compile " << label << " shader" << std::endl;
+            return false;
+        }
+        return true;
+    };
 
-    ctx->shadingGenericShader = ctx->backend->CompileShader(planetgen::shaders::shading_generic_comp);
-    if (!ctx->shadingGenericShader)
-    {
-        ctx->lastError = PG_ERROR_SHADER_COMPILE_FAILED;
-        std::cerr << "[planetgen] Failed to compile generic shading shader" << std::endl;
-    }
-
-    ctx->erosionShader = ctx->backend->CompileShader(planetgen::shaders::erosion_earth_comp);
-    if (!ctx->erosionShader)
-    {
-        ctx->lastError = PG_ERROR_SHADER_COMPILE_FAILED;
-        std::cerr << "[planetgen] Failed to compile erosion shader" << std::endl;
-    }
+    reg(BP::Height,         planetgen::shaders::height_earth_comp,   "height");
+    reg(BP::ShadingEarth,   planetgen::shaders::shading_earth_comp,  "shading_earth");
+    reg(BP::ShadingGeneric, planetgen::shaders::shading_generic_comp,"shading_generic");
+    reg(BP::Erosion,        planetgen::shaders::erosion_earth_comp,  "erosion");
 
     return ctx;
 }
@@ -204,14 +215,8 @@ void pg_context_destroy(PgContext ctx)
     if (!ctx)
         return;
 
-    if (ctx->backend)
-    {
-        if (ctx->heightShader) ctx->backend->DestroyShader(ctx->heightShader);
-        if (ctx->shadingEarthShader) ctx->backend->DestroyShader(ctx->shadingEarthShader);
-        if (ctx->shadingGenericShader) ctx->backend->DestroyShader(ctx->shadingGenericShader);
-        if (ctx->erosionShader) ctx->backend->DestroyShader(ctx->erosionShader);
-    }
-
+    // Registry destructor fires first, calls DestroyShader for each program.
+    // Then backend destructor tears down the GL context.
     delete ctx;
 }
 
@@ -260,7 +265,6 @@ PgBody pg_body_create_from_json(PgContext ctx, const char* json_path)
         PgBodyDesc desc{};
         pg_body_desc_defaults(&desc);
 
-        // Parse terrain noise layers
         auto parseNoise = [](const nlohmann::json& j, PgNoiseLayer& layer)
         {
             if (j.contains("scale")) layer.scale = j["scale"].get<float>();
@@ -310,13 +314,13 @@ PgResult pg_generate_heights(PgBody body, const float* vertices, uint32_t vertex
     auto* ctx = body->ctx;
     auto& gpu = *ctx->backend;
 
-    if (!ctx->heightShader)
+    uint32_t program = ctx->registry.Resolve(planetgen::BuiltinProgram::Height);
+    if (!program)
     {
         ctx->lastError = PG_ERROR_NOT_INITIALIZED;
         return nullptr;
     }
 
-    // Create GPU buffers
     size_t vertexBytes = vertex_count * 3 * sizeof(float);
     size_t heightBytes = vertex_count * sizeof(float);
     size_t normalBytes = vertex_count * 3 * sizeof(float);
@@ -327,18 +331,21 @@ PgResult pg_generate_heights(PgBody body, const float* vertices, uint32_t vertex
 
     gpu.UploadBuffer(vertexBuf, vertices, vertexBytes);
 
-    // Bind and dispatch
-    gpu.BindShader(ctx->heightShader);
+    gpu.BindShader(program);
     gpu.BindBuffer(vertexBuf, 0);
     gpu.BindBuffer(heightBuf, 1);
     gpu.BindBuffer(normalBuf, 2);
 
-    SetHeightUniforms(gpu, body->desc, seed, vertex_count);
+    // Upload typed params via UBO
+    auto params = MakeHeightParams(body->desc, seed, vertex_count);
+    auto ubo = gpu.CreateParamBuffer(sizeof(params));
+    gpu.SetParams(ubo, &params, sizeof(params), ParamBinding);
 
     gpu.Dispatch(ComputeGroupCount(vertex_count, HeightWorkgroupSize));
     gpu.Barrier();
 
-    // Readback
+    gpu.DestroyParamBuffer(ubo);
+
     auto result = new (std::nothrow) PgResult_T();
     if (!result)
     {
@@ -373,39 +380,57 @@ PgResult pg_generate_shading(PgBody body, const float* vertices, const float* he
     auto* ctx = body->ctx;
     auto& gpu = *ctx->backend;
 
-    // Choose shader based on climate model setting
-    uint32_t shader = desc->use_climate_model ? ctx->shadingEarthShader : ctx->shadingGenericShader;
-    if (!shader)
+    // Choose between climate and generic shader based on descriptor
+    using BP = planetgen::BuiltinProgram;
+    BP programId = desc->use_climate_model ? BP::ShadingEarth : BP::ShadingGeneric;
+    uint32_t program = ctx->registry.Resolve(programId);
+    if (!program)
     {
         // Fall back to whichever is available
-        shader = ctx->shadingEarthShader ? ctx->shadingEarthShader : ctx->shadingGenericShader;
-        if (!shader)
+        program = ctx->registry.Resolve(BP::ShadingEarth);
+        if (!program) program = ctx->registry.Resolve(BP::ShadingGeneric);
+        if (!program)
         {
             ctx->lastError = PG_ERROR_NOT_INITIALIZED;
             return nullptr;
         }
     }
 
-    size_t vertexBytes = vertex_count * 3 * sizeof(float);
-    size_t heightBytes = vertex_count * sizeof(float);
+    size_t vertexBytes  = vertex_count * 3 * sizeof(float);
+    size_t heightBytes  = vertex_count * sizeof(float);
     size_t shadingBytes = vertex_count * 4 * sizeof(float);
 
-    auto vertexBuf = gpu.CreateBuffer(vertexBytes);
+    auto vertexBuf  = gpu.CreateBuffer(vertexBytes);
     auto shadingBuf = gpu.CreateBuffer(shadingBytes);
-    auto heightBuf = gpu.CreateBuffer(heightBytes);
+    auto heightBuf  = gpu.CreateBuffer(heightBytes);
 
     gpu.UploadBuffer(vertexBuf, vertices, vertexBytes);
-    gpu.UploadBuffer(heightBuf, heights, heightBytes);
+    gpu.UploadBuffer(heightBuf, heights,  heightBytes);
 
-    gpu.BindShader(shader);
-    gpu.BindBuffer(vertexBuf, 0);
+    gpu.BindShader(program);
+    gpu.BindBuffer(vertexBuf,  0);
     gpu.BindBuffer(shadingBuf, 1);
-    gpu.BindBuffer(heightBuf, 2);
+    gpu.BindBuffer(heightBuf,  2);
 
-    SetShadingUniforms(gpu, *desc, seed, vertex_count);
+    // Upload the correct param struct for whichever path we took
+    planetgen::GpuBufferHandle ubo = 0;
+    if (programId == BP::ShadingEarth)
+    {
+        auto p = MakeShadingEarthParams(*desc, seed, vertex_count);
+        ubo = gpu.CreateParamBuffer(sizeof(p));
+        gpu.SetParams(ubo, &p, sizeof(p), ParamBinding);
+    }
+    else
+    {
+        auto p = MakeShadingGenericParams(*desc, seed, vertex_count);
+        ubo = gpu.CreateParamBuffer(sizeof(p));
+        gpu.SetParams(ubo, &p, sizeof(p), ParamBinding);
+    }
 
     gpu.Dispatch(ComputeGroupCount(vertex_count, ShadingWorkgroupSize));
     gpu.Barrier();
+
+    gpu.DestroyParamBuffer(ubo);
 
     auto result = new (std::nothrow) PgResult_T();
     if (!result)
@@ -439,7 +464,8 @@ PgResult pg_generate_erosion(PgBody body, const float* heights, uint32_t vertex_
     auto* ctx = body->ctx;
     auto& gpu = *ctx->backend;
 
-    if (!ctx->erosionShader)
+    uint32_t program = ctx->registry.Resolve(planetgen::BuiltinProgram::Erosion);
+    if (!program)
     {
         ctx->lastError = PG_ERROR_NOT_INITIALIZED;
         return nullptr;
@@ -447,31 +473,34 @@ PgResult pg_generate_erosion(PgBody body, const float* heights, uint32_t vertex_
 
     size_t heightBytes = vertex_count * sizeof(float);
 
-    auto inputBuf = gpu.CreateBuffer(heightBytes);
+    auto inputBuf  = gpu.CreateBuffer(heightBytes);
     auto outputBuf = gpu.CreateBuffer(heightBytes);
 
     gpu.UploadBuffer(inputBuf, heights, heightBytes);
+    gpu.BindShader(program);
 
-    gpu.BindShader(ctx->erosionShader);
+    // Params are the same every iteration — create once, re-upload each iter
+    auto params = MakeErosionParams(*desc, vertex_count);
+    auto ubo = gpu.CreateParamBuffer(sizeof(params));
 
-    // Run iterations, ping-ponging between buffers
     for (int i = 0; i < desc->iterations; ++i)
     {
-        gpu.BindBuffer(inputBuf, 0);
+        gpu.BindBuffer(inputBuf,  0);
         gpu.BindBuffer(outputBuf, 1);
 
-        SetErosionUniforms(gpu, *desc, vertex_count);
+        gpu.SetParams(ubo, &params, sizeof(params), ParamBinding);
 
         gpu.Dispatch(ComputeGroupCount(vertex_count, ErosionWorkgroupSize));
         gpu.Barrier();
 
-        // Swap for next iteration
+        // Ping-pong
         auto tmp = inputBuf;
-        inputBuf = outputBuf;
+        inputBuf  = outputBuf;
         outputBuf = tmp;
     }
 
-    // After all iterations, inputBuf holds the final result (due to last swap)
+    gpu.DestroyParamBuffer(ubo);
+
     auto result = new (std::nothrow) PgResult_T();
     if (!result)
     {
@@ -543,8 +572,6 @@ uint32_t pg_result_get_gpu_buffer(PgResult result)
 void pg_result_destroy(PgResult result)
 {
     // GPU buffers are not destroyed here — they may still be in use by the consumer.
-    // In a full implementation, result would ref-count or the consumer would manage GPU lifetime.
-    // For now, just free the CPU-side data.
     delete result;
 }
 
@@ -559,21 +586,18 @@ void pg_body_desc_defaults(PgBodyDesc* desc)
 
     std::memset(desc, 0, sizeof(PgBodyDesc));
 
-    // Continent noise
     desc->continent_noise.scale = 0.8f;
     desc->continent_noise.octaves = 6;
     desc->continent_noise.persistence = 0.5f;
     desc->continent_noise.lacunarity = 2.0f;
     desc->continent_noise.strength = 2.0f;
 
-    // Mountain noise
     desc->mountain_noise.scale = 1.5f;
     desc->mountain_noise.octaves = 5;
     desc->mountain_noise.persistence = 0.5f;
     desc->mountain_noise.lacunarity = 4.0f;
     desc->mountain_noise.strength = 0.87f;
 
-    // Mask noise
     desc->mask_noise.scale = 1.09f;
     desc->mask_noise.octaves = 3;
     desc->mask_noise.persistence = 0.55f;
@@ -593,7 +617,6 @@ void pg_body_desc_defaults(PgBodyDesc* desc)
     desc->mountain_gain = 0.8f;
     desc->mountain_smoothing = 1.0f;
 
-    // Tectonics
     desc->use_tectonics = 1;
     desc->num_plates = 12;
     desc->continental_fraction = 0.45f;
@@ -603,7 +626,6 @@ void pg_body_desc_defaults(PgBodyDesc* desc)
     desc->coastline_noise = 0.4f;
     desc->plate_elevation_noise = 0.2f;
 
-    // Ocean floor
     desc->use_ocean_floor = 1;
     desc->shelf_width = 0.15f;
     desc->ocean_ridge_octaves = 4;
@@ -618,7 +640,6 @@ void pg_body_desc_defaults(PgBodyDesc* desc)
     desc->abyssal_scale = 2.0f;
     desc->abyssal_strength = 0.1f;
 
-    // Detail
     desc->detail_low_threshold = -0.1f;
     desc->detail_high_threshold = 0.3f;
     desc->perturb_strength_low = 0.001f;
