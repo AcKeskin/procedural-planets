@@ -22,7 +22,7 @@ layout(std140, binding = 1) uniform ContinentGrowthParamsBlock
     uint  count;
     uint  seed;
     uint  resolution;
-    uint  iterations;   // warp octaves for coastline irregularity
+    uint  warpOctaves;  // domain-warp octaves for coastline irregularity
     float sizeVariance;
     float clustering;
     float _pad0;
@@ -167,12 +167,12 @@ void main()
     vec3 uvw = (vec3(gid) + 0.5) / float(res) * 2.0 - 1.0;
     vec3 dir = normalize(uvw);
 
-    // Domain warp for analytic coastline irregularity (uses iterations as octave count)
-    uint warpOctaves = clamp(iterations, 1u, 4u);
+    // Domain warp for analytic coastline irregularity
+    uint octaves = clamp(warpOctaves, 1u, 4u);
     vec3 warpedDir = dir;
     float warpAmp   = 0.35;
     float warpFreq  = 1.8;
-    for (uint i = 0u; i < warpOctaves; ++i)
+    for (uint i = 0u; i < octaves; ++i)
     {
         float wx = (snoise3(dir * warpFreq + vec3(11.3, 0.0, 0.0), seed + 900u) * 2.0 - 1.0) * warpAmp;
         float wy = (snoise3(dir * warpFreq + vec3(0.0, 17.7, 0.0), seed + 901u) * 2.0 - 1.0) * warpAmp;

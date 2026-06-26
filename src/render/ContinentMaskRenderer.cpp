@@ -1,6 +1,7 @@
 #include "ContinentMaskRenderer.h"
 #define NOMINMAX
 #include <GL/gl3w.h>
+#include "backend/ParamBlocks.h"
 #include <iostream>
 #include <algorithm>
 
@@ -56,26 +57,14 @@ void ContinentMaskRenderer::Generate(const planetgen::BodyConfig& config, uint32
     // Bind as image3D for compute write (binding = 0, as declared in shader)
     glBindImageTexture(0, _texture, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RG32F);
 
-    // Create and upload the UBO matching ContinentGrowthParams (binding = 1)
-    struct alignas(16) Params
-    {
-        uint32_t count;
-        uint32_t seed;
-        uint32_t resolution;
-        uint32_t iterations;
-        float    sizeVariance;
-        float    clustering;
-        float    _pad0;
-        float    _pad1;
-    };
-
-    Params p{};
-    p.count       = static_cast<uint32_t>((std::max)(1, sh.continentCount));
-    p.seed        = seed;
-    p.resolution  = res;
-    p.iterations  = 3u;  // warp octaves for coastline detail
+    // Upload the growth params as binding = 1, reusing the canonical std140 struct.
+    planetgen::ContinentGrowthParams p{};
+    p.count        = static_cast<uint32_t>((std::max)(1, sh.continentCount));
+    p.seed         = seed;
+    p.resolution   = res;
+    p.warpOctaves  = 3u; // coastline-detail octaves
     p.sizeVariance = sh.continentSizeVariance;
-    p.clustering  = sh.continentClustering;
+    p.clustering   = sh.continentClustering;
 
     GLuint ubo = 0;
     glGenBuffers(1, &ubo);

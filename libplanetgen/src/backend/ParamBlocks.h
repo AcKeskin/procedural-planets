@@ -220,7 +220,7 @@ struct alignas(16) ContinentGrowthParams
     uint32_t count;
     uint32_t seed;
     uint32_t resolution;
-    uint32_t iterations;
+    uint32_t warpOctaves; // domain-warp octaves for coastline irregularity
 
     // Row 1
     float sizeVariance;
