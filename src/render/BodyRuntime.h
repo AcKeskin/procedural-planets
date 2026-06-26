@@ -40,6 +40,10 @@ public:
     std::string GetVertexShaderPath()   const { return _config.shaderPaths.vertexShaderPath;   }
     std::string GetFragmentShaderPath() const { return _config.shaderPaths.fragmentShaderPath; }
 
+    // Continent mask — set before calling SetShapeUniforms so it binds the sampler
+    void SetContinentMaskTexture(uint32_t textureId) { _continentMaskTexId = textureId; }
+    uint32_t GetContinentMaskTexture() const { return _continentMaskTexId; }
+
     // Uniform binding — mirrors the old SetShapeUniforms/SetShadingUniforms/SetRenderUniforms
     void SetShapeUniforms(ComputeShader& shader, uint32_t seed) const;
     void SetShadingUniforms(ComputeShader& shader, uint32_t seed) const;
@@ -65,6 +69,7 @@ public:
 private:
     planetgen::BodyConfig       _config;
     const planetgen::PaletteRegistry& _registry;
+    uint32_t                    _continentMaskTexId = 0;
 
     // Cached BiomePalette converted from PaletteRegistry on construction
     mutable BiomePalette _biomePalette;

@@ -88,6 +88,10 @@ std::string BodyConfigFromJson(const std::string& jsonStr, BodyConfig& out)
             cfg.shape.mountainPower        = s.value("mountainPower", cfg.shape.mountainPower);
             cfg.shape.mountainGain         = s.value("mountainGain", cfg.shape.mountainGain);
             cfg.shape.mountainSmoothing    = s.value("mountainSmoothing", cfg.shape.mountainSmoothing);
+            cfg.shape.continentCount          = s.value("continentCount",          cfg.shape.continentCount);
+            cfg.shape.continentSizeVariance   = s.value("continentSizeVariance",   cfg.shape.continentSizeVariance);
+            cfg.shape.continentClustering     = s.value("continentClustering",     cfg.shape.continentClustering);
+            cfg.shape.continentMaskResolution = s.value("continentMaskResolution", cfg.shape.continentMaskResolution);
             if (s.contains("continentNoise"))
                 cfg.shape.continentNoise = ParseNoiseLayer(s["continentNoise"], cfg.shape.continentNoise);
             if (s.contains("mountainNoise"))
@@ -330,20 +334,24 @@ std::string BodyConfigToJson(const BodyConfig& cfg)
     };
 
     j["shape"] = {
-        { "continentBaseLevel",   cfg.shape.continentBaseLevel   },
-        { "continentNoise",       NoiseLayerToJson(cfg.shape.continentNoise) },
-        { "globalFrequency",      cfg.shape.globalFrequency      },
-        { "heightScale",          cfg.shape.heightScale          },
-        { "maskNoise",            NoiseLayerToJson(cfg.shape.maskNoise)      },
-        { "mountainBlend",        cfg.shape.mountainBlend        },
-        { "mountainGain",         cfg.shape.mountainGain         },
-        { "mountainNoise",        NoiseLayerToJson(cfg.shape.mountainNoise)  },
-        { "mountainPower",        cfg.shape.mountainPower        },
-        { "mountainSmoothing",    cfg.shape.mountainSmoothing    },
-        { "normalEpsilon",        cfg.shape.normalEpsilon        },
-        { "oceanDepthMultiplier", cfg.shape.oceanDepthMultiplier },
-        { "oceanFloorDepth",      cfg.shape.oceanFloorDepth      },
-        { "oceanFloorSmoothing",  cfg.shape.oceanFloorSmoothing  },
+        { "continentBaseLevel",      cfg.shape.continentBaseLevel       },
+        { "continentCount",          cfg.shape.continentCount           },
+        { "continentClustering",     cfg.shape.continentClustering      },
+        { "continentMaskResolution", cfg.shape.continentMaskResolution  },
+        { "continentNoise",          NoiseLayerToJson(cfg.shape.continentNoise) },
+        { "continentSizeVariance",   cfg.shape.continentSizeVariance    },
+        { "globalFrequency",         cfg.shape.globalFrequency          },
+        { "heightScale",             cfg.shape.heightScale              },
+        { "maskNoise",               NoiseLayerToJson(cfg.shape.maskNoise)      },
+        { "mountainBlend",           cfg.shape.mountainBlend            },
+        { "mountainGain",            cfg.shape.mountainGain             },
+        { "mountainNoise",           NoiseLayerToJson(cfg.shape.mountainNoise)  },
+        { "mountainPower",           cfg.shape.mountainPower            },
+        { "mountainSmoothing",       cfg.shape.mountainSmoothing        },
+        { "normalEpsilon",           cfg.shape.normalEpsilon            },
+        { "oceanDepthMultiplier",    cfg.shape.oceanDepthMultiplier     },
+        { "oceanFloorDepth",         cfg.shape.oceanFloorDepth          },
+        { "oceanFloorSmoothing",     cfg.shape.oceanFloorSmoothing      },
     };
 
     j["tectonics"] = {

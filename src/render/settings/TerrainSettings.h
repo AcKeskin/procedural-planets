@@ -77,6 +77,12 @@ struct EarthTerrainSettings
     float heightScale = 0.04f;
     float globalFrequency = 1.0f;
 
+    // Continental mask growth — drive ContinentMaskRenderer
+    int   continentCount          = 6;
+    float continentSizeVariance   = 0.4f;
+    float continentClustering     = 0.4f;
+    int   continentMaskResolution = 96;
+
     // Finite-difference step for GPU analytical normal computation
     float normalEpsilon = 0.0001f;
 

@@ -16,6 +16,7 @@ add_library(render STATIC
     GlFence.cpp
     GenerationScheduler.cpp
     BodyRuntime.cpp
+    ContinentMaskRenderer.cpp
     BiomePalette.cpp
     Framebuffer.cpp
     PostProcessor.cpp

@@ -13,6 +13,7 @@ set(SHADER_SOURCES
     "${SHADER_SOURCE_DIR}/compute/shading_earth.comp"
     "${SHADER_SOURCE_DIR}/compute/shading_generic.comp"
     "${SHADER_SOURCE_DIR}/compute/erosion_earth.comp"
+    "${SHADER_SOURCE_DIR}/compute/continent_growth.comp"
     "${SHADER_SOURCE_DIR}/includes/noise.glsl"
 )
 

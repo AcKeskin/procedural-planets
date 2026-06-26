@@ -1,4 +1,5 @@
 #include "BodyRuntime.h"
+#include <GL/gl3w.h>
 #include <glm/glm.hpp>
 
 // Noise domain offsets — must match what the compute shaders expect (same as old Earth.cpp)
@@ -85,6 +86,19 @@ void BodyRuntime::SetShapeUniforms(ComputeShader& shader, uint32_t seed) const
     shader.SetFloat("detailPersistence",   h.detailPersistence);
     shader.SetFloat("detailLacunarity",    h.detailLacunarity);
     shader.SetFloat("perturbScale",        h.perturbScale);
+
+    // Continent mask sampler (texture unit 4 — arbitrary free slot for compute)
+    if (_continentMaskTexId != 0)
+    {
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_3D, _continentMaskTexId);
+        shader.SetInt("continentMask", 4);
+        shader.SetInt("continentMaskAvailable", 1);
+    }
+    else
+    {
+        shader.SetInt("continentMaskAvailable", 0);
+    }
 
     // Ocean floor topology
     shader.SetInt("useOceanFloor",        o.enabled ? 1 : 0);

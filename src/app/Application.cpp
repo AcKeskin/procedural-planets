@@ -40,7 +40,11 @@ void SyncEarthToConfig(planetgen::BodyConfig& cfg,
                             t.mountainLacunarity, t.mountainStrength };
     sh.maskNoise       = { t.maskScale, t.maskOctaves, t.maskPersistence,
                             t.maskLacunarity, 1.0f };
-    sh.heightScale          = t.heightScale;
+    sh.heightScale             = t.heightScale;
+    sh.continentCount          = t.continentCount;
+    sh.continentSizeVariance   = t.continentSizeVariance;
+    sh.continentClustering     = t.continentClustering;
+    sh.continentMaskResolution = t.continentMaskResolution;
     sh.oceanDepthMultiplier = t.oceanDepthMultiplier;
     sh.oceanFloorDepth      = t.oceanFloorDepth;
     sh.oceanFloorSmoothing  = t.oceanFloorSmoothing;
@@ -155,7 +159,11 @@ void SyncConfigToEarth(const planetgen::BodyConfig& cfg,
     t.maskOctaves          = sh.maskNoise.octaves;
     t.maskPersistence      = sh.maskNoise.persistence;
     t.maskLacunarity       = sh.maskNoise.lacunarity;
-    t.heightScale          = sh.heightScale;
+    t.heightScale             = sh.heightScale;
+    t.continentCount          = sh.continentCount;
+    t.continentSizeVariance   = sh.continentSizeVariance;
+    t.continentClustering     = sh.continentClustering;
+    t.continentMaskResolution = sh.continentMaskResolution;
     t.oceanDepthMultiplier = sh.oceanDepthMultiplier;
     t.oceanFloorDepth      = sh.oceanFloorDepth;
     t.oceanFloorSmoothing  = sh.oceanFloorSmoothing;
@@ -279,6 +287,9 @@ bool Application::Initialize()
 
     // Initialize libplanetgen with the app's existing GL context
     _terrainGenerator.InitializeLibrary();
+
+    if (!_continentMaskRenderer.Initialize())
+        std::cerr << "[Application] ContinentMaskRenderer failed to initialize (non-fatal)" << std::endl;
 
     if (!_sceneFbo.Create(_window.GetWidth(), _window.GetHeight()))
     {
@@ -659,6 +670,10 @@ void Application::SwitchBody(planetgen::BodyConfig config)
     _atmosphereSettings.enabled = _activeBody->HasAtmosphere();
 
     _generationScheduler.Initialize(_terrainGenerator, *_activeBody, _genConfig.seed);
+
+    // Force mask regeneration on body switch
+    _lastMaskSeed = ~0u;
+
     RegenerateLodSystem();
 
     float camDist = _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier;
@@ -707,6 +722,34 @@ void Application::RegenerateLodSystem()
     if (_activeBody && _activeBody->Config().metadata.typeName == "earth")
         SyncEarthToConfig(_activeBody->Config(),
                           _terrainSettings, _shadingSettings, _biomeSettings, _earthColors);
+
+    // Regenerate continental mask when its params change (or first time)
+    if (_activeBody && _continentMaskRenderer.IsReady())
+    {
+        const auto& sh = _activeBody->Config().shape;
+        bool paramsChanged = (!_continentMaskRenderer.HasTexture()               ||
+                              sh.continentCount          != _lastContinentCount   ||
+                              sh.continentSizeVariance   != _lastContinentSizeVariance ||
+                              sh.continentClustering     != _lastContinentClustering   ||
+                              sh.continentMaskResolution != _lastContinentMaskResolution ||
+                              _genConfig.seed            != _lastMaskSeed);
+        if (paramsChanged)
+        {
+            _continentMaskRenderer.Generate(_activeBody->Config(), _genConfig.seed);
+            _activeBody->SetContinentMaskTexture(_continentMaskRenderer.GetMaskTextureId());
+
+            _lastContinentCount          = sh.continentCount;
+            _lastContinentSizeVariance   = sh.continentSizeVariance;
+            _lastContinentClustering     = sh.continentClustering;
+            _lastContinentMaskResolution = sh.continentMaskResolution;
+            _lastMaskSeed                = _genConfig.seed;
+        }
+    }
+    else if (_activeBody)
+    {
+        // Shader not loaded — height shader sees mask unavailable
+        _activeBody->SetContinentMaskTexture(0);
+    }
 
     _generationScheduler.SetBody(*_activeBody, _genConfig.seed);
 

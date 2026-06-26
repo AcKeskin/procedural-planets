@@ -118,6 +118,34 @@ bool TerrainPanel::DrawEarthTerrainContent(EarthTerrainSettings& settings,
     }
 
     ImGui::Spacing();
+    ImGui::Text("Continental Mask");
+    ImGui::Separator();
+
+    ImGui::SliderInt("Continent Count", &settings.continentCount, 1, 12);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Number of cratons to seed for the growth mask");
+
+    ImGui::SliderFloat("Size Variance", &settings.continentSizeVariance, 0.0f, 1.0f, "%.2f");
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("How much continents vary in size");
+
+    ImGui::SliderFloat("Clustering", &settings.continentClustering, 0.0f, 1.0f, "%.2f");
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("0 = dispersed continents, 1 = supercontinent");
+
+    ImGui::SliderInt("Mask Resolution", &settings.continentMaskResolution, 32, 256);
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        needsRegeneration = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("3D texture resolution per axis — higher is smoother but slower");
+
+    ImGui::Spacing();
     ImGui::Text("Continental Shape");
     ImGui::Separator();
 

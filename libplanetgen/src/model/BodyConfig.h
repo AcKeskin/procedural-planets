@@ -57,6 +57,12 @@ struct ShapeBlock
     float mountainPower     = 2.18f;
     float mountainGain      = 0.8f;
     float mountainSmoothing = 1.0f;
+
+    // Continental mask growth params — drive ContinentMaskRenderer dispatch
+    int   continentCount          = 6;
+    float continentSizeVariance   = 0.4f;
+    float continentClustering     = 0.4f;  // 0=dispersed, 1=supercontinent
+    int   continentMaskResolution = 96;
 };
 
 // ============================================================================

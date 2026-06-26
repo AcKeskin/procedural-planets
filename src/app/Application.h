@@ -27,6 +27,7 @@
 #include "settings/CinematicSettings.h"
 #include "BiomePalette.h"
 #include "BodyRuntime.h"
+#include "ContinentMaskRenderer.h"
 #include <memory>
 #include "cinematic/CinematicController.h"
 #include "cinematic/CaptureManager.h"
@@ -145,6 +146,14 @@ private:
     // Active body — typed config + runtime shim
     planetgen::PaletteRegistry _paletteRegistry;
     std::unique_ptr<render::BodyRuntime> _activeBody;
+
+    // Continental mask — generated once per regen when continent params change
+    render::ContinentMaskRenderer _continentMaskRenderer;
+    int   _lastContinentCount          = -1;
+    float _lastContinentSizeVariance   = -1.0f;
+    float _lastContinentClustering     = -1.0f;
+    int   _lastContinentMaskResolution = -1;
+    uint32_t _lastMaskSeed             = ~0u;
     int _selectedBodyType = 0; // GUI selector index
 
     // Frame state

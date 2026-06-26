@@ -6,6 +6,7 @@
 #include "model/BodyConfigProjection.h"
 #include "model/BodyConfigJson.h"
 #include "model/PaletteRegistry.h"
+#include "backend/ParamBlocks.h"
 #include "planetgen/planetgen.h"
 
 #include <cstring>
@@ -320,4 +321,46 @@ TEST_CASE("crystalline.json loads and validates cleanly", "[model][parity]")
     CHECK(cfg.tectonics.enabled == false);
     CHECK(cfg.paletteRef.paletteId == "crystalline");
     CHECK(cfg.shape.heightScale == Catch::Approx(0.08f));
+}
+
+// ============================================================================
+// Continental mask growth params — Step 1/3 of the continent mask feature
+// ============================================================================
+
+TEST_CASE("BodyConfig has continent mask growth fields with correct defaults", "[model][continent-mask]")
+{
+    planetgen::BodyConfig cfg;
+    CHECK(cfg.shape.continentCount          == 6);
+    CHECK(cfg.shape.continentSizeVariance   == Catch::Approx(0.4f));
+    CHECK(cfg.shape.continentClustering     == Catch::Approx(0.4f));
+    CHECK(cfg.shape.continentMaskResolution == 96);
+}
+
+TEST_CASE("Continent mask growth params round-trip through JSON", "[model][continent-mask][json]")
+{
+    planetgen::BodyConfig original;
+    original.shape.continentCount          = 4;
+    original.shape.continentSizeVariance   = 0.7f;
+    original.shape.continentClustering     = 0.2f;
+    original.shape.continentMaskResolution = 64;
+
+    std::string json = planetgen::BodyConfigToJson(original);
+    REQUIRE(!json.empty());
+
+    planetgen::BodyConfig parsed;
+    std::string err = planetgen::BodyConfigFromJson(json, parsed);
+    REQUIRE(err.empty());
+
+    CHECK(parsed.shape.continentCount          == 4);
+    CHECK(parsed.shape.continentSizeVariance   == Catch::Approx(0.7f));
+    CHECK(parsed.shape.continentClustering     == Catch::Approx(0.2f));
+    CHECK(parsed.shape.continentMaskResolution == 64);
+}
+
+TEST_CASE("ContinentGrowthParams struct has correct size (std140 2-row)", "[model][continent-mask][param-block]")
+{
+    // The GLSL binding = 1 std140 block must match ContinentGrowthParams exactly.
+    // Two 16-byte rows: uint[4] + float[4].
+    CHECK(sizeof(planetgen::ContinentGrowthParams) == 32u);
+    CHECK(alignof(planetgen::ContinentGrowthParams) == 16u);
 }

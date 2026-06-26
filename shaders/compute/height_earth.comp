@@ -238,6 +238,21 @@ vec4 sphericalVoronoi(vec3 dir, int numPlates, uint seed)
 }
 
 // ============================================================================
+// Continental mask — loose uniforms, set by BodyRuntime::SetShapeUniforms
+// ============================================================================
+
+uniform sampler3D continentMask;
+uniform int       continentMaskAvailable;
+
+// Sample R=continentalness, G=accretionAge from the baked 3D texture.
+// Direction is in [-1,1]³ sphere surface → remap to [0,1]³ UVW.
+vec2 sampleContinentMask(vec3 dir)
+{
+    vec3 uvw = dir * 0.5 + 0.5;
+    return texture(continentMask, uvw).rg;
+}
+
+// ============================================================================
 // SSBOs
 // ============================================================================
 
@@ -373,31 +388,89 @@ float evaluateHeight(vec3 dir)
         float boundaryDist = secondDist - nearDist;
         float boundaryProximity = 1.0 - smoothstep(0.0, boundaryWidth, boundaryDist);
 
-        bool nearContinental = isPlateContinental(nearId, seed, continentalFraction);
-        bool secondContinental = isPlateContinental(secondId, seed, continentalFraction);
-        float nearBaseElev = nearContinental ? 0.5 : -0.5;
-        float secondBaseElev = secondContinental ? 0.5 : -0.5;
-
-        float boundaryBlend = boundaryProximity * 0.5;
-        float baseElevation = mix(nearBaseElev, secondBaseElev, boundaryBlend);
-
-        float interiorNoise = fbm(dir, continentOffset, continentLayers, contScale,
-                                   continentPersistence, continentLacunarity,
-                                   plateElevationNoise, seed);
-
-        float coastPerturb = fbm(dir, vec3(3000.0), 4, contScale * 1.5,
-                                  0.5, 2.0, coastlineNoise, seed + 3u);
-
         float bType = boundaryType(nearId, secondId, seed);
         float convergentEffect = max(0.0, bType) * boundaryProximity * convergentMountainScale;
         float divergentEffect = max(0.0, -bType) * boundaryProximity * divergentRiftDepth;
 
-        continentShape = baseElevation + interiorNoise + coastPerturb * boundaryProximity
-                         + convergentEffect - divergentEffect;
-        continentShape += continentBaseLevel;
+        if (continentMaskAvailable == 1)
+        {
+            // --- Mask path: baked continentalness replaces the coin-flip ---
+            // Multi-scale domain warp before sampling for analytic coastlines
+            float warpAmp = 0.12;
+            vec3 sampleDir = normalize(dir + vec3(
+                fbm(dir, vec3(333.0), 2, contScale * 1.2, 0.5, 2.0, warpAmp, seed + 50u),
+                fbm(dir, vec3(444.0), 2, contScale * 1.2, 0.5, 2.0, warpAmp, seed + 51u),
+                fbm(dir, vec3(555.0), 2, contScale * 1.2, 0.5, 2.0, warpAmp, seed + 52u)
+            ));
 
-        mountainMask = max(0.0, bType) * boundaryProximity;
-        mountainMask = max(mountainMask, Blend(0.0, mountainBlend, continentShape));
+            vec2 maskSample = sampleContinentMask(sampleDir);
+            float continentalness = maskSample.r;   // [0,1]: 1=craton, 0=ocean
+            float accretionAge    = maskSample.g;   // [0,1]: 0=core, 1=margin
+
+            // Threshold with smooth gradient: >0.5 = continental
+            float maskThreshold = 0.5;
+            float continentFactor = smoothstep(maskThreshold - 0.2, maskThreshold + 0.2, continentalness);
+
+            float nearBaseElev = mix(-0.5, 0.5, continentFactor);
+            float interiorNoise = fbm(dir, continentOffset, continentLayers, contScale,
+                                       continentPersistence, continentLacunarity,
+                                       plateElevationNoise, seed);
+
+            continentShape = nearBaseElev + interiorNoise + convergentEffect - divergentEffect;
+            continentShape += continentBaseLevel;
+
+            // --- Age-derived interior structure (Step 6) ---
+            // Low age (0) = cratonic shield: flat, slightly elevated
+            // Mid age (0.3-0.7) = accreted orogeny belt: banded relief
+            // High age (>0.8) = continental margin: transitions to ocean
+            if (continentFactor > 0.3)
+            {
+                // Craton shields: damp relief near core (age ~ 0)
+                float cratonFactor = 1.0 - smoothstep(0.0, 0.3, accretionAge);
+                float cratonElevation = cratonFactor * 0.1;  // slight plateau
+                float cratonFlat = snoise(dir * contScale * 0.5 + vec3(8000.0), seed + 60u) * 0.03;
+                continentShape += cratonElevation + cratonFlat * cratonFactor;
+
+                // Accreted orogeny belts: banded noise in mid-age band
+                float orogenFactor = smoothstep(0.25, 0.45, accretionAge) *
+                                     (1.0 - smoothstep(0.65, 0.85, accretionAge));
+                float orogenBands = fbm(dir, vec3(9000.0), 3, contScale * 2.5,
+                                         0.5, 2.0, 0.12 * orogenFactor, seed + 61u);
+                continentShape += orogenBands;
+
+                // Margin basins: depress outer edges
+                float marginFactor = smoothstep(0.75, 1.0, accretionAge) * continentFactor;
+                continentShape -= marginFactor * 0.15;
+            }
+
+            mountainMask = max(0.0, bType) * boundaryProximity;
+            mountainMask = max(mountainMask, Blend(0.0, mountainBlend, continentShape));
+        }
+        else
+        {
+            // --- Original coin-flip path ---
+            bool nearContinental = isPlateContinental(nearId, seed, continentalFraction);
+            bool secondContinental = isPlateContinental(secondId, seed, continentalFraction);
+            float nearBaseElev = nearContinental ? 0.5 : -0.5;
+            float secondBaseElev = secondContinental ? 0.5 : -0.5;
+
+            float boundaryBlend = boundaryProximity * 0.5;
+            float baseElevation = mix(nearBaseElev, secondBaseElev, boundaryBlend);
+
+            float interiorNoise = fbm(dir, continentOffset, continentLayers, contScale,
+                                       continentPersistence, continentLacunarity,
+                                       plateElevationNoise, seed);
+
+            float coastPerturb = fbm(dir, vec3(3000.0), 4, contScale * 1.5,
+                                      0.5, 2.0, coastlineNoise, seed + 3u);
+
+            continentShape = baseElevation + interiorNoise + coastPerturb * boundaryProximity
+                             + convergentEffect - divergentEffect;
+            continentShape += continentBaseLevel;
+
+            mountainMask = max(0.0, bType) * boundaryProximity;
+            mountainMask = max(mountainMask, Blend(0.0, mountainBlend, continentShape));
+        }
     }
     else
     {
@@ -410,6 +483,31 @@ float evaluateHeight(vec3 dir)
         float elevationMask = Blend(0.0, mountainBlend, continentShape);
         float noiseMask = Blend(0.0, mountainBlend * 0.5, maskNoise);
         mountainMask = elevationMask * noiseMask;
+    }
+
+    // --- Step 7: Boundary mountain refinement from baked mask ---
+    // When the mask is available, coast/convergent boundaries on continental crust
+    // get fold belts; ocean-side gets arcs/trenches modulated by the mask value.
+    if (useTectonics != 0 && continentMaskAvailable == 1)
+    {
+        vec4 vb = sphericalVoronoi(dir, numPlates, seed + 500u);
+        float bProx = 1.0 - smoothstep(0.0, boundaryWidth, vb.y - vb.x);
+        float bt    = boundaryType(int(vb.z), int(vb.w), seed);
+
+        // Sample mask at current dir for boundary classification
+        vec2  bms           = sampleContinentMask(normalize(dir));
+        float bContinental  = bms.r;
+
+        // Fold belt on convergent continental crust
+        float foldBelt = max(0.0, bt) * bProx * bContinental * convergentMountainScale * 0.4;
+
+        // Arc/trench suppression on ocean side (reduce mountain contribution)
+        float arcSide = max(0.0, bt) * bProx * (1.0 - bContinental);
+        // Trenches deepen on oceanic convergent; compensate via negative elevation
+        float trenchDeepen = arcSide * 0.25;
+
+        continentShape += foldBelt - trenchDeepen;
+        mountainMask = max(mountainMask, bProx * bContinental * max(0.0, bt));
     }
 
     if (useOceanFloor != 0 && continentShape < 0.0)

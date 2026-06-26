@@ -211,4 +211,24 @@ struct alignas(16) ErosionParams
 
 static_assert(sizeof(ErosionParams) == 2 * 16, "ErosionParams std140 layout mismatch");
 
+// ============================================================================
+// ContinentGrowthParams — binding = 1 in continent_growth.comp
+// ============================================================================
+struct alignas(16) ContinentGrowthParams
+{
+    // Row 0
+    uint32_t count;
+    uint32_t seed;
+    uint32_t resolution;
+    uint32_t iterations;
+
+    // Row 1
+    float sizeVariance;
+    float clustering;
+    float _pad0;
+    float _pad1;
+};
+
+static_assert(sizeof(ContinentGrowthParams) == 2 * 16, "ContinentGrowthParams std140 layout mismatch");
+
 } // namespace planetgen

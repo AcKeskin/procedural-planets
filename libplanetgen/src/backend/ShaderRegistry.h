@@ -8,13 +8,14 @@
 namespace planetgen
 {
 
-// Stable ids for the four built-in compute programs
+// Stable ids for built-in compute programs
 enum class BuiltinProgram : int
 {
     Height = 0,
     ShadingEarth = 1,
     ShadingGeneric = 2,
     Erosion = 3,
+    ContinentGrowth = 4,
 };
 
 // Converts a BuiltinProgram id to its canonical string key
@@ -22,10 +23,11 @@ inline std::string BuiltinKey(BuiltinProgram id)
 {
     switch (id)
     {
-    case BuiltinProgram::Height:         return "__builtin_height";
-    case BuiltinProgram::ShadingEarth:   return "__builtin_shading_earth";
-    case BuiltinProgram::ShadingGeneric: return "__builtin_shading_generic";
-    case BuiltinProgram::Erosion:        return "__builtin_erosion";
+    case BuiltinProgram::Height:          return "__builtin_height";
+    case BuiltinProgram::ShadingEarth:    return "__builtin_shading_earth";
+    case BuiltinProgram::ShadingGeneric:  return "__builtin_shading_generic";
+    case BuiltinProgram::Erosion:         return "__builtin_erosion";
+    case BuiltinProgram::ContinentGrowth: return "__builtin_continent_growth";
     }
     return "";
 }
