@@ -34,7 +34,6 @@
 #include "cinematic/CaptureManager.h"
 #include "gui/CinematicPanel.h"
 #include "math/Camera.h"
-#include "generation/Planet.h"
 
 namespace planets::app
 {
@@ -76,8 +75,6 @@ private:
     void Render();
     void RenderGui();
 
-    void RegeneratePlanetCpu();
-    void RegeneratePlanetGpu();
     void RegenerateLodSystem();
     void ShuffleTerrain();
     void StartCinematic();
@@ -105,7 +102,6 @@ private:
     // Rendering pipeline
     render::Framebuffer _sceneFbo;
     render::PostProcessor _postProcessor;
-    render::Mesh _planetMesh;
     render::TerrainGenerator _terrainGenerator;
     render::GenerationScheduler _generationScheduler;
     render::lod::PlanetQuadTree _quadTree;
@@ -152,9 +148,6 @@ private:
     // Active celestial body
     std::unique_ptr<render::CelestialBody> _activeBody;
     int _selectedBodyType = 0; // GUI selector index
-
-    // CPU fallback
-    core::Planet _planet;
 
     // Frame state
     float _lastTime;

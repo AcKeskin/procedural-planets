@@ -1,6 +1,5 @@
 #include "Application.h"
 #include "GpuConstants.h"
-#include "MeshGenerator.h"
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -69,21 +68,8 @@ bool Application::Initialize()
     SyncEarthSettings(*earth);
     SwitchBody(std::move(earth));
 
-    // CPU fallback planet
-    core::PlanetSettings planetSettings;
-    planetSettings.radius = _lodConfig.planetRadius;
-    planetSettings.seaLevel = _seaLevel;
-    planetSettings.subdivisions = _genConfig.subdivisions;
-    planetSettings.seed = _genConfig.seed;
-    _planet.Configure(planetSettings);
-
-    // Initial generation
-    if (_lodConfig.enabled && _genConfig.useGpu)
-        RegenerateLodSystem();
-    else if (_genConfig.useGpu)
-        RegeneratePlanetGpu();
-    else
-        RegeneratePlanetCpu();
+    // Initial generation (LOD-only; GPU is a hard requirement, enforced in SwitchBody)
+    RegenerateLodSystem();
 
     _camera.SetPosition(glm::vec3(0.0f, 0.0f, _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier));
 
@@ -302,22 +288,15 @@ void Application::Render()
         _planetShader.SetInt("uPaletteSize", _biomePalette.GetEntryCount());
     }
 
-    if (_lodConfig.enabled && _genConfig.useGpu)
+    // Async LOD pipeline: process scheduler, apply results, then update + render
+    _generationScheduler.ProcessFrame(AppDefaults::SchedulerPatchesPerFrame, AppDefaults::SchedulerPatchesPerFrame);
+    _quadTree.ApplyCompletedPatches();
+    _quadTree.Update(_camera.GetPosition(), viewProjection);
+    _quadTree.Render(_planetShader);
+    if (_activeBody && _seaLevel > 0.0f)
     {
-        // Async pipeline: process scheduler, apply results, then update + render
-        _generationScheduler.ProcessFrame(AppDefaults::SchedulerPatchesPerFrame, AppDefaults::SchedulerPatchesPerFrame);
-        _quadTree.ApplyCompletedPatches();
-        _quadTree.Update(_camera.GetPosition(), viewProjection);
-        _quadTree.Render(_planetShader);
-        if (_activeBody && _seaLevel > 0.0f)
-        {
-            _oceanRenderer.Render(
-                view, projection, _camera.GetPosition(), _sceneSettings.lightDir, _lastTime, _oceanSettings);
-        }
-    }
-    else
-    {
-        _planetMesh.Draw();
+        _oceanRenderer.Render(
+            view, projection, _camera.GetPosition(), _sceneSettings.lightDir, _lastTime, _oceanSettings);
     }
 
     _sceneFbo.Unbind();
@@ -415,8 +394,8 @@ void Application::RenderGui()
         _terrainStats.vertexCount = 0;
 
         bool randomize = false;
-        bool needsRegen = _terrainPanel.Draw(
-            _genConfig, _terrainSettings, _lodConfig, _terrainStats, _planet, visibility.terrain, randomize);
+        bool needsRegen =
+            _terrainPanel.Draw(_genConfig, _terrainSettings, _lodConfig, _terrainStats, visibility.terrain, randomize);
 
         if (randomize)
         {
@@ -428,13 +407,6 @@ void Application::RenderGui()
                                              _oceanSettings,
                                              _genConfig.seed);
             needsRegen = true;
-        }
-
-        // Sync CPU planet settings back to generation config
-        if (!_genConfig.useGpu)
-        {
-            _genConfig.subdivisions = _planet.GetSettings().subdivisions;
-            _genConfig.seed = _planet.GetSettings().seed;
         }
 
         needsRegen |= _surfacePanel.Draw(_activeBody.get(),
@@ -455,14 +427,7 @@ void Application::RenderGui()
             StartCinematic();
 
         if (needsRegen)
-        {
-            if (_lodConfig.enabled && _genConfig.useGpu)
-                RegenerateLodSystem();
-            else if (_genConfig.useGpu)
-                RegeneratePlanetGpu();
-            else
-                RegeneratePlanetCpu();
-        }
+            RegenerateLodSystem();
     }
 
     _guiManager.EndFrame();
@@ -491,9 +456,17 @@ void Application::SwitchBody(std::unique_ptr<render::CelestialBody> newBody)
     std::string erosionPath = _activeBody->GetErosionShaderPath();
     if (erosionPath.empty())
         erosionPath = "shaders/compute/erosion_earth.comp"; // Fallback for bodies without erosion
-    _genConfig.useGpu = _terrainGenerator.Initialize(
+
+    // GPU compute is a hard requirement now (LOD-only, no CPU fallback).
+    bool gpuReady = _terrainGenerator.Initialize(
         _activeBody->GetHeightShaderPath(), _activeBody->GetShadingShaderPath(), erosionPath);
-    _terrainStats.gpuAvailable = _genConfig.useGpu;
+    if (!gpuReady)
+    {
+        std::cerr << "[SwitchBody] FATAL: GPU terrain generator failed to initialize for "
+                  << _activeBody->GetTypeName() << " — aborting." << std::endl;
+        std::abort();
+    }
+    _terrainStats.gpuAvailable = true;
 
     // Load palette
     _biomePalette = _activeBody->LoadBiomePalette();
@@ -507,19 +480,9 @@ void Application::SwitchBody(std::unique_ptr<render::CelestialBody> newBody)
     // Toggle atmosphere based on body type
     _atmosphereSettings.enabled = _activeBody->HasAtmosphere();
 
-    // Initialize scheduler and regenerate
-    if (_genConfig.useGpu)
-    {
-        _generationScheduler.Initialize(_terrainGenerator, *_activeBody, _genConfig.seed);
-        if (_lodConfig.enabled)
-            RegenerateLodSystem();
-        else
-            RegeneratePlanetGpu();
-    }
-    else
-    {
-        RegeneratePlanetCpu();
-    }
+    // Initialize scheduler and regenerate (LOD-only)
+    _generationScheduler.Initialize(_terrainGenerator, *_activeBody, _genConfig.seed);
+    RegenerateLodSystem();
 
     // Reposition camera for new body size
     float camDist = _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier;
@@ -542,12 +505,7 @@ void Application::ShuffleTerrain()
                                      _oceanSettings,
                                      _genConfig.seed);
 
-    if (_lodConfig.enabled && _genConfig.useGpu)
-        RegenerateLodSystem();
-    else if (_genConfig.useGpu)
-        RegeneratePlanetGpu();
-    else
-        RegeneratePlanetCpu();
+    RegenerateLodSystem();
 }
 
 void Application::StartCinematic()
@@ -563,60 +521,6 @@ void Application::StopCinematic()
     _cinematicController.Stop();
     _guiVisible = true;
     _camera.SetMode(core::CameraMode::FreeFly);
-}
-
-void Application::RegeneratePlanetCpu()
-{
-    auto start = std::chrono::high_resolution_clock::now();
-
-    core::PlanetSettings planetSettings;
-    planetSettings.subdivisions = _genConfig.subdivisions;
-    planetSettings.seed = _genConfig.seed;
-    _planet.Configure(planetSettings);
-    _planet.Reseed(_genConfig.seed);
-
-    auto meshData = render::MeshGenerator::GeneratePlanetMesh(_planet, _genConfig.subdivisions);
-    _planetMesh.Upload(meshData);
-
-    auto end = std::chrono::high_resolution_clock::now();
-    _terrainStats.cpuTimeMs = std::chrono::duration<float, std::milli>(end - start).count();
-
-    std::cout << "[Planet] CPU generated " << _planetMesh.GetVertexCount() << " vertices in " << _terrainStats.cpuTimeMs
-              << " ms" << std::endl;
-}
-
-void Application::RegeneratePlanetGpu()
-{
-    if (!_terrainGenerator.IsReady())
-    {
-        RegeneratePlanetCpu();
-        return;
-    }
-
-    auto start = std::chrono::high_resolution_clock::now();
-
-    auto vertices = render::MeshGenerator::GetIcosphereVertices(_genConfig.subdivisions);
-    auto heights = _terrainGenerator.GenerateHeights(vertices, _genConfig.seed, _terrainSettings);
-
-    render::MeshData meshData;
-    if (_terrainGenerator.IsShadingReady())
-    {
-        auto shadingData = _terrainGenerator.GenerateShadingData(vertices, _genConfig.seed, _shadingSettings);
-        meshData = render::MeshGenerator::GeneratePlanetMesh(
-            _genConfig.subdivisions, _lodConfig.planetRadius, heights, shadingData);
-    }
-    else
-    {
-        meshData = render::MeshGenerator::GeneratePlanetMesh(_genConfig.subdivisions, _lodConfig.planetRadius, heights);
-    }
-
-    _planetMesh.Upload(meshData);
-
-    auto end = std::chrono::high_resolution_clock::now();
-    _terrainStats.gpuTimeMs = std::chrono::duration<float, std::milli>(end - start).count();
-
-    std::cout << "[Planet] GPU generated " << _planetMesh.GetVertexCount() << " vertices in " << _terrainStats.gpuTimeMs
-              << " ms" << std::endl;
 }
 
 void Application::RegenerateLodSystem()

@@ -2,11 +2,6 @@
 
 #include <cstdint>
 
-namespace planets::core
-{
-class Planet;
-}
-
 namespace planets::render
 {
 
@@ -23,7 +18,6 @@ public:
               EarthTerrainSettings& terrain,
               LodConfig& lod,
               const TerrainStats& stats,
-              planets::core::Planet& planet,
               bool& visible,
               bool& randomizeRequested);
 
@@ -33,7 +27,6 @@ private:
                                  uint32_t& seed,
                                  int& subdivisions,
                                  bool& randomizeRequested);
-    bool DrawPlanetContent(planets::core::Planet& planet);
     bool DrawLodContent(LodConfig& lod, const TerrainStats& stats);
 };
 

@@ -12,7 +12,6 @@ add_library(render STATIC
     gui/CinematicPanel.cpp
     Renderer.cpp
     Mesh.cpp
-    MeshGenerator.cpp
     TerrainGenerator.cpp
     GlFence.cpp
     GenerationScheduler.cpp
