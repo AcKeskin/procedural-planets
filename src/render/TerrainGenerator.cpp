@@ -1,5 +1,6 @@
 #include "TerrainGenerator.h"
 #include "GpuConstants.h"
+#include "backend/ParamMappers.h"
 #include <iostream>
 
 namespace planets::render
@@ -7,9 +8,6 @@ namespace planets::render
 
 namespace
 {
-const glm::vec3 ContinentNoiseOffset(0.0f);
-const glm::vec3 MountainNoiseOffset(1000.0f);
-const glm::vec3 MaskNoiseOffset(2000.0f);
 constexpr float DefaultMaskMultiplier = 1.0f;
 constexpr float FallbackHeightScale = 0.04f;
 } // namespace
@@ -291,6 +289,9 @@ std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3
     return heights;
 }
 
+// Legacy overload — no callers remain outside this file. Still sets loose uniforms
+// (all no-ops now that the shader uses a std140 UBO). Retained for ABI stability;
+// delete with the ComputeNoiseParams struct when the next cleanup lands.
 std::vector<float> TerrainGenerator::GenerateHeights(const std::vector<glm::vec3>& vertices,
                                                      uint32_t seed,
                                                      const ComputeNoiseParams& continentParams,
@@ -472,106 +473,10 @@ std::vector<glm::vec4> TerrainGenerator::GenerateShadingData(const std::vector<g
 
 void TerrainGenerator::SetHeightUniforms(uint32_t seed, size_t vertexCount, const EarthTerrainSettings& settings)
 {
-    ComputeNoiseParams continentParams;
-    continentParams.offset = ContinentNoiseOffset;
-    continentParams.numLayers = settings.continentOctaves;
-    continentParams.scale = settings.continentScale;
-    continentParams.persistence = settings.continentPersistence;
-    continentParams.lacunarity = settings.continentLacunarity;
-    continentParams.multiplier = settings.continentStrength;
-
-    ComputeNoiseParams mountainParams;
-    mountainParams.offset = MountainNoiseOffset;
-    mountainParams.numLayers = settings.mountainOctaves;
-    mountainParams.scale = settings.mountainScale;
-    mountainParams.persistence = settings.mountainPersistence;
-    mountainParams.lacunarity = settings.mountainLacunarity;
-    mountainParams.multiplier = settings.mountainStrength;
-    mountainParams.power = settings.mountainPower;
-    mountainParams.gain = settings.mountainGain;
-    mountainParams.smoothOffset = settings.mountainSmoothing;
-
-    ComputeNoiseParams maskParams;
-    maskParams.offset = MaskNoiseOffset;
-    maskParams.numLayers = settings.maskOctaves;
-    maskParams.scale = settings.maskScale;
-    maskParams.persistence = settings.maskPersistence;
-    maskParams.lacunarity = settings.maskLacunarity;
-    maskParams.multiplier = DefaultMaskMultiplier;
-
     _computeShader.Use();
-    _computeShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
-    _computeShader.SetUint("seed", seed);
-
-    _computeShader.SetVec3("continentOffset", continentParams.offset);
-    _computeShader.SetInt("continentLayers", continentParams.numLayers);
-    _computeShader.SetFloat("continentScale", continentParams.scale);
-    _computeShader.SetFloat("continentPersistence", continentParams.persistence);
-    _computeShader.SetFloat("continentLacunarity", continentParams.lacunarity);
-    _computeShader.SetFloat("continentMultiplier", continentParams.multiplier);
-
-    _computeShader.SetVec3("mountainOffset", mountainParams.offset);
-    _computeShader.SetInt("mountainLayers", mountainParams.numLayers);
-    _computeShader.SetFloat("mountainScale", mountainParams.scale);
-    _computeShader.SetFloat("mountainPersistence", mountainParams.persistence);
-    _computeShader.SetFloat("mountainLacunarity", mountainParams.lacunarity);
-    _computeShader.SetFloat("mountainMultiplier", mountainParams.multiplier);
-    _computeShader.SetFloat("mountainPower", mountainParams.power);
-    _computeShader.SetFloat("mountainGain", mountainParams.gain);
-    _computeShader.SetFloat("mountainSmooth", mountainParams.smoothOffset);
-
-    _computeShader.SetVec3("maskOffset", maskParams.offset);
-    _computeShader.SetInt("maskLayers", maskParams.numLayers);
-    _computeShader.SetFloat("maskScale", maskParams.scale);
-    _computeShader.SetFloat("maskPersistence", maskParams.persistence);
-    _computeShader.SetFloat("maskLacunarity", maskParams.lacunarity);
-    _computeShader.SetFloat("maskMultiplier", maskParams.multiplier);
-
-    _computeShader.SetFloat("oceanDepthMultiplier", settings.oceanDepthMultiplier);
-    _computeShader.SetFloat("oceanFloorDepth", settings.oceanFloorDepth);
-    _computeShader.SetFloat("oceanFloorSmoothing", settings.oceanFloorSmoothing);
-    _computeShader.SetFloat("mountainBlend", settings.mountainBlend);
-    _computeShader.SetFloat("heightScale", settings.heightScale);
-    _computeShader.SetFloat("continentBaseLevel", settings.continentBaseLevel);
-
-    // Tectonic plate uniforms
-    _computeShader.SetInt("useTectonics", settings.useTectonics ? 1 : 0);
-    _computeShader.SetInt("numPlates", settings.numPlates);
-    _computeShader.SetFloat("continentalFraction", settings.continentalFraction);
-    _computeShader.SetFloat("boundaryWidth", settings.boundaryWidth);
-    _computeShader.SetFloat("convergentMountainScale", settings.convergentMountainScale);
-    _computeShader.SetFloat("divergentRiftDepth", settings.divergentRiftDepth);
-    _computeShader.SetFloat("coastlineNoise", settings.coastlineNoise);
-    _computeShader.SetFloat("plateElevationNoise", settings.plateElevationNoise);
-
-    _computeShader.SetFloat("detailLowThreshold", settings.detailLowThreshold);
-    _computeShader.SetFloat("detailHighThreshold", settings.detailHighThreshold);
-    _computeShader.SetFloat("perturbStrengthLow", settings.perturbStrengthLow);
-    _computeShader.SetFloat("perturbStrengthHigh", settings.perturbStrengthHigh);
-    _computeShader.SetInt("detailOctavesLow", settings.detailOctavesLow);
-    _computeShader.SetInt("detailOctavesHigh", settings.detailOctavesHigh);
-    _computeShader.SetFloat("detailPersistence", settings.detailPersistence);
-    _computeShader.SetFloat("detailLacunarity", settings.detailLacunarity);
-    _computeShader.SetFloat("perturbScale", settings.perturbScale);
-    _computeShader.SetFloat("globalFrequency", settings.globalFrequency);
-
-    // Ocean floor topology uniforms
-    _computeShader.SetInt("useOceanFloor", settings.useOceanFloor ? 1 : 0);
-    _computeShader.SetFloat("shelfWidth", settings.shelfWidth);
-    _computeShader.SetInt("oceanRidgeOctaves", settings.oceanRidgeOctaves);
-    _computeShader.SetFloat("oceanRidgeScale", settings.oceanRidgeScale);
-    _computeShader.SetFloat("oceanRidgeStrength", settings.oceanRidgeStrength);
-    _computeShader.SetFloat("oceanRidgePower", settings.oceanRidgePower);
-    _computeShader.SetFloat("oceanRidgeGain", settings.oceanRidgeGain);
-    _computeShader.SetInt("trenchOctaves", settings.trenchOctaves);
-    _computeShader.SetFloat("trenchScale", settings.trenchScale);
-    _computeShader.SetFloat("trenchDepth", settings.trenchDepth);
-    _computeShader.SetInt("abyssalOctaves", settings.abyssalOctaves);
-    _computeShader.SetFloat("abyssalScale", settings.abyssalScale);
-    _computeShader.SetFloat("abyssalStrength", settings.abyssalStrength);
-
-    // Finite-difference epsilon for analytical normal computation
-    _computeShader.SetFloat("normalEpsilon", settings.normalEpsilon);
+    PgBodyDesc desc = ToPgBodyDesc(settings);
+    auto p = planetgen::MakeHeightParams(desc, seed, static_cast<uint32_t>(vertexCount));
+    _computeShader.SetParamBlock(&p, sizeof(p), 3); // binding = 3 per height_earth.comp
 }
 
 void TerrainGenerator::SetShadingUniforms(uint32_t seed,
@@ -580,25 +485,17 @@ void TerrainGenerator::SetShadingUniforms(uint32_t seed,
                                           float heightScale)
 {
     _shadingShader.Use();
-    _shadingShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
-    _shadingShader.SetUint("seed", seed);
-
-    _shadingShader.SetFloat("largeNoiseScale", settings.largeNoiseScale);
-    _shadingShader.SetInt("largeNoiseOctaves", settings.largeNoiseOctaves);
-    _shadingShader.SetFloat("detailNoiseScale", settings.detailNoiseScale);
-    _shadingShader.SetFloat("smallNoiseScale", settings.smallNoiseScale);
-    _shadingShader.SetInt("smallNoiseOctaves", settings.smallNoiseOctaves);
-    _shadingShader.SetFloat("warpStrength", settings.warpStrength);
-
-    // Climate model uniforms
-    _shadingShader.SetInt("useClimateModel", settings.useClimateModel ? 1 : 0);
-    _shadingShader.SetFloat("temperatureLapseRate", settings.temperatureLapseRate);
-    _shadingShader.SetFloat("temperatureExponent", settings.temperatureExponent);
-    _shadingShader.SetFloat("moistureNoiseScale", settings.moistureNoiseScale);
-    _shadingShader.SetFloat("moistureNoiseStrength", settings.moistureNoiseStrength);
-    _shadingShader.SetFloat("hadleyIntensity", settings.hadleyIntensity);
-    _shadingShader.SetFloat("continentalityStrength", settings.continentalityStrength);
-    _shadingShader.SetFloat("heightScale", heightScale);
+    PgShadingDesc desc = ToPgShadingDesc(settings, heightScale);
+    if (desc.use_climate_model)
+    {
+        auto p = planetgen::MakeShadingEarthParams(desc, seed, static_cast<uint32_t>(vertexCount));
+        _shadingShader.SetParamBlock(&p, sizeof(p), 3); // binding = 3 per shading_earth.comp
+    }
+    else
+    {
+        auto p = planetgen::MakeShadingGenericParams(desc, seed, static_cast<uint32_t>(vertexCount));
+        _shadingShader.SetParamBlock(&p, sizeof(p), 3); // binding = 3 per shading_generic.comp
+    }
 }
 
 // ============================================================================
@@ -616,8 +513,8 @@ void TerrainGenerator::DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
     heightBuffer.Bind(1);
     normalBuffer.Bind(2);
 
-    body.SetShapeUniforms(_computeShader, seed);
-    _computeShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
+    // vertexCount goes into the UBO's numVertices field — SetShapeUniforms handles it
+    body.SetShapeUniforms(_computeShader, seed, static_cast<uint32_t>(vertexCount));
 
     unsigned int groupCount = (static_cast<unsigned int>(vertexCount) + HeightWorkgroupSize - 1) / HeightWorkgroupSize;
     _computeShader.Dispatch(groupCount);
@@ -634,8 +531,8 @@ void TerrainGenerator::DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
     shadingBuffer.Bind(1);
     heightBuffer.Bind(2);
 
-    body.SetShadingUniforms(_shadingShader, seed);
-    _shadingShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
+    // vertexCount goes into the UBO's numVertices field — SetShadingUniforms handles it
+    body.SetShadingUniforms(_shadingShader, seed, static_cast<uint32_t>(vertexCount));
 
     unsigned int groupCount =
         (static_cast<unsigned int>(vertexCount) + ShadingWorkgroupSize - 1) / ShadingWorkgroupSize;
@@ -681,13 +578,15 @@ void TerrainGenerator::DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
 void TerrainGenerator::SetErosionUniforms(size_t vertexCount, int gridResolution, const EarthTerrainSettings& settings)
 {
     _erosionShader.Use();
-    _erosionShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
-    _erosionShader.SetInt("gridResolution", gridResolution);
-    _erosionShader.SetFloat("thermalRate", settings.thermalErosionRate);
-    _erosionShader.SetFloat("thermalThreshold", settings.thermalThreshold);
-    _erosionShader.SetFloat("hydraulicRate", settings.hydraulicErosionRate);
-    _erosionShader.SetFloat("depositionRate", settings.depositionRate);
-    _erosionShader.SetFloat("evaporationRate", settings.evaporationRate);
+    PgErosionDesc desc{};
+    desc.grid_resolution  = gridResolution;
+    desc.thermal_rate     = settings.thermalErosionRate;
+    desc.thermal_threshold = settings.thermalThreshold;
+    desc.hydraulic_rate   = settings.hydraulicErosionRate;
+    desc.deposition_rate  = settings.depositionRate;
+    desc.evaporation_rate = settings.evaporationRate;
+    auto p = planetgen::MakeErosionParams(desc, static_cast<uint32_t>(vertexCount));
+    _erosionShader.SetParamBlock(&p, sizeof(p), 3); // binding = 3 per erosion_earth.comp
 }
 
 void TerrainGenerator::DispatchErosionAsync(GpuBuffer<float>& inputBuffer,
@@ -699,7 +598,7 @@ void TerrainGenerator::DispatchErosionAsync(GpuBuffer<float>& inputBuffer,
     inputBuffer.Bind(0);
     outputBuffer.Bind(1);
 
-    body.SetErosionUniforms(_erosionShader, vertexCount, gridResolution);
+    body.SetErosionUniforms(_erosionShader, static_cast<uint32_t>(vertexCount), gridResolution);
 
     unsigned int groupCount =
         (static_cast<unsigned int>(vertexCount) + ErosionWorkgroupSize - 1) / ErosionWorkgroupSize;

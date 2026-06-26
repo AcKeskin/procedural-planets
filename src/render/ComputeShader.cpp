@@ -13,21 +13,24 @@ namespace planets::render
 
 ComputeShader::ComputeShader()
     : _program(0)
+    , _ubo(0)
 {
 }
 
 ComputeShader::~ComputeShader()
 {
     if (_program)
-    {
         glDeleteProgram(_program);
-    }
+    if (_ubo)
+        glDeleteBuffers(1, &_ubo);
 }
 
 ComputeShader::ComputeShader(ComputeShader&& other) noexcept
     : _program(other._program)
+    , _ubo(other._ubo)
 {
     other._program = 0;
+    other._ubo     = 0;
 }
 
 ComputeShader& ComputeShader::operator=(ComputeShader&& other) noexcept
@@ -35,11 +38,13 @@ ComputeShader& ComputeShader::operator=(ComputeShader&& other) noexcept
     if (this != &other)
     {
         if (_program)
-        {
             glDeleteProgram(_program);
-        }
+        if (_ubo)
+            glDeleteBuffers(1, &_ubo);
         _program = other._program;
+        _ubo     = other._ubo;
         other._program = 0;
+        other._ubo     = 0;
     }
     return *this;
 }
@@ -139,6 +144,17 @@ void ComputeShader::SetVec4(const std::string& name, const glm::vec4& value) con
 void ComputeShader::SetVec4Array(const std::string& name, const glm::vec4* values, int count) const
 {
     glUniform4fv(glGetUniformLocation(_program, name.c_str()), count, glm::value_ptr(values[0]));
+}
+
+void ComputeShader::SetParamBlock(const void* data, std::size_t sizeBytes, unsigned int binding)
+{
+    if (!_ubo)
+        glGenBuffers(1, &_ubo);
+
+    glBindBuffer(GL_UNIFORM_BUFFER, _ubo);
+    glBufferData(GL_UNIFORM_BUFFER, static_cast<GLsizeiptr>(sizeBytes), data, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_UNIFORM_BUFFER, binding, _ubo);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
 std::string ComputeShader::LoadFile(const std::string& path)

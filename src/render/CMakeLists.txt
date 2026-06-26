@@ -28,11 +28,12 @@ add_library(render STATIC
     effects/AtmosphereRenderer.cpp
     cinematic/CinematicController.cpp
     cinematic/CaptureManager.cpp
-    # Model sources compiled directly (DLL boundary: symbols not exported via PG_API)
+    # Model and backend sources compiled directly (DLL boundary: symbols not exported via PG_API)
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfig.cpp
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfigProjection.cpp
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfigJson.cpp
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/PaletteRegistry.cpp
+    ${CMAKE_SOURCE_DIR}/libplanetgen/src/backend/ParamMappers.cpp
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/imgui_draw.cpp

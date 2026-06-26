@@ -35,6 +35,7 @@ add_custom_target(planetgen_embed_shaders DEPENDS "${EMBEDDED_SHADER_OUTPUT}")
 
 set(PLANETGEN_SOURCES
     src/api/planetgen_api.cpp
+    src/backend/ParamMappers.cpp
     src/backend/ShaderRegistry.cpp
     src/backend/opengl/GlDevice.cpp
     src/backend/opengl/WindowedGLBackend.cpp
@@ -51,6 +52,7 @@ set(PLANETGEN_HEADERS
     src/api/InternalTypes.h
     src/backend/IComputeBackend.h
     src/backend/ParamBlocks.h
+    src/backend/ParamMappers.h
     src/backend/ShaderRegistry.h
     src/backend/opengl/GlDevice.h
     src/backend/opengl/WindowedGLBackend.h

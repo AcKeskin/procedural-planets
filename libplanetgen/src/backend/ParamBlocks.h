@@ -18,7 +18,7 @@ namespace planetgen
 {
 
 // ============================================================================
-// HeightParams — binding = 0 in height_earth.comp
+// HeightParams — binding = 3 in height_earth.comp
 // ============================================================================
 struct alignas(16) HeightParams
 {
@@ -140,7 +140,7 @@ static_assert(offsetof(HeightParams, maskOffsetX) == 11 * 16,
               "HeightParams maskOffset must start at row 11");
 
 // ============================================================================
-// ShadingEarthParams — binding = 0 in shading_earth.comp
+// ShadingEarthParams — binding = 3 in shading_earth.comp
 // ============================================================================
 struct alignas(16) ShadingEarthParams
 {
@@ -172,7 +172,7 @@ struct alignas(16) ShadingEarthParams
 static_assert(sizeof(ShadingEarthParams) == 4 * 16, "ShadingEarthParams std140 layout mismatch");
 
 // ============================================================================
-// ShadingGenericParams — binding = 0 in shading_generic.comp
+// ShadingGenericParams — binding = 3 in shading_generic.comp
 // ============================================================================
 struct alignas(16) ShadingGenericParams
 {
@@ -192,7 +192,7 @@ struct alignas(16) ShadingGenericParams
 static_assert(sizeof(ShadingGenericParams) == 2 * 16, "ShadingGenericParams std140 layout mismatch");
 
 // ============================================================================
-// ErosionParams — binding = 0 in erosion_earth.comp
+// ErosionParams — binding = 3 in erosion_earth.comp
 // ============================================================================
 struct alignas(16) ErosionParams
 {

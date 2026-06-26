@@ -12,6 +12,7 @@
 #include <planetgen/planetgen.h>
 #include "model/BodyConfig.h"
 #include "model/PaletteRegistry.h"
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -44,14 +45,15 @@ public:
     void SetContinentMaskTexture(uint32_t textureId) { _continentMaskTexId = textureId; }
     uint32_t GetContinentMaskTexture() const { return _continentMaskTexId; }
 
-    // Uniform binding — mirrors the old SetShapeUniforms/SetShadingUniforms/SetRenderUniforms
-    void SetShapeUniforms(ComputeShader& shader, uint32_t seed) const;
-    void SetShadingUniforms(ComputeShader& shader, uint32_t seed) const;
+    // Uniform binding — uploads a std140 UBO block for each compute stage.
+    // vertexCount is packed into the UBO's numVertices field.
+    void SetShapeUniforms(ComputeShader& shader, uint32_t seed, uint32_t vertexCount) const;
+    void SetShadingUniforms(ComputeShader& shader, uint32_t seed, uint32_t vertexCount) const;
     void SetRenderUniforms(Shader& shader) const;
 
     // Erosion
     bool SupportsErosion() const { return _config.erosion.enabled; }
-    void SetErosionUniforms(ComputeShader& shader, size_t vertexCount, int gridResolution) const;
+    void SetErosionUniforms(ComputeShader& shader, uint32_t vertexCount, int gridResolution) const;
     int  GetErosionIterations() const { return _config.erosion.enabled ? _config.erosion.iterations : 0; }
 
     // Metadata
