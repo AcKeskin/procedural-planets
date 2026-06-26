@@ -10,30 +10,30 @@
         "thermalThreshold": 0.01
     },
     "heightDetail": {
-        "detailHighThreshold": 1.0,
-        "detailLacunarity": 2.0,
-        "detailLowThreshold": 0.0,
-        "detailOctavesHigh": 0,
-        "detailOctavesLow": 0,
-        "detailPersistence": 0.5,
-        "perturbScale": 1.0,
-        "perturbStrengthHigh": 0.0,
-        "perturbStrengthLow": 0.0
+        "detailHighThreshold": 0.3,
+        "detailLacunarity": 2.2,
+        "detailLowThreshold": -0.1,
+        "detailOctavesHigh": 5,
+        "detailOctavesLow": 2,
+        "detailPersistence": 0.45,
+        "perturbScale": 20.0,
+        "perturbStrengthHigh": 0.004,
+        "perturbStrengthLow": 0.001
     },
     "metadata": {
-        "atmosphereHeight": 0.0,
-        "hasAtmosphere": false,
+        "atmosphereHeight": 0.08,
+        "hasAtmosphere": true,
         "hasSolidSurface": true,
-        "name": "Crystalline World",
-        "radius": 12.0,
-        "seaLevel": 0.0,
-        "typeName": "generic"
+        "name": "Earth",
+        "radius": 10.0,
+        "seaLevel": 0.995,
+        "typeName": "earth"
     },
     "oceanFloor": {
         "abyssalOctaves": 4,
         "abyssalScale": 2.0,
         "abyssalStrength": 0.1,
-        "enabled": false,
+        "enabled": true,
         "oceanRidgeGain": 0.8,
         "oceanRidgeOctaves": 4,
         "oceanRidgePower": 2.0,
@@ -45,18 +45,18 @@
         "trenchScale": 1.5
     },
     "paletteRef": {
-        "paletteId": "crystalline"
+        "paletteId": "earth"
     },
     "shaderPaths": {
         "erosion": "shaders/compute/erosion_earth.comp",
-        "fragment": "shaders/generic/planet_generic.frag",
+        "fragment": "shaders/earth/planet_earth.frag",
         "height": "shaders/compute/height_earth.comp",
-        "shading": "shaders/compute/shading_generic.comp",
-        "vertex": "shaders/generic/planet_generic.vert"
+        "shading": "shaders/compute/shading_earth.comp",
+        "vertex": "shaders/earth/planet_earth.vert"
     },
     "shading": {
         "aoStrength": 0.35,
-        "biomesEnabled": false,
+        "biomesEnabled": true,
         "coastalDepthRange": 0.04,
         "colorFlatHighA": [0.20, 0.40, 0.18],
         "colorFlatHighB": [0.10, 0.28, 0.12],
@@ -68,38 +68,38 @@
         "colorSteepHigh": [0.30, 0.28, 0.26],
         "colorSteepLow": [0.40, 0.38, 0.35],
         "continentalityStrength": 0.3,
-        "detailNoiseScale": 3.0,
+        "detailNoiseScale": 2.0,
         "flatColBlend": 1.5,
         "flatColBlendNoise": 0.3,
         "flatToSteepBlend": 0.15,
         "hadleyIntensity": 1.0,
-        "largeNoiseScale": 0.3,
         "largeNoiseOctaves": 3,
+        "largeNoiseScale": 0.3,
         "moistureNoiseScale": 1.5,
         "moistureNoiseStrength": 0.15,
         "shoreHeight": 0.08,
         "smallNoiseOctaves": 5,
-        "smallNoiseScale": 25.0,
+        "smallNoiseScale": 15.0,
         "snowBlend": 0.1,
         "snowLatitude": 0.8,
         "snowLine": 0.85,
         "steepnessThreshold": 0.3,
         "temperatureExponent": 0.6,
         "temperatureLapseRate": 2.0,
-        "useClimateModel": false,
-        "warpStrength": 0.2
+        "useClimateModel": true,
+        "warpStrength": 0.3
     },
     "shape": {
-        "continentBaseLevel": 0.0,
+        "continentBaseLevel": -0.35,
         "continentNoise": {
-            "lacunarity": 2.5,
-            "octaves": 3,
-            "persistence": 0.4,
+            "lacunarity": 2.0,
+            "octaves": 6,
+            "persistence": 0.5,
             "scale": 0.8,
-            "strength": 0.6
+            "strength": 2.0
         },
         "globalFrequency": 1.0,
-        "heightScale": 0.08,
+        "heightScale": 0.04,
         "maskNoise": {
             "lacunarity": 1.66,
             "octaves": 3,
@@ -107,20 +107,20 @@
             "scale": 1.09,
             "strength": 1.0
         },
-        "mountainBlend": 0.4,
-        "mountainGain": 1.0,
+        "mountainBlend": 1.16,
+        "mountainGain": 0.8,
         "mountainNoise": {
-            "lacunarity": 2.8,
-            "octaves": 4,
-            "persistence": 0.45,
-            "scale": 5.0,
-            "strength": 1.5
+            "lacunarity": 4.0,
+            "octaves": 5,
+            "persistence": 0.5,
+            "scale": 1.5,
+            "strength": 0.87
         },
-        "mountainPower": 1.0,
+        "mountainPower": 2.18,
         "mountainSmoothing": 1.0,
         "normalEpsilon": 0.0001,
-        "oceanDepthMultiplier": 0.0,
-        "oceanFloorDepth": 0.0,
+        "oceanDepthMultiplier": 5.0,
+        "oceanFloorDepth": 1.36,
         "oceanFloorSmoothing": 0.5
     },
     "tectonics": {
@@ -129,7 +129,7 @@
         "continentalFraction": 0.45,
         "convergentMountainScale": 0.6,
         "divergentRiftDepth": 0.3,
-        "enabled": false,
+        "enabled": true,
         "numPlates": 12,
         "plateElevationNoise": 0.2
     }

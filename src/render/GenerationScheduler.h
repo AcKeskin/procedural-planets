@@ -3,10 +3,8 @@
 #include "GlFence.h"
 #include "GpuBuffer.h"
 #include "TerrainGenerator.h"
-#include "CelestialBody.h"
+#include "BodyRuntime.h"
 #include "lod/SpherePatch.h"
-#include "settings/TerrainSettings.h"
-#include "settings/SurfaceSettings.h"
 #include <glm/glm.hpp>
 #include <vector>
 #include <memory>
@@ -70,10 +68,10 @@ public:
     GenerationScheduler(const GenerationScheduler&) = delete;
     GenerationScheduler& operator=(const GenerationScheduler&) = delete;
 
-    void Initialize(TerrainGenerator& terrainGen, const CelestialBody& body, uint32_t seed);
+    void Initialize(TerrainGenerator& terrainGen, const BodyRuntime& body, uint32_t seed);
 
     // Update body reference without full reinit (e.g. parameter slider change)
-    void SetBody(const CelestialBody& body, uint32_t seed);
+    void SetBody(const BodyRuntime& body, uint32_t seed);
 
     void Enqueue(GenerationRequest request);
 
@@ -99,7 +97,7 @@ private:
     std::vector<CompletedGeneration> _completed;
 
     TerrainGenerator* _terrainGen = nullptr;
-    const CelestialBody* _body = nullptr;
+    const BodyRuntime* _body = nullptr;
     uint32_t _seed = 0;
 };
 

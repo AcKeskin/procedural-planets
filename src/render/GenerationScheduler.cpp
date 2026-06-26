@@ -6,7 +6,7 @@
 namespace planets::render
 {
 
-void GenerationScheduler::Initialize(TerrainGenerator& terrainGen, const CelestialBody& body, uint32_t seed)
+void GenerationScheduler::Initialize(TerrainGenerator& terrainGen, const BodyRuntime& body, uint32_t seed)
 {
     CancelAll();
     _terrainGen = &terrainGen;
@@ -14,7 +14,7 @@ void GenerationScheduler::Initialize(TerrainGenerator& terrainGen, const Celesti
     _seed = seed;
 }
 
-void GenerationScheduler::SetBody(const CelestialBody& body, uint32_t seed)
+void GenerationScheduler::SetBody(const BodyRuntime& body, uint32_t seed)
 {
     _body = &body;
     _seed = seed;
@@ -68,7 +68,7 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
     const auto& unitVertices = task.request.patch->GetUnitSphereVertices();
     task.vertexCount = unitVertices.size();
 
-    // Pack vertices as flat float array (same layout as synchronous path)
+    // Pack vertices as flat float array
     std::vector<float> packedVertices;
     packedVertices.reserve(task.vertexCount * 3);
     for (const auto& v : unitVertices)
@@ -82,7 +82,7 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
     task.heightBuffer.Allocate(task.vertexCount);
     task.normalBuffer.Allocate(task.vertexCount * 3);
 
-    // Dispatch height compute (also computes analytical normals)
+    // Dispatch height compute — body sets its own uniforms
     _terrainGen->DispatchHeightsAsync(
         task.vertexBuffer, task.heightBuffer, task.normalBuffer, task.vertexCount, *_body, _seed);
 

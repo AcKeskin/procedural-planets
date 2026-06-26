@@ -609,14 +609,13 @@ void TerrainGenerator::DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
                                             GpuBuffer<float>& heightBuffer,
                                             GpuBuffer<float>& normalBuffer,
                                             size_t vertexCount,
-                                            const CelestialBody& body,
+                                            const BodyRuntime& body,
                                             uint32_t seed)
 {
     vertexBuffer.Bind(0);
     heightBuffer.Bind(1);
     normalBuffer.Bind(2);
 
-    // Body type sets its own uniforms
     body.SetShapeUniforms(_computeShader, seed);
     _computeShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
 
@@ -628,14 +627,13 @@ void TerrainGenerator::DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
                                             GpuBuffer<glm::vec4>& shadingBuffer,
                                             GpuBuffer<float>& heightBuffer,
                                             size_t vertexCount,
-                                            const CelestialBody& body,
+                                            const BodyRuntime& body,
                                             uint32_t seed)
 {
     vertexBuffer.Bind(0);
     shadingBuffer.Bind(1);
     heightBuffer.Bind(2);
 
-    // Body type sets its own uniforms
     body.SetShadingUniforms(_shadingShader, seed);
     _shadingShader.SetUint("numVertices", static_cast<unsigned int>(vertexCount));
 
@@ -696,7 +694,7 @@ void TerrainGenerator::DispatchErosionAsync(GpuBuffer<float>& inputBuffer,
                                             GpuBuffer<float>& outputBuffer,
                                             size_t vertexCount,
                                             int gridResolution,
-                                            const CelestialBody& body)
+                                            const BodyRuntime& body)
 {
     inputBuffer.Bind(0);
     outputBuffer.Bind(1);

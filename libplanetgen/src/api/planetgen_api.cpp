@@ -4,6 +4,8 @@
 #include "../backend/opengl/HeadlessGLBackend.h"
 #include "../backend/ParamBlocks.h"
 #include "EmbeddedShaders.h"
+#include "../model/BodyConfig.h"
+#include "../model/BodyConfigProjection.h"
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -579,114 +581,24 @@ void pg_result_destroy(PgResult result)
 // Utility — default descriptors
 // ============================================================================
 
+// Defaults now delegate to the typed BodyConfig model — single source of truth.
 void pg_body_desc_defaults(PgBodyDesc* desc)
 {
     if (!desc)
         return;
-
-    std::memset(desc, 0, sizeof(PgBodyDesc));
-
-    desc->continent_noise.scale = 0.8f;
-    desc->continent_noise.octaves = 6;
-    desc->continent_noise.persistence = 0.5f;
-    desc->continent_noise.lacunarity = 2.0f;
-    desc->continent_noise.strength = 2.0f;
-
-    desc->mountain_noise.scale = 1.5f;
-    desc->mountain_noise.octaves = 5;
-    desc->mountain_noise.persistence = 0.5f;
-    desc->mountain_noise.lacunarity = 4.0f;
-    desc->mountain_noise.strength = 0.87f;
-
-    desc->mask_noise.scale = 1.09f;
-    desc->mask_noise.octaves = 3;
-    desc->mask_noise.persistence = 0.55f;
-    desc->mask_noise.lacunarity = 1.66f;
-    desc->mask_noise.strength = 1.0f;
-
-    desc->height_scale = 0.04f;
-    desc->ocean_depth_multiplier = 5.0f;
-    desc->ocean_floor_depth = 1.36f;
-    desc->ocean_floor_smoothing = 0.5f;
-    desc->mountain_blend = 1.16f;
-    desc->continent_base_level = -0.35f;
-    desc->global_frequency = 1.0f;
-    desc->normal_epsilon = 0.0001f;
-
-    desc->mountain_power = 2.18f;
-    desc->mountain_gain = 0.8f;
-    desc->mountain_smoothing = 1.0f;
-
-    desc->use_tectonics = 1;
-    desc->num_plates = 12;
-    desc->continental_fraction = 0.45f;
-    desc->boundary_width = 0.15f;
-    desc->convergent_mountain_scale = 0.6f;
-    desc->divergent_rift_depth = 0.3f;
-    desc->coastline_noise = 0.4f;
-    desc->plate_elevation_noise = 0.2f;
-
-    desc->use_ocean_floor = 1;
-    desc->shelf_width = 0.15f;
-    desc->ocean_ridge_octaves = 4;
-    desc->ocean_ridge_scale = 0.8f;
-    desc->ocean_ridge_strength = 0.3f;
-    desc->ocean_ridge_power = 2.0f;
-    desc->ocean_ridge_gain = 0.8f;
-    desc->trench_octaves = 3;
-    desc->trench_scale = 1.5f;
-    desc->trench_depth = 0.4f;
-    desc->abyssal_octaves = 4;
-    desc->abyssal_scale = 2.0f;
-    desc->abyssal_strength = 0.1f;
-
-    desc->detail_low_threshold = -0.1f;
-    desc->detail_high_threshold = 0.3f;
-    desc->perturb_strength_low = 0.001f;
-    desc->perturb_strength_high = 0.004f;
-    desc->detail_octaves_low = 2;
-    desc->detail_octaves_high = 5;
-    desc->detail_persistence = 0.45f;
-    desc->detail_lacunarity = 2.2f;
-    desc->perturb_scale = 20.0f;
+    *desc = planetgen::ProjectToBodyDesc(planetgen::BodyConfig{});
 }
 
 void pg_shading_desc_defaults(PgShadingDesc* desc)
 {
     if (!desc)
         return;
-
-    std::memset(desc, 0, sizeof(PgShadingDesc));
-
-    desc->detail_noise_scale = 2.0f;
-    desc->small_noise_scale = 15.0f;
-    desc->small_noise_octaves = 5;
-    desc->warp_strength = 0.3f;
-
-    desc->use_climate_model = 1;
-    desc->large_noise_scale = 0.3f;
-    desc->large_noise_octaves = 3;
-    desc->temperature_lapse_rate = 2.0f;
-    desc->temperature_exponent = 0.6f;
-    desc->moisture_noise_scale = 1.5f;
-    desc->moisture_noise_strength = 0.15f;
-    desc->hadley_intensity = 1.0f;
-    desc->continentality_strength = 0.3f;
-    desc->height_scale = 0.04f;
+    *desc = planetgen::ProjectToShadingDesc(planetgen::BodyConfig{});
 }
 
 void pg_erosion_desc_defaults(PgErosionDesc* desc)
 {
     if (!desc)
         return;
-
-    std::memset(desc, 0, sizeof(PgErosionDesc));
-
-    desc->iterations = 5;
-    desc->grid_resolution = 256;
-    desc->thermal_rate = 0.02f;
-    desc->thermal_threshold = 0.01f;
-    desc->hydraulic_rate = 0.01f;
-    desc->deposition_rate = 0.005f;
-    desc->evaporation_rate = 0.1f;
+    *desc = planetgen::ProjectToErosionDesc(planetgen::BodyConfig{});
 }

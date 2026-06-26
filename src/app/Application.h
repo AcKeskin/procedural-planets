@@ -26,14 +26,13 @@
 #include "settings/AtmosphereSettings.h"
 #include "settings/CinematicSettings.h"
 #include "BiomePalette.h"
-#include "CelestialBody.h"
-#include "Earth.h"
-#include "GenericBody.h"
+#include "BodyRuntime.h"
 #include <memory>
 #include "cinematic/CinematicController.h"
 #include "cinematic/CaptureManager.h"
 #include "gui/CinematicPanel.h"
 #include "math/Camera.h"
+#include <model/PaletteRegistry.h>
 
 namespace planets::app
 {
@@ -80,11 +79,8 @@ private:
     void StartCinematic();
     void StopCinematic();
 
-    // Sync loose Application settings into an Earth body
-    void SyncEarthSettings(render::Earth& earth);
-
-    // Switch active body type, reload shaders/palette, regenerate terrain
-    void SwitchBody(std::unique_ptr<render::CelestialBody> newBody);
+    // Load a BodyConfig from data/bodies/<name>.json and switch to it
+    void SwitchBody(planetgen::BodyConfig config);
 
     // Build QuadTreeConfig from current LodConfig
     render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
@@ -115,15 +111,16 @@ private:
     render::SurfacePanel _surfacePanel;
     render::AtmospherePanel _atmospherePanel;
     render::DebugPanel _debugPanel;
+
     // Settings (Application owns all)
     render::SceneSettings _sceneSettings;
-    render::EarthTerrainSettings _terrainSettings;
-    render::EarthShadingSettings _shadingSettings;
+    render::EarthTerrainSettings _terrainSettings;   // GUI terrain panel edits these for Earth
+    render::EarthShadingSettings _shadingSettings;   // GUI surface panel edits these for Earth
     render::GenerationConfig _genConfig;
     render::LodConfig _lodConfig;
     render::TerrainStats _terrainStats;
-    render::BiomeSettings _biomeSettings;
-    render::EarthColors _earthColors;
+    render::BiomeSettings _biomeSettings;            // GUI biome panel
+    render::EarthColors _earthColors;                // GUI color panel
     render::effects::OceanSettings _oceanSettings;
     render::effects::AtmosphereSettings _atmosphereSettings;
     render::BiomePalette _biomePalette;
@@ -145,8 +142,9 @@ private:
     bool _cinematicPanelVisible = true;
     bool _screenshotRequested = false;
 
-    // Active celestial body
-    std::unique_ptr<render::CelestialBody> _activeBody;
+    // Active body — typed config + runtime shim
+    planetgen::PaletteRegistry _paletteRegistry;
+    std::unique_ptr<render::BodyRuntime> _activeBody;
     int _selectedBodyType = 0; // GUI selector index
 
     // Frame state

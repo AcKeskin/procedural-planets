@@ -2,7 +2,7 @@
 
 #include "ComputeShader.h"
 #include "GpuBuffer.h"
-#include "CelestialBody.h"
+#include "BodyRuntime.h"
 #include <planetgen/planetgen.h>
 #include <glm/glm.hpp>
 #include <vector>
@@ -70,20 +70,20 @@ public:
     std::vector<glm::vec4>
     GenerateShadingData(const std::vector<glm::vec3>& vertices, uint32_t seed, const EarthShadingSettings& settings);
 
-    // Abstract dispatch: body type sets its own uniforms (async LOD path)
+    // Dispatch via BodyRuntime (async LOD path)
     void DispatchHeightsAsync(GpuBuffer<float>& vertexBuffer,
                               GpuBuffer<float>& heightBuffer,
                               GpuBuffer<float>& normalBuffer,
                               size_t vertexCount,
-                              const CelestialBody& body,
+                              const BodyRuntime& body,
                               uint32_t seed);
 
-    // Abstract dispatch: body type sets its own uniforms (async LOD path)
+    // Dispatch via BodyRuntime (async LOD path)
     void DispatchShadingAsync(GpuBuffer<float>& vertexBuffer,
                               GpuBuffer<glm::vec4>& shadingBuffer,
                               GpuBuffer<float>& heightBuffer,
                               size_t vertexCount,
-                              const CelestialBody& body,
+                              const BodyRuntime& body,
                               uint32_t seed);
 
     // Earth-specific dispatch (legacy, used by synchronous paths)
@@ -103,12 +103,12 @@ public:
                               const EarthShadingSettings& settings,
                               float heightScale);
 
-    // Abstract erosion dispatch: body sets its own uniforms
+    // Erosion dispatch via BodyRuntime
     void DispatchErosionAsync(GpuBuffer<float>& inputBuffer,
                               GpuBuffer<float>& outputBuffer,
                               size_t vertexCount,
                               int gridResolution,
-                              const CelestialBody& body);
+                              const BodyRuntime& body);
 
     // Earth-specific erosion dispatch (legacy)
     void DispatchErosionAsync(GpuBuffer<float>& inputBuffer,

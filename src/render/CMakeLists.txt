@@ -15,10 +15,8 @@ add_library(render STATIC
     TerrainGenerator.cpp
     GlFence.cpp
     GenerationScheduler.cpp
-    CelestialBody.cpp
-    Earth.cpp
+    BodyRuntime.cpp
     BiomePalette.cpp
-    GenericBody.cpp
     Framebuffer.cpp
     PostProcessor.cpp
     lod/SpherePatch.cpp
@@ -29,6 +27,11 @@ add_library(render STATIC
     effects/AtmosphereRenderer.cpp
     cinematic/CinematicController.cpp
     cinematic/CaptureManager.cpp
+    # Model sources compiled directly (DLL boundary: symbols not exported via PG_API)
+    ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfig.cpp
+    ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfigProjection.cpp
+    ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfigJson.cpp
+    ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/PaletteRegistry.cpp
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/imgui_draw.cpp

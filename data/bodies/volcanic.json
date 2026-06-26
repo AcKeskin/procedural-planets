@@ -1,34 +1,136 @@
 {
-    "name": "Volcanic World",
-    "radius": 8.0,
-    "seaLevel": 0.0,
-    "atmosphereHeight": 0.0,
-    "hasSolidSurface": true,
-    "hasAtmosphere": false,
-    "palette": "data/palettes/volcanic.json",
-    "terrain": {
-        "heightScale": 0.06,
-        "oceanDepthMultiplier": 0.0,
-        "oceanFloorDepth": 0.0,
-        "mountainBlend": 0.7,
-        "continent": {
-            "scale": 1.2,
-            "octaves": 5,
-            "persistence": 0.55,
-            "lacunarity": 2.2,
-            "strength": 0.8
-        },
-        "mountain": {
-            "scale": 3.0,
-            "octaves": 6,
-            "persistence": 0.6,
-            "lacunarity": 2.0,
-            "strength": 1.2
-        }
+    "erosion": {
+        "depositionRate": 0.005,
+        "enabled": false,
+        "evaporationRate": 0.1,
+        "gridResolution": 256,
+        "hydraulicRate": 0.01,
+        "iterations": 5,
+        "thermalRate": 0.02,
+        "thermalThreshold": 0.01
+    },
+    "heightDetail": {
+        "detailHighThreshold": 1.0,
+        "detailLacunarity": 2.0,
+        "detailLowThreshold": 0.0,
+        "detailOctavesHigh": 0,
+        "detailOctavesLow": 0,
+        "detailPersistence": 0.5,
+        "perturbScale": 1.0,
+        "perturbStrengthHigh": 0.0,
+        "perturbStrengthLow": 0.0
+    },
+    "metadata": {
+        "atmosphereHeight": 0.0,
+        "hasAtmosphere": false,
+        "hasSolidSurface": true,
+        "name": "Volcanic World",
+        "radius": 8.0,
+        "seaLevel": 0.0,
+        "typeName": "generic"
+    },
+    "oceanFloor": {
+        "abyssalOctaves": 4,
+        "abyssalScale": 2.0,
+        "abyssalStrength": 0.1,
+        "enabled": false,
+        "oceanRidgeGain": 0.8,
+        "oceanRidgeOctaves": 4,
+        "oceanRidgePower": 2.0,
+        "oceanRidgeScale": 0.8,
+        "oceanRidgeStrength": 0.3,
+        "shelfWidth": 0.15,
+        "trenchDepth": 0.4,
+        "trenchOctaves": 3,
+        "trenchScale": 1.5
+    },
+    "paletteRef": {
+        "paletteId": "volcanic"
+    },
+    "shaderPaths": {
+        "erosion": "shaders/compute/erosion_earth.comp",
+        "fragment": "shaders/generic/planet_generic.frag",
+        "height": "shaders/compute/height_earth.comp",
+        "shading": "shaders/compute/shading_generic.comp",
+        "vertex": "shaders/generic/planet_generic.vert"
     },
     "shading": {
+        "aoStrength": 0.35,
+        "biomesEnabled": false,
+        "coastalDepthRange": 0.04,
+        "colorFlatHighA": [0.20, 0.40, 0.18],
+        "colorFlatHighB": [0.10, 0.28, 0.12],
+        "colorFlatLowA": [0.45, 0.55, 0.30],
+        "colorFlatLowB": [0.15, 0.40, 0.15],
+        "colorShoreHigh": [0.62, 0.55, 0.40],
+        "colorShoreLow": [0.78, 0.72, 0.50],
+        "colorSnow": [0.95, 0.95, 0.98],
+        "colorSteepHigh": [0.30, 0.28, 0.26],
+        "colorSteepLow": [0.40, 0.38, 0.35],
+        "continentalityStrength": 0.3,
         "detailNoiseScale": 4.0,
+        "flatColBlend": 1.5,
+        "flatColBlendNoise": 0.3,
+        "flatToSteepBlend": 0.15,
+        "hadleyIntensity": 1.0,
+        "largeNoiseOctaves": 3,
+        "largeNoiseScale": 0.3,
+        "moistureNoiseScale": 1.5,
+        "moistureNoiseStrength": 0.15,
+        "shoreHeight": 0.08,
+        "smallNoiseOctaves": 5,
         "smallNoiseScale": 20.0,
+        "snowBlend": 0.1,
+        "snowLatitude": 0.8,
+        "snowLine": 0.85,
+        "steepnessThreshold": 0.3,
+        "temperatureExponent": 0.6,
+        "temperatureLapseRate": 2.0,
+        "useClimateModel": false,
         "warpStrength": 0.5
+    },
+    "shape": {
+        "continentBaseLevel": 0.0,
+        "continentNoise": {
+            "lacunarity": 2.2,
+            "octaves": 5,
+            "persistence": 0.55,
+            "scale": 1.2,
+            "strength": 0.8
+        },
+        "globalFrequency": 1.0,
+        "heightScale": 0.06,
+        "maskNoise": {
+            "lacunarity": 1.66,
+            "octaves": 3,
+            "persistence": 0.55,
+            "scale": 1.09,
+            "strength": 1.0
+        },
+        "mountainBlend": 0.7,
+        "mountainGain": 1.0,
+        "mountainNoise": {
+            "lacunarity": 2.0,
+            "octaves": 6,
+            "persistence": 0.6,
+            "scale": 3.0,
+            "strength": 1.2
+        },
+        "mountainPower": 1.0,
+        "mountainSmoothing": 1.0,
+        "normalEpsilon": 0.0001,
+        "oceanDepthMultiplier": 0.0,
+        "oceanFloorDepth": 0.0,
+        "oceanFloorSmoothing": 0.5
+    },
+    "tectonics": {
+        "boundaryWidth": 0.15,
+        "coastlineNoise": 0.4,
+        "continentalFraction": 0.45,
+        "convergentMountainScale": 0.6,
+        "divergentRiftDepth": 0.3,
+        "enabled": false,
+        "numPlates": 12,
+        "plateElevationNoise": 0.2
     }
 }

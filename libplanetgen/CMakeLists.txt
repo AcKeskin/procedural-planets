@@ -38,6 +38,10 @@ set(PLANETGEN_SOURCES
     src/backend/opengl/GlDevice.cpp
     src/backend/opengl/WindowedGLBackend.cpp
     src/backend/opengl/HeadlessGLBackend.cpp
+    src/model/BodyConfig.cpp
+    src/model/BodyConfigProjection.cpp
+    src/model/BodyConfigJson.cpp
+    src/model/PaletteRegistry.cpp
 )
 
 set(PLANETGEN_HEADERS
@@ -50,6 +54,10 @@ set(PLANETGEN_HEADERS
     src/backend/opengl/GlDevice.h
     src/backend/opengl/WindowedGLBackend.h
     src/backend/opengl/HeadlessGLBackend.h
+    src/model/BodyConfig.h
+    src/model/BodyConfigProjection.h
+    src/model/BodyConfigJson.h
+    src/model/PaletteRegistry.h
 )
 
 add_library(planetgen SHARED ${PLANETGEN_SOURCES} ${PLANETGEN_HEADERS})
@@ -61,8 +69,8 @@ target_compile_definitions(planetgen PRIVATE PLANETGEN_EXPORTS)
 target_include_directories(planetgen
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src  # Expose model/ headers to consumers (BodyConfig, PaletteRegistry)
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_BINARY_DIR}  # For generated EmbeddedShaders.h
 )
 
@@ -82,6 +90,7 @@ target_link_libraries(planetgen
         glfw
         OpenGL::GL
         nlohmann_json::nlohmann_json
+        glm::glm
 )
 
 target_include_directories(planetgen PRIVATE ${GL3W_INCLUDE_DIR})
@@ -106,6 +115,7 @@ set(PLANETGEN_TEST_SOURCES
     tests/test_registry.cpp
     tests/test_headless.cpp
     tests/test_determinism.cpp
+    tests/test_body_model.cpp
 )
 
 add_executable(planetgen_tests ${PLANETGEN_TEST_SOURCES})
@@ -119,9 +129,13 @@ target_include_directories(planetgen_tests
 )
 
 # Link the shared planetgen library for the public C API (pg_*),
-# and compile internal sources directly for ShaderRegistry (not exported from the DLL).
+# and compile internal sources directly for ShaderRegistry + model (not exported from the DLL).
 target_sources(planetgen_tests PRIVATE
     src/backend/ShaderRegistry.cpp
+    src/model/BodyConfig.cpp
+    src/model/BodyConfigProjection.cpp
+    src/model/BodyConfigJson.cpp
+    src/model/PaletteRegistry.cpp
     ${GL3W_SRC}
 )
 
@@ -131,13 +145,21 @@ target_link_libraries(planetgen_tests
         Catch2::Catch2WithMain
         glfw
         OpenGL::GL
+        nlohmann_json::nlohmann_json
+        glm::glm
 )
 
 add_dependencies(planetgen_tests planetgen_embed_shaders planetgen_copy_shaders)
 
 include(CTest)
 include(Catch)
-catch_discover_tests(planetgen_tests)
+
+# Pass the source root so tests can locate data/bodies/*.json
+target_compile_definitions(planetgen_tests PRIVATE
+    PLANETGEN_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}"
+)
+
+catch_discover_tests(planetgen_tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 # ============================================================================
 # Install
