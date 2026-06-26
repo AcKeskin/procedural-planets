@@ -33,6 +33,7 @@
 #include "cinematic/CaptureManager.h"
 #include "gui/CinematicPanel.h"
 #include "math/Camera.h"
+#include "CaptureRequest.h"
 #include <model/PaletteRegistry.h>
 
 namespace planets::app
@@ -69,6 +70,13 @@ public:
     bool Initialize();
     void Run();
     void Shutdown();
+
+    // Headless capture: boot with overrides, render warm-up frames, write one PNG, return.
+    // Returns true on a successful capture.
+    bool RunCapture(const CaptureRequest& request);
+
+    // Apply CLI overrides before window/scene creation (size, vsync, seed, camera).
+    void ApplyCaptureOverrides(const CaptureRequest& request);
 
 private:
     void ProcessInput(float deltaTime);
@@ -161,6 +169,10 @@ private:
     float _deltaTime = 0.0f;
     int _previousWidth;
     int _previousHeight;
+
+    // Headless capture overrides (applied in Initialize when .enabled). Default = interactive.
+    CaptureRequest _capture;
+    bool _headlessCaptureRequested = false;
 };
 
 } // namespace planets::app

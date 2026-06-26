@@ -278,6 +278,13 @@ bool Application::Initialize()
 {
     render::WindowConfig windowConfig;
     windowConfig.title = "Procedural Planets";
+    if (_capture.enabled)
+    {
+        // Capture mode forces deterministic size + vsync off so frames render as fast as possible.
+        windowConfig.width = _capture.width;
+        windowConfig.height = _capture.height;
+        windowConfig.vsync = false;
+    }
     if (!_window.Initialize(windowConfig))
         return false;
 
@@ -315,6 +322,10 @@ bool Application::Initialize()
         return false;
     }
 
+    // Capture mode: seed must be set before generation so the shot is deterministic.
+    if (_capture.enabled)
+        _genConfig.seed = _capture.seed;
+
     // Load earth body from JSON and initialize
     auto earthCfg = LoadBodyConfig("data/bodies/earth.json");
     SyncConfigToEarth(earthCfg, _terrainSettings, _shadingSettings, _biomeSettings, _earthColors);
@@ -323,7 +334,11 @@ bool Application::Initialize()
     // Initial generation (LOD-only; GPU is a hard requirement)
     RegenerateLodSystem();
 
-    _camera.SetPosition(glm::vec3(0.0f, 0.0f, _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier));
+    if (_capture.enabled && _capture.hasCamera)
+        _camera.SetPosition(_capture.cameraPos);
+    else
+        _camera.SetPosition(
+            glm::vec3(0.0f, 0.0f, _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier));
 
     _lastTime = static_cast<float>(glfwGetTime());
     _previousWidth = _window.GetWidth();
@@ -360,6 +375,50 @@ void Application::Run()
         _renderer.EndFrame();
         _window.SwapBuffers();
     }
+}
+
+void Application::ApplyCaptureOverrides(const CaptureRequest& request)
+{
+    _capture = request;
+}
+
+bool Application::RunCapture(const CaptureRequest& request)
+{
+    ApplyCaptureOverrides(request);
+
+    if (!Initialize())
+    {
+        std::cerr << "[Capture] Initialization failed." << std::endl;
+        return false;
+    }
+
+    // Warm-up: the LOD scheduler generates patches asynchronously over several frames.
+    // Render `frames` frames so the planet is fully populated before the shot.
+    int warmup = (std::max)(1, _capture.frames);
+    for (int i = 0; i < warmup; ++i)
+    {
+        float currentTime = static_cast<float>(glfwGetTime());
+        _deltaTime = currentTime - _lastTime;
+        _lastTime = currentTime;
+
+        _window.PollEvents();
+        Render();
+        _renderer.EndFrame();
+        _window.SwapBuffers();
+    }
+
+    // Final frame: flag the capture so Render() writes the PNG at the pre-GUI point.
+    _headlessCaptureRequested = true;
+    Render();
+    _renderer.EndFrame();
+    _window.SwapBuffers();
+
+    bool ok = !_headlessCaptureRequested; // cleared once the capture ran
+    if (!ok)
+        std::cerr << "[Capture] Capture did not run (render path skipped it)." << std::endl;
+
+    Shutdown();
+    return ok;
 }
 
 void Application::Shutdown()
@@ -558,6 +617,13 @@ void Application::Render()
     {
         _captureManager.CaptureScreenshot(_window.GetWidth(), _window.GetHeight());
         _screenshotRequested = false;
+    }
+
+    // Headless capture point: same place as F12 (scene composited, before the GUI overlay).
+    if (_headlessCaptureRequested)
+    {
+        _captureManager.CaptureScreenshotToFile(_capture.outputPath, _window.GetWidth(), _window.GetHeight());
+        _headlessCaptureRequested = false;
     }
 
     RenderGui();

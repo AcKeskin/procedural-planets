@@ -2,6 +2,7 @@
 add_executable(procedural-planets
     Main.cpp
     Application.cpp
+    CaptureRequest.cpp
     Input.cpp
 )
 
