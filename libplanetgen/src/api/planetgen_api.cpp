@@ -5,19 +5,72 @@
 #include "EmbeddedShaders.h"
 #include "../model/BodyConfig.h"
 #include "../model/BodyConfigProjection.h"
+#include "../model/BodyConfigJson.h"
 #include "../strategy/HeightStrategy.h"
 #include "../strategy/ShadingStrategy.h"
 #include "../strategy/ErosionStrategy.h"
+#include "../strategy/GenerationPipeline.h"
+#include "../mesh/MeshGen.h"
 #include <iostream>
 #include <fstream>
 #include <cstring>
-
-// nlohmann/json for body_create_from_json
-#include <nlohmann/json.hpp>
+#include <exception>
+#include <new>
+#include <string>
 
 // Dispatch mechanics (param mapping, workgroup sizing, GPU buffer threading)
 // now live in the strategy layer (src/strategy/*). This file owns only the
 // C ABI surface: handle lifecycle, result construction, and CPU readback.
+
+namespace
+{
+
+// Resolve the body's palette by id and copy it into the result (FFI-safe entries).
+void FillPalette(PgResult_T* result, const PgBody_T* body)
+{
+    const planetgen::Palette& pal =
+        body->ctx->palettes.Resolve(body->config.paletteRef.paletteId);
+    result->palette.clear();
+    result->palette.reserve(pal.entries.size());
+    for (const auto& e : pal.entries)
+    {
+        PgPaletteEntry out{};
+        out.color[0] = e.color.x;
+        out.color[1] = e.color.y;
+        out.color[2] = e.color.z;
+        out.parameter = e.parameter;
+        result->palette.push_back(out);
+    }
+}
+
+// Run a generation body with an exception boundary so nothing crosses the C ABI.
+// On a thrown exception, record code+message on the context and return null.
+template <typename Fn>
+PgResult GuardGen(PgContext_T* ctx, Fn&& fn)
+{
+    try
+    {
+        return fn();
+    }
+    catch (const std::bad_alloc&)
+    {
+        if (ctx) ctx->SetError(PG_ERROR_OUT_OF_MEMORY, "out of memory during generation");
+        return nullptr;
+    }
+    catch (const std::exception& e)
+    {
+        if (ctx) ctx->SetError(PG_ERROR_INVALID_ARGUMENT,
+                               std::string("generation failed: ") + e.what());
+        return nullptr;
+    }
+    catch (...)
+    {
+        if (ctx) ctx->SetError(PG_ERROR_INVALID_ARGUMENT, "generation failed: unknown error");
+        return nullptr;
+    }
+}
+
+} // namespace
 
 // ============================================================================
 // Context lifecycle
@@ -69,7 +122,8 @@ PgContext pg_context_create(const PgContextDesc* desc)
     {
         if (!ctx->registry.RegisterProgram(id, src))
         {
-            ctx->lastError = PG_ERROR_SHADER_COMPILE_FAILED;
+            ctx->SetError(PG_ERROR_SHADER_COMPILE_FAILED,
+                          std::string("failed to compile builtin shader: ") + label);
             std::cerr << "[planetgen] Failed to compile " << label << " shader" << std::endl;
             return false;
         }
@@ -102,6 +156,13 @@ PgError pg_context_get_error(PgContext ctx)
     return ctx->lastError;
 }
 
+const char* pg_get_last_error_message(PgContext ctx)
+{
+    if (!ctx)
+        return "null context";
+    return ctx->lastErrorMessage.c_str();
+}
+
 // ============================================================================
 // Body configuration
 // ============================================================================
@@ -116,7 +177,8 @@ PgBody pg_body_create(PgContext ctx, const PgBodyDesc* desc)
         return nullptr;
 
     body->ctx = ctx;
-    body->desc = *desc;
+    body->desc = *desc; // flat path: desc authoritative, config stays default
+    ctx->ClearError();
     return body;
 }
 
@@ -125,51 +187,33 @@ PgBody pg_body_create_from_json(PgContext ctx, const char* json_path)
     if (!ctx || !json_path)
         return nullptr;
 
-    std::ifstream file(json_path);
-    if (!file.is_open())
+    // JSON is the canonical composable path: load the full typed BodyConfig (all
+    // strategy-aligned blocks, with per-block defaults + validation), then project
+    // it down to the flat desc the strategies bind. Earth is just one such config.
+    planetgen::BodyConfig config;
+    const std::string err = planetgen::BodyConfigLoadFile(json_path, config);
+    if (!err.empty())
     {
-        ctx->lastError = PG_ERROR_FILE_NOT_FOUND;
+        // Distinguish "file missing" from "bad contents" for the status code.
+        std::ifstream probe(json_path);
+        const PgError code = probe.is_open() ? PG_ERROR_JSON_PARSE_FAILED
+                                             : PG_ERROR_FILE_NOT_FOUND;
+        ctx->SetError(code, std::string("body config load failed: ") + err);
         return nullptr;
     }
 
-    try
+    auto body = new (std::nothrow) PgBody_T();
+    if (!body)
     {
-        nlohmann::json json;
-        file >> json;
-
-        PgBodyDesc desc{};
-        pg_body_desc_defaults(&desc);
-
-        auto parseNoise = [](const nlohmann::json& j, PgNoiseLayer& layer)
-        {
-            if (j.contains("scale")) layer.scale = j["scale"].get<float>();
-            if (j.contains("octaves")) layer.octaves = j["octaves"].get<int>();
-            if (j.contains("persistence")) layer.persistence = j["persistence"].get<float>();
-            if (j.contains("lacunarity")) layer.lacunarity = j["lacunarity"].get<float>();
-            if (j.contains("strength")) layer.strength = j["strength"].get<float>();
-        };
-
-        if (json.contains("terrain"))
-        {
-            auto& t = json["terrain"];
-            desc.height_scale = t.value("heightScale", desc.height_scale);
-            desc.ocean_depth_multiplier = t.value("oceanDepthMultiplier", desc.ocean_depth_multiplier);
-            desc.ocean_floor_depth = t.value("oceanFloorDepth", desc.ocean_floor_depth);
-            desc.mountain_blend = t.value("mountainBlend", desc.mountain_blend);
-
-            if (t.contains("continent")) parseNoise(t["continent"], desc.continent_noise);
-            if (t.contains("mountain")) parseNoise(t["mountain"], desc.mountain_noise);
-            if (t.contains("mask")) parseNoise(t["mask"], desc.mask_noise);
-        }
-
-        return pg_body_create(ctx, &desc);
-    }
-    catch (const nlohmann::json::exception& e)
-    {
-        std::cerr << "[planetgen] JSON parse error: " << e.what() << std::endl;
-        ctx->lastError = PG_ERROR_JSON_PARSE_FAILED;
+        ctx->SetError(PG_ERROR_OUT_OF_MEMORY, "out of memory creating body");
         return nullptr;
     }
+
+    body->ctx = ctx;
+    body->config = config;
+    body->desc = planetgen::ProjectToBodyDesc(config);
+    ctx->ClearError();
+    return body;
 }
 
 void pg_body_destroy(PgBody body)
@@ -187,11 +231,12 @@ PgResult pg_generate_heights(PgBody body, const float* vertices, uint32_t vertex
         return nullptr;
 
     auto* ctx = body->ctx;
+    return GuardGen(ctx, [&]() -> PgResult {
     auto& gpu = *ctx->backend;
 
     if (!ctx->registry.Resolve(planetgen::BuiltinProgram::Height))
     {
-        ctx->lastError = PG_ERROR_NOT_INITIALIZED;
+        ctx->SetError(PG_ERROR_NOT_INITIALIZED, "height program not registered");
         return nullptr;
     }
 
@@ -212,7 +257,7 @@ PgResult pg_generate_heights(PgBody body, const float* vertices, uint32_t vertex
         gpu.DestroyBuffer(vertexBuf);
         if (hb.heights) gpu.DestroyBuffer(hb.heights);
         if (hb.normals) gpu.DestroyBuffer(hb.normals);
-        ctx->lastError = PG_ERROR_NOT_INITIALIZED;
+        ctx->SetError(PG_ERROR_NOT_INITIALIZED, "height strategy failed to produce buffers");
         return nullptr;
     }
 
@@ -238,7 +283,10 @@ PgResult pg_generate_heights(PgBody body, const float* vertices, uint32_t vertex
 
     gpu.DestroyBuffer(vertexBuf);
 
+    FillPalette(result, body);
+    ctx->ClearError();
     return result;
+    });
 }
 
 PgResult pg_generate_shading(PgBody body, const float* vertices, const float* heights,
@@ -248,6 +296,7 @@ PgResult pg_generate_shading(PgBody body, const float* vertices, const float* he
         return nullptr;
 
     auto* ctx = body->ctx;
+    return GuardGen(ctx, [&]() -> PgResult {
     auto& gpu = *ctx->backend;
 
     const size_t vertexBytes  = vertex_count * 3 * sizeof(float);
@@ -269,7 +318,7 @@ PgResult pg_generate_shading(PgBody body, const float* vertices, const float* he
     {
         gpu.DestroyBuffer(vertexBuf);
         gpu.DestroyBuffer(heightBuf);
-        ctx->lastError = PG_ERROR_NOT_INITIALIZED;
+        ctx->SetError(PG_ERROR_NOT_INITIALIZED, "shading program not registered");
         return nullptr;
     }
 
@@ -293,7 +342,10 @@ PgResult pg_generate_shading(PgBody body, const float* vertices, const float* he
     gpu.DestroyBuffer(vertexBuf);
     gpu.DestroyBuffer(heightBuf);
 
+    FillPalette(result, body);
+    ctx->ClearError();
     return result;
+    });
 }
 
 PgResult pg_generate_erosion(PgBody body, const float* heights, uint32_t vertex_count,
@@ -303,11 +355,12 @@ PgResult pg_generate_erosion(PgBody body, const float* heights, uint32_t vertex_
         return nullptr;
 
     auto* ctx = body->ctx;
+    return GuardGen(ctx, [&]() -> PgResult {
     auto& gpu = *ctx->backend;
 
     if (!ctx->registry.Resolve(planetgen::BuiltinProgram::Erosion))
     {
-        ctx->lastError = PG_ERROR_NOT_INITIALIZED;
+        ctx->SetError(PG_ERROR_NOT_INITIALIZED, "erosion program not registered");
         return nullptr;
     }
 
@@ -340,7 +393,57 @@ PgResult pg_generate_erosion(PgBody body, const float* heights, uint32_t vertex_
     if (resultBuf != inputBuf)
         gpu.DestroyBuffer(inputBuf);
 
+    FillPalette(result, body);
+    ctx->ClearError();
     return result;
+    });
+}
+
+PgResult pg_generate_mesh(PgBody body, uint32_t rings, uint32_t segments, uint32_t seed)
+{
+    if (!body)
+        return nullptr;
+
+    auto* ctx = body->ctx;
+    return GuardGen(ctx, [&]() -> PgResult {
+
+    // Build geometry, then run the full pipeline over it (height -> [erosion] ->
+    // shading + palette). One call gives the consumer mesh + per-vertex data.
+    planetgen::MeshData mesh = planetgen::MakeUvSphere(rings, segments);
+    const uint32_t vertexCount = static_cast<uint32_t>(mesh.positions.size() / 3);
+
+    planetgen::GenerationPipeline pipeline(*ctx->backend, ctx->registry, ctx->palettes);
+    planetgen::PipelineResult pr =
+        pipeline.Generate(body->config, mesh.positions.data(), vertexCount, seed);
+
+    if (pr.count == 0)
+    {
+        ctx->SetError(PG_ERROR_NOT_INITIALIZED, "mesh generation pipeline produced no data");
+        return nullptr;
+    }
+
+    auto result = new (std::nothrow) PgResult_T();
+    if (!result)
+    {
+        ctx->SetError(PG_ERROR_OUT_OF_MEMORY, "out of memory creating mesh result");
+        return nullptr;
+    }
+
+    result->type = PgResultType::Heights;
+    result->count = pr.count;
+    result->heights = std::move(pr.heights);
+    result->normals = std::move(pr.normals);
+    result->shading = std::move(pr.shading);
+    result->vertices = std::move(mesh.positions);
+    result->indices  = std::move(mesh.indices);
+    result->heightsGpuBuffer = pr.heightsGpuBuffer;
+    result->normalsGpuBuffer = pr.normalsGpuBuffer;
+    result->shadingGpuBuffer = pr.shadingGpuBuffer;
+
+    FillPalette(result, body);
+    ctx->ClearError();
+    return result;
+    });
 }
 
 // ============================================================================
@@ -373,6 +476,41 @@ uint32_t pg_result_get_count(PgResult result)
     if (!result)
         return 0;
     return result->count;
+}
+
+const PgPaletteEntry* pg_result_get_palette(PgResult result)
+{
+    if (!result || result->palette.empty())
+        return nullptr;
+    return result->palette.data();
+}
+
+uint32_t pg_result_get_palette_count(PgResult result)
+{
+    if (!result)
+        return 0;
+    return static_cast<uint32_t>(result->palette.size());
+}
+
+const float* pg_result_get_vertices(PgResult result)
+{
+    if (!result || result->vertices.empty())
+        return nullptr;
+    return result->vertices.data();
+}
+
+const uint32_t* pg_result_get_indices(PgResult result)
+{
+    if (!result || result->indices.empty())
+        return nullptr;
+    return result->indices.data();
+}
+
+uint32_t pg_result_get_index_count(PgResult result)
+{
+    if (!result)
+        return 0;
+    return static_cast<uint32_t>(result->indices.size());
 }
 
 uint32_t pg_result_get_gpu_buffer(PgResult result)

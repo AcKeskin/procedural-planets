@@ -49,6 +49,7 @@ set(PLANETGEN_SOURCES
     src/strategy/ErosionStrategy.cpp
     src/strategy/PaletteProvider.cpp
     src/strategy/GenerationPipeline.cpp
+    src/mesh/MeshGen.cpp
 )
 
 set(PLANETGEN_HEADERS
@@ -72,6 +73,7 @@ set(PLANETGEN_HEADERS
     src/strategy/ErosionStrategy.h
     src/strategy/PaletteProvider.h
     src/strategy/GenerationPipeline.h
+    src/mesh/MeshGen.h
 )
 
 add_library(planetgen SHARED ${PLANETGEN_SOURCES} ${PLANETGEN_HEADERS})
@@ -132,6 +134,7 @@ set(PLANETGEN_TEST_SOURCES
     tests/test_body_model.cpp
     tests/test_strategies.cpp
     tests/test_strategy_extension.cpp
+    tests/test_public_api.cpp
 )
 
 add_executable(planetgen_tests ${PLANETGEN_TEST_SOURCES})
@@ -182,6 +185,29 @@ target_compile_definitions(planetgen_tests PRIVATE
 )
 
 catch_discover_tests(planetgen_tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+# ----------------------------------------------------------------------------
+# Single-surface consumer test — compiled against the PUBLIC include dir ONLY.
+# No src/ on the include path: if it ever needed an internal header it would
+# fail to build, which is the criterion-1 observable (consumers touch only the
+# public surface). Links the shared library like any third-party consumer.
+# ----------------------------------------------------------------------------
+add_executable(planetgen_public_tests tests/test_public_consumer.cpp)
+
+target_include_directories(planetgen_public_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include   # public headers only — deliberately no src/
+)
+
+target_link_libraries(planetgen_public_tests
+    PRIVATE
+        planetgen
+        Catch2::Catch2WithMain
+)
+
+add_dependencies(planetgen_public_tests planetgen_embed_shaders planetgen_copy_shaders)
+
+catch_discover_tests(planetgen_public_tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 # ============================================================================
 # Install

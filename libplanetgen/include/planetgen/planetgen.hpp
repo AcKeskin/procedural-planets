@@ -42,6 +42,15 @@ public:
     uint32_t Count() const { return pg_result_get_count(_handle); }
     uint32_t GpuBuffer() const { return pg_result_get_gpu_buffer(_handle); }
 
+    // Resolved palette (empty span when none).
+    const PgPaletteEntry* Palette() const { return pg_result_get_palette(_handle); }
+    uint32_t PaletteCount() const { return pg_result_get_palette_count(_handle); }
+
+    // Mesh data — non-null only for results from Body::GenerateMesh.
+    const float*    Vertices() const { return pg_result_get_vertices(_handle); }
+    const uint32_t* Indices() const { return pg_result_get_indices(_handle); }
+    uint32_t IndexCount() const { return pg_result_get_index_count(_handle); }
+
     bool IsValid() const { return _handle != nullptr; }
     PgResult Handle() const { return _handle; }
 
@@ -87,6 +96,12 @@ public:
                            const PgErosionDesc& desc, uint32_t seed)
     {
         return Result(pg_generate_erosion(_handle, heights, vertexCount, &desc, seed));
+    }
+
+    // Optional: build a UV-sphere mesh + full per-vertex data + palette in one call.
+    Result GenerateMesh(uint32_t rings, uint32_t segments, uint32_t seed)
+    {
+        return Result(pg_generate_mesh(_handle, rings, segments, seed));
     }
 
     bool IsValid() const { return _handle != nullptr; }
@@ -137,6 +152,16 @@ public:
     }
 
     PgError GetError() const { return pg_context_get_error(_handle); }
+
+    // Human-readable message for the last error on this context (valid until the
+    // next call on this context). The C ABI itself never throws — error handling
+    // is codes + message; this wrapper surfaces both for the caller to act on.
+    std::string GetErrorMessage() const
+    {
+        const char* msg = pg_get_last_error_message(_handle);
+        return msg ? std::string(msg) : std::string();
+    }
+
     PgContext Handle() const { return _handle; }
 
 private:

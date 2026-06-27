@@ -135,6 +135,14 @@ typedef struct PgShadingDesc
     float height_scale; // For normalization
 } PgShadingDesc;
 
+// One palette color stop. color = RGB in [0,1]; parameter is the body-specific
+// threshold/weight the renderer interprets (matches the internal PaletteEntry).
+typedef struct PgPaletteEntry
+{
+    float color[3];
+    float parameter;
+} PgPaletteEntry;
+
 // Erosion configuration
 typedef struct PgErosionDesc
 {
@@ -155,6 +163,11 @@ PG_API PgContext pg_context_create(const PgContextDesc* desc);
 PG_API void     pg_context_destroy(PgContext ctx);
 PG_API PgError  pg_context_get_error(PgContext ctx);
 
+// Human-readable message for the last error on this context. Returns a pointer
+// valid until the next call on the same context (do not free, do not retain).
+// Returns "" when there is no error and a static string when ctx is null.
+PG_API const char* pg_get_last_error_message(PgContext ctx);
+
 // ============================================================================
 // Body configuration
 // ============================================================================
@@ -165,6 +178,15 @@ PG_API void   pg_body_destroy(PgBody body);
 
 // ============================================================================
 // Generation dispatch
+//
+// Determinism guarantee: for a fixed backend, identical (body config, seed,
+// geometry) yields byte-identical per-vertex output across calls and processes.
+// Generation is stateless per call — no hidden session state affects the result.
+//
+// Error model: every call below returns a handle (null on failure). On failure
+// the owning context records a status code (pg_context_get_error) and a
+// human-readable message (pg_get_last_error_message). No exception crosses the
+// C ABI — internal exceptions are translated to code + message.
 // ============================================================================
 
 // Generate terrain heights and normals. vertices = packed float3 array (x,y,z per vertex).
@@ -180,6 +202,12 @@ PG_API PgResult pg_generate_shading(PgBody body, const float* vertices, const fl
 PG_API PgResult pg_generate_erosion(PgBody body, const float* heights, uint32_t vertex_count,
                                      const PgErosionDesc* desc, uint32_t seed);
 
+// Optional convenience for callers without their own geometry: build a UV-sphere
+// mesh (rings x segments) and generate full per-vertex data + palette for it in
+// one call. The result carries vertices (packed float3) and triangle indices in
+// addition to heights/normals/shading/palette.
+PG_API PgResult pg_generate_mesh(PgBody body, uint32_t rings, uint32_t segments, uint32_t seed);
+
 // ============================================================================
 // Result access
 // ============================================================================
@@ -189,6 +217,17 @@ PG_API const float* pg_result_get_normals(PgResult result);   // Packed float3 (
 PG_API const float* pg_result_get_shading(PgResult result);   // Packed float4 (x,y,z,w per vertex)
 PG_API uint32_t     pg_result_get_count(PgResult result);
 PG_API uint32_t     pg_result_get_gpu_buffer(PgResult result); // OpenGL SSBO handle (0 if CPU-only)
+
+// Resolved palette for the body (from its palette id). Entries are owned by the
+// result and valid until pg_result_destroy. Count is 0 when no palette resolved.
+PG_API const PgPaletteEntry* pg_result_get_palette(PgResult result);
+PG_API uint32_t              pg_result_get_palette_count(PgResult result);
+
+// Mesh data — non-null only for results from pg_generate_mesh.
+PG_API const float*    pg_result_get_vertices(PgResult result);    // packed float3
+PG_API const uint32_t* pg_result_get_indices(PgResult result);     // triangle list
+PG_API uint32_t        pg_result_get_index_count(PgResult result);
+
 PG_API void         pg_result_destroy(PgResult result);
 
 // ============================================================================
