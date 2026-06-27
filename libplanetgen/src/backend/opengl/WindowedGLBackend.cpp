@@ -82,4 +82,29 @@ void WindowedGLBackend::Barrier()
     _device.Barrier();
 }
 
+GpuTextureHandle WindowedGLBackend::CreateTexture3D_RG32F(uint32_t resolution)
+{
+    return _device.CreateTexture3D_RG32F(resolution);
+}
+
+void WindowedGLBackend::BindImage3D(GpuTextureHandle texture, uint32_t imageUnit)
+{
+    _device.BindImage3D(texture, imageUnit);
+}
+
+void WindowedGLBackend::BindTexture3D(GpuTextureHandle texture, uint32_t samplerUnit)
+{
+    _device.BindTexture3D(texture, samplerUnit);
+}
+
+void WindowedGLBackend::DestroyTexture(GpuTextureHandle texture)
+{
+    _device.DestroyTexture(texture);
+}
+
+void WindowedGLBackend::ImageBarrier()
+{
+    _device.ImageBarrier();
+}
+
 } // namespace planetgen

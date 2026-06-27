@@ -413,8 +413,9 @@ PgResult pg_generate_mesh(PgBody body, uint32_t rings, uint32_t segments, uint32
     const uint32_t vertexCount = static_cast<uint32_t>(mesh.positions.size() / 3);
 
     planetgen::GenerationPipeline pipeline(*ctx->backend, ctx->registry, ctx->palettes);
+    const planetgen::GenerationPipeline::MaskCache maskCache{ &body->maskTexture, &body->maskBuiltKey };
     planetgen::PipelineResult pr =
-        pipeline.Generate(body->config, mesh.positions.data(), vertexCount, seed);
+        pipeline.Generate(body->config, mesh.positions.data(), vertexCount, seed, maskCache);
 
     if (pr.count == 0)
     {
@@ -444,6 +445,53 @@ PgResult pg_generate_mesh(PgBody body, uint32_t rings, uint32_t segments, uint32
     ctx->ClearError();
     return result;
     });
+}
+
+PgError pg_generate_patch(PgBody body, const float* vertices, uint32_t vertex_count, uint32_t seed,
+                          uint32_t height_buffer, uint32_t normal_buffer, uint32_t shading_buffer,
+                          uint32_t* out_vertex_count)
+{
+    if (!body || !vertices || vertex_count == 0 || !height_buffer || !normal_buffer || !shading_buffer)
+        return PG_ERROR_INVALID_ARGUMENT;
+
+    auto* ctx = body->ctx;
+
+    // Status-returning exception boundary (the result-returning GuardGen doesn't
+    // fit — this path allocates no PgResult). Nothing crosses the C ABI.
+    try
+    {
+        planetgen::GenerationPipeline pipeline(*ctx->backend, ctx->registry, ctx->palettes);
+        const planetgen::GenerationPipeline::MaskCache maskCache{ &body->maskTexture, &body->maskBuiltKey };
+        const bool ok = pipeline.GeneratePatch(body->config, vertices, vertex_count, seed,
+                                               height_buffer, normal_buffer, shading_buffer, maskCache);
+        if (!ok)
+        {
+            ctx->SetError(PG_ERROR_NOT_INITIALIZED, "per-patch generation produced no dispatch");
+            return ctx->lastError;
+        }
+
+        if (out_vertex_count)
+            *out_vertex_count = vertex_count;
+
+        ctx->ClearError();
+        return PG_SUCCESS;
+    }
+    catch (const std::bad_alloc&)
+    {
+        ctx->SetError(PG_ERROR_OUT_OF_MEMORY, "out of memory during per-patch generation");
+        return ctx->lastError;
+    }
+    catch (const std::exception& e)
+    {
+        ctx->SetError(PG_ERROR_INVALID_ARGUMENT,
+                      std::string("per-patch generation failed: ") + e.what());
+        return ctx->lastError;
+    }
+    catch (...)
+    {
+        ctx->SetError(PG_ERROR_INVALID_ARGUMENT, "per-patch generation failed: unknown error");
+        return ctx->lastError;
+    }
 }
 
 // ============================================================================

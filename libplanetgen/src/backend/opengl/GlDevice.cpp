@@ -162,4 +162,53 @@ void GlDevice::Barrier()
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }
 
+// --- 3D texture (RG32F) — continent mask ---
+// Mirrors the app-side ContinentMaskRenderer reference: linear filter,
+// clamp-to-edge, RG32F volume the growth compute writes and the height stage reads.
+
+GpuTextureHandle GlDevice::CreateTexture3D_RG32F(uint32_t resolution)
+{
+    unsigned int tex = 0;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_3D, tex);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_RG32F,
+                 static_cast<GLsizei>(resolution),
+                 static_cast<GLsizei>(resolution),
+                 static_cast<GLsizei>(resolution),
+                 0, GL_RG, GL_FLOAT, nullptr);
+    glBindTexture(GL_TEXTURE_3D, 0);
+    return tex;
+}
+
+void GlDevice::BindImage3D(GpuTextureHandle texture, uint32_t imageUnit)
+{
+    glBindImageTexture(imageUnit, texture, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RG32F);
+}
+
+void GlDevice::BindTexture3D(GpuTextureHandle texture, uint32_t samplerUnit)
+{
+    glActiveTexture(GL_TEXTURE0 + samplerUnit);
+    glBindTexture(GL_TEXTURE_3D, texture);
+    glActiveTexture(GL_TEXTURE0);
+}
+
+void GlDevice::DestroyTexture(GpuTextureHandle texture)
+{
+    if (texture)
+    {
+        unsigned int t = texture;
+        glDeleteTextures(1, &t);
+    }
+}
+
+void GlDevice::ImageBarrier()
+{
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+}
+
 } // namespace planetgen

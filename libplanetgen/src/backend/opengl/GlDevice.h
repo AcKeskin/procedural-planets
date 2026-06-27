@@ -45,8 +45,16 @@ public:
     void SetFloat(const std::string& name, float value);
     void SetVec3(const std::string& name, const float* value);
 
+    // 3D-texture (RG32F) support — continent mask: growth pass writes via image,
+    // height stage reads via sampler.
+    GpuTextureHandle CreateTexture3D_RG32F(uint32_t resolution);
+    void BindImage3D(GpuTextureHandle texture, uint32_t imageUnit);
+    void BindTexture3D(GpuTextureHandle texture, uint32_t samplerUnit);
+    void DestroyTexture(GpuTextureHandle texture);
+
     void Dispatch(uint32_t groupsX, uint32_t groupsY = 1, uint32_t groupsZ = 1);
     void Barrier();
+    void ImageBarrier();
 
 private:
     int GetUniformLocation(const std::string& name);

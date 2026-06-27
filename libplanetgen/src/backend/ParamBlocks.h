@@ -127,7 +127,7 @@ struct alignas(16) HeightParams
     // Row 17
     float abyssalScale;
     float abyssalStrength;
-    float _pad3;
+    int32_t continentMaskAvailable; // was _pad3 — 1 when the library bound a mask
     float _pad4;
 };
 

@@ -26,12 +26,28 @@ namespace planetgen
 // The seam every GPU strategy runs against. Bundles the backend (GPU mechanics),
 // the shader registry (id -> compiled program), and the per-call geometry inputs.
 // The orchestrator builds one of these and hands it to each stage.
+//
+// Optional output handles (per-patch path): when a stage's outXxx field is
+// non-zero, the stage binds that caller-owned buffer as its output instead of
+// allocating its own — the write-in-place mode the public per-patch call needs.
+// Zero means "allocate and return a fresh buffer" (the whole-mesh default). The
+// buffers are bound via the backend's existing BindBuffer; the stage never
+// destroys a caller-supplied handle.
 struct StrategyContext
 {
     IComputeBackend& backend;
     const ShaderRegistry& registry;
     uint32_t vertexCount = 0;
     uint32_t seed = 0;
+
+    // Caller-supplied output buffers (0 = strategy allocates its own).
+    GpuBufferHandle outHeights = 0;
+    GpuBufferHandle outNormals = 0;
+    GpuBufferHandle outShading = 0;
+
+    // Continent-mask 3D texture (0 = none). When set, the height stage binds it to
+    // the mask sampler unit and flags continentMaskAvailable in its params.
+    GpuTextureHandle continentMask = 0;
 };
 
 // Output handle bundle for the height stage (heights + packed-float3 normals).

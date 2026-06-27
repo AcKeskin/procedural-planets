@@ -241,8 +241,9 @@ vec4 sphericalVoronoi(vec3 dir, int numPlates, uint seed)
 // Continental mask — loose uniforms, set by BodyRuntime::SetShapeUniforms
 // ============================================================================
 
-uniform sampler3D continentMask;
-uniform int       continentMaskAvailable;
+// Sampler unit is explicit (GL 4.2+ layout binding) so the library binds the mask
+// to unit 4 without a loose uniform. continentMaskAvailable now lives in the UBO.
+layout(binding = 4) uniform sampler3D continentMask;
 
 // Sample R=continentalness, G=accretionAge from the baked 3D texture.
 // Direction is in [-1,1]³ sphere surface → remap to [0,1]³ UVW.
@@ -359,7 +360,7 @@ layout(std140, binding = 3) uniform HeightParamsBlock
     // Row 17
     float abyssalScale;
     float abyssalStrength;
-    float _pad3;
+    int   continentMaskAvailable; // was _pad3 — 1 when the library bound a mask
     float _pad4;
 };
 

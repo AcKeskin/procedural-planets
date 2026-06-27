@@ -1,8 +1,23 @@
 #include "GenerationPipeline.h"
+#include "ContinentMaskPass.h"
 #include "../model/BodyConfigProjection.h"
 
 namespace planetgen
 {
+
+namespace
+{
+// Resolve the continent mask for this call from the body's cache (bake/reuse),
+// or 0 when no cache was supplied or the config disables it.
+GpuTextureHandle ResolveMask(IComputeBackend& backend, const ShaderRegistry& registry,
+                             const BodyConfig& config, uint32_t seed,
+                             GenerationPipeline::MaskCache mask)
+{
+    if (!mask.texture || !mask.key)
+        return 0;
+    return EnsureContinentMask(backend, registry, config, seed, *mask.texture, *mask.key);
+}
+} // namespace
 
 GenerationPipeline::GenerationPipeline(IComputeBackend& backend,
                                        const ShaderRegistry& registry,
@@ -14,7 +29,8 @@ GenerationPipeline::GenerationPipeline(IComputeBackend& backend,
 PipelineResult GenerationPipeline::Generate(const BodyConfig& config,
                                             const float* vertices,
                                             uint32_t vertexCount,
-                                            uint32_t seed)
+                                            uint32_t seed,
+                                            MaskCache mask)
 {
     PipelineResult result;
     if (!vertices || vertexCount == 0)
@@ -26,6 +42,7 @@ PipelineResult GenerationPipeline::Generate(const BodyConfig& config,
     const PgErosionDesc erosionDesc = ProjectToErosionDesc(config);
 
     StrategyContext sc{ _backend, _registry, vertexCount, seed };
+    sc.continentMask = ResolveMask(_backend, _registry, config, seed, mask);
 
     // Upload geometry once; all stages read from this SSBO (binding 0).
     const size_t vertexBytes = vertexCount * 3 * sizeof(float);
@@ -75,6 +92,48 @@ PipelineResult GenerationPipeline::Generate(const BodyConfig& config,
     _backend.DestroyBuffer(vertexBuf);
 
     return result;
+}
+
+bool GenerationPipeline::GeneratePatch(const BodyConfig& config,
+                                       const float* vertices,
+                                       uint32_t vertexCount,
+                                       uint32_t seed,
+                                       GpuBufferHandle outHeights,
+                                       GpuBufferHandle outNormals,
+                                       GpuBufferHandle outShading,
+                                       MaskCache mask)
+{
+    if (!vertices || vertexCount == 0 || !outHeights || !outNormals || !outShading)
+        return false;
+
+    const PgBodyDesc    bodyDesc    = ProjectToBodyDesc(config);
+    const PgShadingDesc shadingDesc = ProjectToShadingDesc(config);
+
+    // Same per-vertex strategies as the whole-mesh path, but writing into the
+    // caller's buffers (outXxx) — this is what makes a standalone patch
+    // byte-identical to the whole-mesh region (cross-consistency). The mask is the
+    // same body-cached texture the whole-mesh path samples (per-vertex-pure lookup).
+    StrategyContext sc{ _backend, _registry, vertexCount, seed };
+    sc.outHeights = outHeights;
+    sc.outNormals = outNormals;
+    sc.outShading = outShading;
+    sc.continentMask = ResolveMask(_backend, _registry, config, seed, mask);
+
+    // Upload geometry once; all stages read from this SSBO (binding 0).
+    const size_t vertexBytes = vertexCount * 3 * sizeof(float);
+    const GpuBufferHandle vertexBuf = _backend.CreateBuffer(vertexBytes);
+    _backend.UploadBuffer(vertexBuf, vertices, vertexBytes);
+
+    // Height -> shading, no erosion. The strategies bind sc.outXxx in place.
+    const HeightBuffers hb = _height.Run(sc, bodyDesc, vertexBuf);
+    _shading.Run(sc, shadingDesc, vertexBuf, hb.heights);
+
+    // No DownloadBuffer, no fence: the data is GPU-resident in the caller's
+    // buffers and the caller owns completion tracking. Only the scratch vertex
+    // SSBO is ours to free; the output buffers belong to the caller.
+    _backend.DestroyBuffer(vertexBuf);
+
+    return true;
 }
 
 } // namespace planetgen

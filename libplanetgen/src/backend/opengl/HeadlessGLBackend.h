@@ -33,8 +33,14 @@ public:
     GpuBufferHandle CreateParamBuffer(size_t sizeBytes) override;
     void DestroyParamBuffer(GpuBufferHandle ubo) override;
 
+    GpuTextureHandle CreateTexture3D_RG32F(uint32_t resolution) override;
+    void BindImage3D(GpuTextureHandle texture, uint32_t imageUnit) override;
+    void BindTexture3D(GpuTextureHandle texture, uint32_t samplerUnit) override;
+    void DestroyTexture(GpuTextureHandle texture) override;
+
     void Dispatch(uint32_t groupsX, uint32_t groupsY, uint32_t groupsZ) override;
     void Barrier() override;
+    void ImageBarrier() override;
 
     GlDevice& Device() { return _device; }
 

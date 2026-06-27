@@ -48,11 +48,26 @@ struct PgContext_T
 // `config` is the composable typed model (the canonical shape, loaded from JSON);
 // `desc` is its flat projection the strategies bind. For bodies created from the
 // flat PgBodyDesc directly, `config` stays default and `desc` is authoritative.
+//
+// The continent mask (an RG32F 3D texture) is whole-body state — a deterministic
+// function of (config, seed). It is baked lazily on the first generation call and
+// cached here, regenerated when the (seed, resolution) it was built for changes.
+// This is a cache, not session state: identical inputs reproduce it exactly, so
+// it does not affect the stateless-per-call / determinism guarantees.
 struct PgBody_T
 {
     PgContext_T* ctx = nullptr;
     PgBodyDesc desc{};
     planetgen::BodyConfig config{};
+
+    planetgen::GpuTextureHandle maskTexture = 0; // 0 = not yet baked
+    uint64_t maskBuiltKey = 0;                   // (seed, resolution) the mask was baked for
+
+    ~PgBody_T()
+    {
+        if (maskTexture && ctx && ctx->backend)
+            ctx->backend->DestroyTexture(maskTexture);
+    }
 };
 
 // Internal result — owns CPU readback data

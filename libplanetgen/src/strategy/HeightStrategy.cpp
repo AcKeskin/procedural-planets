@@ -9,6 +9,7 @@ namespace planetgen
 namespace
 {
 constexpr uint32_t HeightWorkgroupSize = 512;
+constexpr uint32_t kContinentMaskSamplerUnit = 4; // matches layout(binding=4) in height_earth.comp
 } // namespace
 
 HeightBuffers HeightStrategy::Run(const StrategyContext& sc,
@@ -24,15 +25,25 @@ HeightBuffers HeightStrategy::Run(const StrategyContext& sc,
     const size_t heightBytes = sc.vertexCount * sizeof(float);
     const size_t normalBytes = sc.vertexCount * 3 * sizeof(float);
 
-    const GpuBufferHandle heightBuf = gpu.CreateBuffer(heightBytes);
-    const GpuBufferHandle normalBuf = gpu.CreateBuffer(normalBytes);
+    // Per-patch path passes app-owned output buffers; otherwise allocate our own.
+    const GpuBufferHandle heightBuf = sc.outHeights ? sc.outHeights : gpu.CreateBuffer(heightBytes);
+    const GpuBufferHandle normalBuf = sc.outNormals ? sc.outNormals : gpu.CreateBuffer(normalBytes);
 
     gpu.BindShader(program);
     gpu.BindBuffer(vertices,  0);
     gpu.BindBuffer(heightBuf, 1);
     gpu.BindBuffer(normalBuf, 2);
 
-    const auto params = MakeHeightParams(desc, sc.seed, sc.vertexCount);
+    auto params = MakeHeightParams(desc, sc.seed, sc.vertexCount);
+
+    // Continent mask: bind the library-baked 3D texture to the sampler unit the
+    // shader reads, and flag availability in the UBO (no loose uniforms).
+    if (sc.continentMask != 0)
+    {
+        gpu.BindTexture3D(sc.continentMask, kContinentMaskSamplerUnit);
+        params.continentMaskAvailable = 1;
+    }
+
     const GpuBufferHandle ubo = gpu.CreateParamBuffer(sizeof(params));
     gpu.SetParams(ubo, &params, sizeof(params), kParamBinding);
 

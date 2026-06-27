@@ -104,6 +104,19 @@ public:
         return Result(pg_generate_mesh(_handle, rings, segments, seed));
     }
 
+    // Per-patch generation into caller-owned GPU buffers (the LOD path). Writes
+    // height/normal/shading in place, GPU-resident, fence-agnostic — the caller
+    // owns the buffers and its own sync. Returns the status; outVertexCount (if
+    // non-null) echoes the dispatched count. See pg_generate_patch for the full
+    // contract.
+    PgError GeneratePatch(const float* vertices, uint32_t vertexCount, uint32_t seed,
+                          uint32_t heightBuffer, uint32_t normalBuffer, uint32_t shadingBuffer,
+                          uint32_t* outVertexCount = nullptr)
+    {
+        return pg_generate_patch(_handle, vertices, vertexCount, seed,
+                                 heightBuffer, normalBuffer, shadingBuffer, outVertexCount);
+    }
+
     bool IsValid() const { return _handle != nullptr; }
     PgBody Handle() const { return _handle; }
 

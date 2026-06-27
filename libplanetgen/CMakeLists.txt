@@ -48,6 +48,7 @@ set(PLANETGEN_SOURCES
     src/strategy/ShadingStrategy.cpp
     src/strategy/ErosionStrategy.cpp
     src/strategy/PaletteProvider.cpp
+    src/strategy/ContinentMaskPass.cpp
     src/strategy/GenerationPipeline.cpp
     src/mesh/MeshGen.cpp
 )
@@ -72,6 +73,7 @@ set(PLANETGEN_HEADERS
     src/strategy/ShadingStrategy.h
     src/strategy/ErosionStrategy.h
     src/strategy/PaletteProvider.h
+    src/strategy/ContinentMaskPass.h
     src/strategy/GenerationPipeline.h
     src/strategy/StrategyCommon.h
     src/mesh/MeshGen.h
@@ -132,6 +134,7 @@ set(PLANETGEN_TEST_SOURCES
     tests/test_registry.cpp
     tests/test_headless.cpp
     tests/test_determinism.cpp
+    tests/test_patch_generation.cpp
     tests/test_body_model.cpp
     tests/test_strategies.cpp
     tests/test_strategy_extension.cpp
@@ -161,6 +164,7 @@ target_sources(planetgen_tests PRIVATE
     src/strategy/ShadingStrategy.cpp
     src/strategy/ErosionStrategy.cpp
     src/strategy/PaletteProvider.cpp
+    src/strategy/ContinentMaskPass.cpp
     src/strategy/GenerationPipeline.cpp
     ${GL3W_SRC}
 )

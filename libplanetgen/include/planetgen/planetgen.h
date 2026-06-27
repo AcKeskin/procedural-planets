@@ -183,6 +183,15 @@ PG_API void   pg_body_destroy(PgBody body);
 // geometry) yields byte-identical per-vertex output across calls and processes.
 // Generation is stateless per call — no hidden session state affects the result.
 //
+// Continent mask (library-owned): when the body config enables tectonics, the
+// library bakes a continent-mask 3D texture from (config, seed) and samples it in
+// the height stage — the caller supplies NO texture. The mask is generated lazily
+// on the first generation call for a body, cached on the body, and regenerated when
+// the (seed, mask resolution) it was built for changes. It is a deterministic
+// function of (config, seed), so it does not affect the determinism / cross-
+// consistency guarantees: a standalone patch stays byte-identical to the whole-mesh
+// region with the mask on.
+//
 // Error model: every call below returns a handle (null on failure). On failure
 // the owning context records a status code (pg_context_get_error) and a
 // human-readable message (pg_get_last_error_message). No exception crosses the
@@ -207,6 +216,32 @@ PG_API PgResult pg_generate_erosion(PgBody body, const float* heights, uint32_t 
 // one call. The result carries vertices (packed float3) and triangle indices in
 // addition to heights/normals/shading/palette.
 PG_API PgResult pg_generate_mesh(PgBody body, uint32_t rings, uint32_t segments, uint32_t seed);
+
+// Per-patch generation into CALLER-OWNED GPU buffers (the LOD path).
+//
+// The caller passes one patch's packed float3 vertex positions plus three GL
+// buffer object names (SSBOs) it owns and has sized: height_buffer (float per
+// vertex), normal_buffer (float3 per vertex), shading_buffer (float4 per vertex).
+// The library runs the per-vertex height + shading stages and writes results
+// directly INTO those buffers. Contract:
+//   - App-owned buffers: the library writes in place, allocates no output, and
+//     never deletes the caller's buffers. It allocates no PgResult.
+//   - GPU-resident, no readback: the data stays on the GPU; there is no CPU
+//     copy-out. The caller binds/renders from the same buffers.
+//   - Fence-agnostic: the call records the compute dispatch into the current GL
+//     context and returns. It creates NO glFenceSync. The caller owns completion
+//     tracking — drop and poll your own fence around this call.
+//   - Cross-consistency: a patch generated here is byte-identical to the same
+//     vertices generated via the whole-mesh path, for the per-vertex stages
+//     (height + shading). Erosion is NOT run on this path (neighbour-coupled —
+//     it would seam at patch boundaries) so it is excluded from that guarantee.
+//   - Determinism: identical (config, seed, vertices) yields byte-identical
+//     buffer contents across calls.
+// out_vertex_count (optional, may be null) echoes the vertex count dispatched.
+// Returns PG_SUCCESS, or an error code with a retrievable message on the context.
+PG_API PgError pg_generate_patch(PgBody body, const float* vertices, uint32_t vertex_count,
+                                 uint32_t seed, uint32_t height_buffer, uint32_t normal_buffer,
+                                 uint32_t shading_buffer, uint32_t* out_vertex_count);
 
 // ============================================================================
 // Result access

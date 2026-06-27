@@ -37,7 +37,8 @@ GpuBufferHandle ShadingStrategy::Run(const StrategyContext& sc,
     }
 
     const size_t shadingBytes = sc.vertexCount * 4 * sizeof(float);
-    const GpuBufferHandle shadingBuf = gpu.CreateBuffer(shadingBytes);
+    // Per-patch path passes an app-owned shading buffer; otherwise allocate our own.
+    const GpuBufferHandle shadingBuf = sc.outShading ? sc.outShading : gpu.CreateBuffer(shadingBytes);
 
     gpu.BindShader(program);
     gpu.BindBuffer(vertices,   0);
