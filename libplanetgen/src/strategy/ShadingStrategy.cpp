@@ -1,4 +1,5 @@
 #include "ShadingStrategy.h"
+#include "StrategyCommon.h"
 #include "../backend/ParamBlocks.h"
 #include "../backend/ParamMappers.h"
 
@@ -8,9 +9,6 @@ namespace planetgen
 namespace
 {
 constexpr uint32_t ShadingWorkgroupSize = 256;
-constexpr uint32_t ParamBinding = 3;
-
-uint32_t GroupCount(uint32_t count, uint32_t wg) { return (count + wg - 1) / wg; }
 } // namespace
 
 GpuBufferHandle ShadingStrategy::Run(const StrategyContext& sc,
@@ -51,13 +49,13 @@ GpuBufferHandle ShadingStrategy::Run(const StrategyContext& sc,
     {
         const auto p = MakeShadingEarthParams(desc, sc.seed, sc.vertexCount);
         ubo = gpu.CreateParamBuffer(sizeof(p));
-        gpu.SetParams(ubo, &p, sizeof(p), ParamBinding);
+        gpu.SetParams(ubo, &p, sizeof(p), kParamBinding);
     }
     else
     {
         const auto p = MakeShadingGenericParams(desc, sc.seed, sc.vertexCount);
         ubo = gpu.CreateParamBuffer(sizeof(p));
-        gpu.SetParams(ubo, &p, sizeof(p), ParamBinding);
+        gpu.SetParams(ubo, &p, sizeof(p), kParamBinding);
     }
 
     gpu.Dispatch(GroupCount(sc.vertexCount, ShadingWorkgroupSize));

@@ -1,12 +1,12 @@
 #pragma once
 
-// App-side body runtime + param binder for the LOD compute path.
+// The app's runtime view of the active body — owns its BodyConfig + resolved
+// palette, and binds each compute stage's params for the LOD dispatch.
 //
 // The library's GenerationPipeline is whole-mesh and stateless, so it can't drive
 // the app's per-patch LOD dispatch into LOD-owned buffers. This type stays app-side
-// by design: it holds the active BodyConfig + resolved palette and binds each
-// compute stage's std140 UBO via the shared ParamMappers — the same mapping code
-// the library strategies use, so there is one source of truth for the field layout.
+// by design and binds each stage's std140 UBO via the shared ParamMappers — the same
+// mapping code the library strategies use, so the field layout has one source of truth.
 // Surface is exactly what GenerationScheduler, TerrainGenerator, SurfacePanel, and
 // Application's frame loop need.
 

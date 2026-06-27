@@ -1,4 +1,5 @@
 #include "HeightStrategy.h"
+#include "StrategyCommon.h"
 #include "../backend/ParamBlocks.h"
 #include "../backend/ParamMappers.h"
 
@@ -8,9 +9,6 @@ namespace planetgen
 namespace
 {
 constexpr uint32_t HeightWorkgroupSize = 512;
-constexpr uint32_t ParamBinding = 3; // SSBOs use 0/1/2
-
-uint32_t GroupCount(uint32_t count, uint32_t wg) { return (count + wg - 1) / wg; }
 } // namespace
 
 HeightBuffers HeightStrategy::Run(const StrategyContext& sc,
@@ -36,7 +34,7 @@ HeightBuffers HeightStrategy::Run(const StrategyContext& sc,
 
     const auto params = MakeHeightParams(desc, sc.seed, sc.vertexCount);
     const GpuBufferHandle ubo = gpu.CreateParamBuffer(sizeof(params));
-    gpu.SetParams(ubo, &params, sizeof(params), ParamBinding);
+    gpu.SetParams(ubo, &params, sizeof(params), kParamBinding);
 
     gpu.Dispatch(GroupCount(sc.vertexCount, HeightWorkgroupSize));
     gpu.Barrier();

@@ -73,6 +73,7 @@ set(PLANETGEN_HEADERS
     src/strategy/ErosionStrategy.h
     src/strategy/PaletteProvider.h
     src/strategy/GenerationPipeline.h
+    src/strategy/StrategyCommon.h
     src/mesh/MeshGen.h
 )
 

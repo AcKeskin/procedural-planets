@@ -38,8 +38,15 @@ PipelineResult GenerationPipeline::Generate(const BodyConfig& config,
     const GpuBufferHandle normals = hb.normals;
 
     // --- Erosion (only when the config enables it) ---
+    // Erosion may return its own scratch buffer instead of the input; if so, the
+    // original height SSBO is no longer referenced and must be freed here.
     if (config.erosion.enabled)
+    {
+        const GpuBufferHandle preErosion = heights;
         heights = _erosion.Run(sc, erosionDesc, heights);
+        if (heights != preErosion)
+            _backend.DestroyBuffer(preErosion);
+    }
 
     // --- Shading (always) ---
     const GpuBufferHandle shading = _shading.Run(sc, shadingDesc, vertexBuf, heights);

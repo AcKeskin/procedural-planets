@@ -1,4 +1,5 @@
 #include "ErosionStrategy.h"
+#include "StrategyCommon.h"
 #include "../backend/ParamBlocks.h"
 #include "../backend/ParamMappers.h"
 
@@ -8,9 +9,6 @@ namespace planetgen
 namespace
 {
 constexpr uint32_t ErosionWorkgroupSize = 256;
-constexpr uint32_t ParamBinding = 3;
-
-uint32_t GroupCount(uint32_t count, uint32_t wg) { return (count + wg - 1) / wg; }
 } // namespace
 
 GpuBufferHandle ErosionStrategy::Run(const StrategyContext& sc,
@@ -38,7 +36,7 @@ GpuBufferHandle ErosionStrategy::Run(const StrategyContext& sc,
     {
         gpu.BindBuffer(in,  0);
         gpu.BindBuffer(out, 1);
-        gpu.SetParams(ubo, &params, sizeof(params), ParamBinding);
+        gpu.SetParams(ubo, &params, sizeof(params), kParamBinding);
         gpu.Dispatch(GroupCount(sc.vertexCount, ErosionWorkgroupSize));
         gpu.Barrier();
 
