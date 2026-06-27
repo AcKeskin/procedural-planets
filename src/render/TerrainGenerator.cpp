@@ -6,12 +6,7 @@ namespace planets::render
 {
 
 TerrainGenerator::TerrainGenerator() = default;
-
-TerrainGenerator::~TerrainGenerator()
-{
-    if (_pgContext)
-        pg_context_destroy(_pgContext);
-}
+TerrainGenerator::~TerrainGenerator() = default;
 
 bool TerrainGenerator::Initialize(const std::string& heightShaderPath,
                                   const std::string& shadingShaderPath,
@@ -38,31 +33,6 @@ bool TerrainGenerator::Initialize(const std::string& heightShaderPath,
     }
 
     return success;
-}
-
-bool TerrainGenerator::InitializeLibrary()
-{
-    if (_pgContext)
-        return true; // Already initialized
-
-    PgContextDesc desc{};
-    desc.use_existing_context = 1; // Reuse app's GL context
-    _pgContext = pg_context_create(&desc);
-
-    if (!_pgContext)
-    {
-        std::cerr << "[TerrainGenerator] Failed to initialize libplanetgen context" << std::endl;
-        return false;
-    }
-
-    PgError err = pg_context_get_error(_pgContext);
-    if (err != PG_SUCCESS)
-    {
-        std::cerr << "[TerrainGenerator] libplanetgen context created with errors (code " << err << ")" << std::endl;
-    }
-
-    std::cout << "[TerrainGenerator] libplanetgen context initialized (embedded shaders)" << std::endl;
-    return true;
 }
 
 // ============================================================================

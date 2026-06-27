@@ -292,9 +292,6 @@ bool Application::Initialize()
     _renderer.Initialize();
     _guiManager.Initialize(_window.GetHandle());
 
-    // Initialize libplanetgen with the app's existing GL context
-    _terrainGenerator.InitializeLibrary();
-
     if (!_continentMaskRenderer.Initialize())
         std::cerr << "[Application] ContinentMaskRenderer failed to initialize (non-fatal)" << std::endl;
 

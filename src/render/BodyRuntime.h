@@ -1,9 +1,14 @@
 #pragma once
 
-// THROWAWAY SHIM — deleted when GenerationPipeline lands.
-// Bridges a BodyConfig + resolved palette to the interface call sites currently expect from
-// CelestialBody. Exposes exactly the surface used by GenerationScheduler, TerrainGenerator,
-// SurfacePanel, and Application's frame loop.
+// App-side body runtime + param binder for the LOD compute path.
+//
+// The library's GenerationPipeline is whole-mesh and stateless, so it can't drive
+// the app's per-patch LOD dispatch into LOD-owned buffers. This type stays app-side
+// by design: it holds the active BodyConfig + resolved palette and binds each
+// compute stage's std140 UBO via the shared ParamMappers — the same mapping code
+// the library strategies use, so there is one source of truth for the field layout.
+// Surface is exactly what GenerationScheduler, TerrainGenerator, SurfacePanel, and
+// Application's frame loop need.
 
 #include "BiomePalette.h"
 #include "ComputeShader.h"

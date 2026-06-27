@@ -2,11 +2,12 @@
 #include "InternalTypes.h"
 #include "../backend/opengl/WindowedGLBackend.h"
 #include "../backend/opengl/HeadlessGLBackend.h"
-#include "../backend/ParamBlocks.h"
-#include "../backend/ParamMappers.h"
 #include "EmbeddedShaders.h"
 #include "../model/BodyConfig.h"
 #include "../model/BodyConfigProjection.h"
+#include "../strategy/HeightStrategy.h"
+#include "../strategy/ShadingStrategy.h"
+#include "../strategy/ErosionStrategy.h"
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -14,28 +15,9 @@
 // nlohmann/json for body_create_from_json
 #include <nlohmann/json.hpp>
 
-namespace
-{
-
-constexpr uint32_t HeightWorkgroupSize  = 512;
-constexpr uint32_t ShadingWorkgroupSize = 256;
-constexpr uint32_t ErosionWorkgroupSize = 256;
-
-// UBO binding point for param structs — SSBOs use 0/1/2
-constexpr uint32_t ParamBinding = 3;
-
-uint32_t ComputeGroupCount(uint32_t count, uint32_t workgroupSize)
-{
-    return (count + workgroupSize - 1) / workgroupSize;
-}
-
-// Bring mapper functions into this translation unit's anonymous scope
-using planetgen::MakeHeightParams;
-using planetgen::MakeShadingEarthParams;
-using planetgen::MakeShadingGenericParams;
-using planetgen::MakeErosionParams;
-
-} // namespace
+// Dispatch mechanics (param mapping, workgroup sizing, GPU buffer threading)
+// now live in the strategy layer (src/strategy/*). This file owns only the
+// C ABI surface: handle lifecycle, result construction, and CPU readback.
 
 // ============================================================================
 // Context lifecycle
@@ -207,44 +189,39 @@ PgResult pg_generate_heights(PgBody body, const float* vertices, uint32_t vertex
     auto* ctx = body->ctx;
     auto& gpu = *ctx->backend;
 
-    uint32_t program = ctx->registry.Resolve(planetgen::BuiltinProgram::Height);
-    if (!program)
+    if (!ctx->registry.Resolve(planetgen::BuiltinProgram::Height))
     {
         ctx->lastError = PG_ERROR_NOT_INITIALIZED;
         return nullptr;
     }
 
-    size_t vertexBytes = vertex_count * 3 * sizeof(float);
-    size_t heightBytes = vertex_count * sizeof(float);
-    size_t normalBytes = vertex_count * 3 * sizeof(float);
+    const size_t vertexBytes = vertex_count * 3 * sizeof(float);
+    const size_t heightBytes = vertex_count * sizeof(float);
+    const size_t normalBytes = vertex_count * 3 * sizeof(float);
 
-    auto vertexBuf = gpu.CreateBuffer(vertexBytes);
-    auto heightBuf = gpu.CreateBuffer(heightBytes);
-    auto normalBuf = gpu.CreateBuffer(normalBytes);
-
+    const auto vertexBuf = gpu.CreateBuffer(vertexBytes);
     gpu.UploadBuffer(vertexBuf, vertices, vertexBytes);
 
-    gpu.BindShader(program);
-    gpu.BindBuffer(vertexBuf, 0);
-    gpu.BindBuffer(heightBuf, 1);
-    gpu.BindBuffer(normalBuf, 2);
+    // Dispatch through the height strategy — the C ABI keeps per-call granularity.
+    planetgen::StrategyContext sc{ gpu, ctx->registry, vertex_count, seed };
+    planetgen::HeightStrategy strategy;
+    const planetgen::HeightBuffers hb = strategy.Run(sc, body->desc, vertexBuf);
 
-    // Upload typed params via UBO
-    auto params = MakeHeightParams(body->desc, seed, vertex_count);
-    auto ubo = gpu.CreateParamBuffer(sizeof(params));
-    gpu.SetParams(ubo, &params, sizeof(params), ParamBinding);
-
-    gpu.Dispatch(ComputeGroupCount(vertex_count, HeightWorkgroupSize));
-    gpu.Barrier();
-
-    gpu.DestroyParamBuffer(ubo);
+    if (!hb.heights || !hb.normals)
+    {
+        gpu.DestroyBuffer(vertexBuf);
+        if (hb.heights) gpu.DestroyBuffer(hb.heights);
+        if (hb.normals) gpu.DestroyBuffer(hb.normals);
+        ctx->lastError = PG_ERROR_NOT_INITIALIZED;
+        return nullptr;
+    }
 
     auto result = new (std::nothrow) PgResult_T();
     if (!result)
     {
         gpu.DestroyBuffer(vertexBuf);
-        gpu.DestroyBuffer(heightBuf);
-        gpu.DestroyBuffer(normalBuf);
+        gpu.DestroyBuffer(hb.heights);
+        gpu.DestroyBuffer(hb.normals);
         return nullptr;
     }
 
@@ -253,11 +230,11 @@ PgResult pg_generate_heights(PgBody body, const float* vertices, uint32_t vertex
     result->heights.resize(vertex_count);
     result->normals.resize(vertex_count * 3);
 
-    gpu.DownloadBuffer(heightBuf, result->heights.data(), heightBytes);
-    gpu.DownloadBuffer(normalBuf, result->normals.data(), normalBytes);
+    gpu.DownloadBuffer(hb.heights, result->heights.data(), heightBytes);
+    gpu.DownloadBuffer(hb.normals, result->normals.data(), normalBytes);
 
-    result->heightsGpuBuffer = heightBuf;
-    result->normalsGpuBuffer = normalBuf;
+    result->heightsGpuBuffer = hb.heights;
+    result->normalsGpuBuffer = hb.normals;
 
     gpu.DestroyBuffer(vertexBuf);
 
@@ -273,57 +250,28 @@ PgResult pg_generate_shading(PgBody body, const float* vertices, const float* he
     auto* ctx = body->ctx;
     auto& gpu = *ctx->backend;
 
-    // Choose between climate and generic shader based on descriptor
-    using BP = planetgen::BuiltinProgram;
-    BP programId = desc->use_climate_model ? BP::ShadingEarth : BP::ShadingGeneric;
-    uint32_t program = ctx->registry.Resolve(programId);
-    if (!program)
-    {
-        // Fall back to whichever is available
-        program = ctx->registry.Resolve(BP::ShadingEarth);
-        if (!program) program = ctx->registry.Resolve(BP::ShadingGeneric);
-        if (!program)
-        {
-            ctx->lastError = PG_ERROR_NOT_INITIALIZED;
-            return nullptr;
-        }
-    }
+    const size_t vertexBytes  = vertex_count * 3 * sizeof(float);
+    const size_t heightBytes  = vertex_count * sizeof(float);
+    const size_t shadingBytes = vertex_count * 4 * sizeof(float);
 
-    size_t vertexBytes  = vertex_count * 3 * sizeof(float);
-    size_t heightBytes  = vertex_count * sizeof(float);
-    size_t shadingBytes = vertex_count * 4 * sizeof(float);
-
-    auto vertexBuf  = gpu.CreateBuffer(vertexBytes);
-    auto shadingBuf = gpu.CreateBuffer(shadingBytes);
-    auto heightBuf  = gpu.CreateBuffer(heightBytes);
-
+    const auto vertexBuf = gpu.CreateBuffer(vertexBytes);
+    const auto heightBuf = gpu.CreateBuffer(heightBytes);
     gpu.UploadBuffer(vertexBuf, vertices, vertexBytes);
     gpu.UploadBuffer(heightBuf, heights,  heightBytes);
 
-    gpu.BindShader(program);
-    gpu.BindBuffer(vertexBuf,  0);
-    gpu.BindBuffer(shadingBuf, 1);
-    gpu.BindBuffer(heightBuf,  2);
+    // Dispatch through the shading strategy — earth/generic choice lives inside it.
+    planetgen::StrategyContext sc{ gpu, ctx->registry, vertex_count, seed };
+    planetgen::ShadingStrategy strategy;
+    const planetgen::GpuBufferHandle shadingBuf =
+        strategy.Run(sc, *desc, vertexBuf, heightBuf);
 
-    // Upload the correct param struct for whichever path we took
-    planetgen::GpuBufferHandle ubo = 0;
-    if (programId == BP::ShadingEarth)
+    if (!shadingBuf)
     {
-        auto p = MakeShadingEarthParams(*desc, seed, vertex_count);
-        ubo = gpu.CreateParamBuffer(sizeof(p));
-        gpu.SetParams(ubo, &p, sizeof(p), ParamBinding);
+        gpu.DestroyBuffer(vertexBuf);
+        gpu.DestroyBuffer(heightBuf);
+        ctx->lastError = PG_ERROR_NOT_INITIALIZED;
+        return nullptr;
     }
-    else
-    {
-        auto p = MakeShadingGenericParams(*desc, seed, vertex_count);
-        ubo = gpu.CreateParamBuffer(sizeof(p));
-        gpu.SetParams(ubo, &p, sizeof(p), ParamBinding);
-    }
-
-    gpu.Dispatch(ComputeGroupCount(vertex_count, ShadingWorkgroupSize));
-    gpu.Barrier();
-
-    gpu.DestroyParamBuffer(ubo);
 
     auto result = new (std::nothrow) PgResult_T();
     if (!result)
@@ -349,7 +297,7 @@ PgResult pg_generate_shading(PgBody body, const float* vertices, const float* he
 }
 
 PgResult pg_generate_erosion(PgBody body, const float* heights, uint32_t vertex_count,
-                              const PgErosionDesc* desc, uint32_t /*seed*/)
+                              const PgErosionDesc* desc, uint32_t seed)
 {
     if (!body || !heights || vertex_count == 0 || !desc)
         return nullptr;
@@ -357,48 +305,26 @@ PgResult pg_generate_erosion(PgBody body, const float* heights, uint32_t vertex_
     auto* ctx = body->ctx;
     auto& gpu = *ctx->backend;
 
-    uint32_t program = ctx->registry.Resolve(planetgen::BuiltinProgram::Erosion);
-    if (!program)
+    if (!ctx->registry.Resolve(planetgen::BuiltinProgram::Erosion))
     {
         ctx->lastError = PG_ERROR_NOT_INITIALIZED;
         return nullptr;
     }
 
-    size_t heightBytes = vertex_count * sizeof(float);
+    const size_t heightBytes = vertex_count * sizeof(float);
 
-    auto inputBuf  = gpu.CreateBuffer(heightBytes);
-    auto outputBuf = gpu.CreateBuffer(heightBytes);
-
+    const auto inputBuf = gpu.CreateBuffer(heightBytes);
     gpu.UploadBuffer(inputBuf, heights, heightBytes);
-    gpu.BindShader(program);
 
-    // Params are the same every iteration — create once, re-upload each iter
-    auto params = MakeErosionParams(*desc, vertex_count);
-    auto ubo = gpu.CreateParamBuffer(sizeof(params));
-
-    for (int i = 0; i < desc->iterations; ++i)
-    {
-        gpu.BindBuffer(inputBuf,  0);
-        gpu.BindBuffer(outputBuf, 1);
-
-        gpu.SetParams(ubo, &params, sizeof(params), ParamBinding);
-
-        gpu.Dispatch(ComputeGroupCount(vertex_count, ErosionWorkgroupSize));
-        gpu.Barrier();
-
-        // Ping-pong
-        auto tmp = inputBuf;
-        inputBuf  = outputBuf;
-        outputBuf = tmp;
-    }
-
-    gpu.DestroyParamBuffer(ubo);
+    // Dispatch through the erosion strategy — it owns the ping-pong + scratch.
+    planetgen::StrategyContext sc{ gpu, ctx->registry, vertex_count, seed };
+    planetgen::ErosionStrategy strategy;
+    const planetgen::GpuBufferHandle resultBuf = strategy.Run(sc, *desc, inputBuf);
 
     auto result = new (std::nothrow) PgResult_T();
     if (!result)
     {
         gpu.DestroyBuffer(inputBuf);
-        gpu.DestroyBuffer(outputBuf);
         return nullptr;
     }
 
@@ -406,10 +332,13 @@ PgResult pg_generate_erosion(PgBody body, const float* heights, uint32_t vertex_
     result->count = vertex_count;
     result->heights.resize(vertex_count);
 
-    gpu.DownloadBuffer(inputBuf, result->heights.data(), heightBytes);
+    gpu.DownloadBuffer(resultBuf, result->heights.data(), heightBytes);
 
-    result->heightsGpuBuffer = inputBuf;
-    gpu.DestroyBuffer(outputBuf);
+    result->heightsGpuBuffer = resultBuf;
+
+    // The strategy may have returned the input or its own scratch; free the other.
+    if (resultBuf != inputBuf)
+        gpu.DestroyBuffer(inputBuf);
 
     return result;
 }

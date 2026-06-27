@@ -44,6 +44,11 @@ set(PLANETGEN_SOURCES
     src/model/BodyConfigProjection.cpp
     src/model/BodyConfigJson.cpp
     src/model/PaletteRegistry.cpp
+    src/strategy/HeightStrategy.cpp
+    src/strategy/ShadingStrategy.cpp
+    src/strategy/ErosionStrategy.cpp
+    src/strategy/PaletteProvider.cpp
+    src/strategy/GenerationPipeline.cpp
 )
 
 set(PLANETGEN_HEADERS
@@ -61,6 +66,12 @@ set(PLANETGEN_HEADERS
     src/model/BodyConfigProjection.h
     src/model/BodyConfigJson.h
     src/model/PaletteRegistry.h
+    src/strategy/IGenerationStrategy.h
+    src/strategy/HeightStrategy.h
+    src/strategy/ShadingStrategy.h
+    src/strategy/ErosionStrategy.h
+    src/strategy/PaletteProvider.h
+    src/strategy/GenerationPipeline.h
 )
 
 add_library(planetgen SHARED ${PLANETGEN_SOURCES} ${PLANETGEN_HEADERS})
@@ -119,6 +130,8 @@ set(PLANETGEN_TEST_SOURCES
     tests/test_headless.cpp
     tests/test_determinism.cpp
     tests/test_body_model.cpp
+    tests/test_strategies.cpp
+    tests/test_strategy_extension.cpp
 )
 
 add_executable(planetgen_tests ${PLANETGEN_TEST_SOURCES})
@@ -135,10 +148,16 @@ target_include_directories(planetgen_tests
 # and compile internal sources directly for ShaderRegistry + model (not exported from the DLL).
 target_sources(planetgen_tests PRIVATE
     src/backend/ShaderRegistry.cpp
+    src/backend/ParamMappers.cpp
     src/model/BodyConfig.cpp
     src/model/BodyConfigProjection.cpp
     src/model/BodyConfigJson.cpp
     src/model/PaletteRegistry.cpp
+    src/strategy/HeightStrategy.cpp
+    src/strategy/ShadingStrategy.cpp
+    src/strategy/ErosionStrategy.cpp
+    src/strategy/PaletteProvider.cpp
+    src/strategy/GenerationPipeline.cpp
     ${GL3W_SRC}
 )
 
