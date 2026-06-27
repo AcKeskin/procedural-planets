@@ -1,24 +1,16 @@
 #pragma once
 
-// The app's runtime view of the active body — owns its BodyConfig + resolved
-// palette, and binds each compute stage's params for the LOD dispatch.
-//
-// The library's GenerationPipeline is whole-mesh and stateless, so it can't drive
-// the app's per-patch LOD dispatch into LOD-owned buffers. This type stays app-side
-// by design and binds each stage's std140 UBO via the shared ParamMappers — the same
-// mapping code the library strategies use, so the field layout has one source of truth.
-// Surface is exactly what GenerationScheduler, TerrainGenerator, SurfacePanel, and
-// Application's frame loop need.
+// The app's render-time view of the active body — owns its BodyConfig + resolved
+// palette and exposes render metadata + render-uniform binding. Terrain compute
+// (height/shading/erosion + the continent mask) is owned by libplanetgen now and
+// driven through the public per-patch path; this type no longer dispatches anything.
+// Surface is what SurfacePanel, the renderer's draw, and the frame loop need.
 
 #include "BiomePalette.h"
-#include "ComputeShader.h"
 #include "Shader.h"
-#include "GpuBuffer.h"
 #include <planetgen/planetgen.h>
 #include "model/BodyConfig.h"
 #include "model/PaletteRegistry.h"
-#include <cstddef>
-#include <cstdint>
 #include <string>
 
 namespace planets::render
@@ -46,20 +38,7 @@ public:
     std::string GetVertexShaderPath()   const { return _config.shaderPaths.vertexShaderPath;   }
     std::string GetFragmentShaderPath() const { return _config.shaderPaths.fragmentShaderPath; }
 
-    // Continent mask — set before calling SetShapeUniforms so it binds the sampler
-    void SetContinentMaskTexture(uint32_t textureId) { _continentMaskTexId = textureId; }
-    uint32_t GetContinentMaskTexture() const { return _continentMaskTexId; }
-
-    // Uniform binding — uploads a std140 UBO block for each compute stage.
-    // vertexCount is packed into the UBO's numVertices field.
-    void SetShapeUniforms(ComputeShader& shader, uint32_t seed, uint32_t vertexCount) const;
-    void SetShadingUniforms(ComputeShader& shader, uint32_t seed, uint32_t vertexCount) const;
     void SetRenderUniforms(Shader& shader) const;
-
-    // Erosion
-    bool SupportsErosion() const { return _config.erosion.enabled; }
-    void SetErosionUniforms(ComputeShader& shader, uint32_t vertexCount, int gridResolution) const;
-    int  GetErosionIterations() const { return _config.erosion.enabled ? _config.erosion.iterations : 0; }
 
     // Metadata
     float       GetRadius()          const { return _config.metadata.radius;           }
@@ -76,7 +55,6 @@ public:
 private:
     planetgen::BodyConfig       _config;
     const planetgen::PaletteRegistry& _registry;
-    uint32_t                    _continentMaskTexId = 0;
 
     // Cached BiomePalette converted from PaletteRegistry on construction
     mutable BiomePalette _biomePalette;

@@ -127,7 +127,7 @@ struct alignas(16) HeightParams
     // Row 17
     float abyssalScale;
     float abyssalStrength;
-    int32_t continentMaskAvailable; // was _pad3 — 1 when the library bound a mask
+    int32_t continentMaskAvailable; // 1 = a continent mask is bound for sampling
     float _pad4;
 };
 

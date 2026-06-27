@@ -360,7 +360,7 @@ layout(std140, binding = 3) uniform HeightParamsBlock
     // Row 17
     float abyssalScale;
     float abyssalStrength;
-    int   continentMaskAvailable; // was _pad3 — 1 when the library bound a mask
+    int   continentMaskAvailable; // 1 = a continent mask is bound for sampling
     float _pad4;
 };
 

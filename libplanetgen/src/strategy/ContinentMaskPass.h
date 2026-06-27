@@ -1,10 +1,9 @@
 #pragma once
 
-// Library-side continent-mask bake. Runs the embedded continent_growth.comp into
-// an RG32F 3D texture (continentalness + accretionAge), sampled later by the height
-// stage. Lifts what the app's ContinentMaskRenderer did app-side into the library,
-// against the backend's 3D-texture affordance — so the mask is owned where the rest
-// of generation lives. Pure function of (config, seed): same inputs -> same volume.
+// Bakes the continent mask: runs continent_growth.comp into an RG32F 3D texture
+// (R=continentalness, G=accretionAge) that the height stage samples by direction.
+// Pure function of (config, seed) — same inputs yield the same volume, which is what
+// lets a standalone patch match the whole-mesh region byte-for-byte.
 
 #include "../backend/IComputeBackend.h"
 #include "../backend/ShaderRegistry.h"

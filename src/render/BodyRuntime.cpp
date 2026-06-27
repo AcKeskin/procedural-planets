@@ -1,10 +1,5 @@
 #include "BodyRuntime.h"
-#include <GL/gl3w.h>
 #include <glm/glm.hpp>
-
-// Mappers convert BodyConfig to std140 param blocks for each compute stage
-#include "backend/ParamMappers.h"
-#include "model/BodyConfigProjection.h"
 
 namespace planets::render
 {
@@ -13,48 +8,6 @@ BodyRuntime::BodyRuntime(planetgen::BodyConfig config, const planetgen::PaletteR
     : _config(std::move(config))
     , _registry(registry)
 {}
-
-void BodyRuntime::SetShapeUniforms(ComputeShader& shader, uint32_t seed, uint32_t vertexCount) const
-{
-    shader.Use();
-
-    // Continent mask sampler — still a real loose uniform (sampler3D, not in UBO)
-    if (_continentMaskTexId != 0)
-    {
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_3D, _continentMaskTexId);
-        shader.SetInt("continentMask", 4);
-        shader.SetInt("continentMaskAvailable", 1);
-    }
-    else
-    {
-        shader.SetInt("continentMaskAvailable", 0);
-    }
-
-    PgBodyDesc desc = planetgen::ProjectToBodyDesc(_config);
-    auto p = planetgen::MakeHeightParams(desc, seed, vertexCount);
-    shader.SetParamBlock(&p, sizeof(p), 3); // binding = 3 per height_earth.comp
-}
-
-void BodyRuntime::SetShadingUniforms(ComputeShader& shader, uint32_t seed, uint32_t vertexCount) const
-{
-    shader.Use();
-
-    PgShadingDesc desc = planetgen::ProjectToShadingDesc(_config);
-
-    // Match how planetgen_api.cpp picks between earth and generic shaders:
-    // useClimateModel drives shader selection, so use the same branch for params.
-    if (desc.use_climate_model)
-    {
-        auto p = planetgen::MakeShadingEarthParams(desc, seed, vertexCount);
-        shader.SetParamBlock(&p, sizeof(p), 3); // binding = 3 per shading_earth.comp
-    }
-    else
-    {
-        auto p = planetgen::MakeShadingGenericParams(desc, seed, vertexCount);
-        shader.SetParamBlock(&p, sizeof(p), 3); // binding = 3 per shading_generic.comp
-    }
-}
 
 void BodyRuntime::SetRenderUniforms(Shader& shader) const
 {
@@ -93,17 +46,6 @@ void BodyRuntime::SetRenderUniforms(Shader& shader) const
     shader.SetVec2("uHeightMinMax", glm::vec2(heightMin, heightMax));
 
     shader.SetFloat("uCoastalDepthRange", sh.coastalDepthRange);
-}
-
-void BodyRuntime::SetErosionUniforms(ComputeShader& shader, uint32_t vertexCount, int gridResolution) const
-{
-    shader.Use();
-
-    PgErosionDesc desc = planetgen::ProjectToErosionDesc(_config);
-    desc.grid_resolution = gridResolution; // caller supplies resolved grid resolution
-
-    auto p = planetgen::MakeErosionParams(desc, vertexCount);
-    shader.SetParamBlock(&p, sizeof(p), 3); // binding = 3 per erosion_earth.comp
 }
 
 void BodyRuntime::EnsurePalette() const

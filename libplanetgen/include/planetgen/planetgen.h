@@ -174,6 +174,9 @@ PG_API const char* pg_get_last_error_message(PgContext ctx);
 
 PG_API PgBody pg_body_create(PgContext ctx, const PgBodyDesc* desc);
 PG_API PgBody pg_body_create_from_json(PgContext ctx, const char* json_path);
+// As above, but the JSON is supplied in memory (config as data — e.g. a host app's
+// in-flight, edited config) rather than read from a file.
+PG_API PgBody pg_body_create_from_json_string(PgContext ctx, const char* json);
 PG_API void   pg_body_destroy(PgBody body);
 
 // ============================================================================

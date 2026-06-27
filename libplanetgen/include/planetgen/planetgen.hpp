@@ -164,6 +164,12 @@ public:
         return Body(pg_body_create_from_json(_handle, jsonPath.c_str()));
     }
 
+    // Create from an in-memory JSON string (config as data — e.g. a GUI-edited config).
+    Body CreateBodyFromJsonString(const std::string& json)
+    {
+        return Body(pg_body_create_from_json_string(_handle, json.c_str()));
+    }
+
     PgError GetError() const { return pg_context_get_error(_handle); }
 
     // Human-readable message for the last error on this context (valid until the

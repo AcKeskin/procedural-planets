@@ -5,7 +5,6 @@
 #include "Renderer.h"
 #include "Shader.h"
 #include "Mesh.h"
-#include "TerrainGenerator.h"
 #include "GenerationScheduler.h"
 #include "ParameterRandomizer.h"
 #include "Framebuffer.h"
@@ -27,7 +26,7 @@
 #include "settings/CinematicSettings.h"
 #include "BiomePalette.h"
 #include "BodyRuntime.h"
-#include "ContinentMaskRenderer.h"
+#include <planetgen/planetgen.hpp>
 #include <memory>
 #include "cinematic/CinematicController.h"
 #include "cinematic/CaptureManager.h"
@@ -107,7 +106,6 @@ private:
     // Rendering pipeline
     render::Framebuffer _sceneFbo;
     render::PostProcessor _postProcessor;
-    render::TerrainGenerator _terrainGenerator;
     render::GenerationScheduler _generationScheduler;
     render::lod::PlanetQuadTree _quadTree;
     render::effects::OceanRenderer _oceanRenderer;
@@ -155,13 +153,12 @@ private:
     planetgen::PaletteRegistry _paletteRegistry;
     std::unique_ptr<render::BodyRuntime> _activeBody;
 
-    // Continental mask — generated once per regen when continent params change
-    render::ContinentMaskRenderer _continentMaskRenderer;
-    int   _lastContinentCount          = -1;
-    float _lastContinentSizeVariance   = -1.0f;
-    float _lastContinentClustering     = -1.0f;
-    int   _lastContinentMaskResolution = -1;
-    uint32_t _lastMaskSeed             = ~0u;
+    // libplanetgen context (owns GPU compute; the app generates terrain ONLY through
+    // this) + the active body handle, recreated on SwitchBody. Context uses the app's
+    // existing GL context so per-patch dispatch hits the app's LOD buffers.
+    std::unique_ptr<pg::Context> _libContext;
+    pg::Body _libBody;
+
     int _selectedBodyType = 0; // GUI selector index
 
     // Frame state

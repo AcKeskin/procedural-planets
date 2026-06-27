@@ -12,11 +12,9 @@ add_library(render STATIC
     gui/CinematicPanel.cpp
     Renderer.cpp
     Mesh.cpp
-    TerrainGenerator.cpp
     GlFence.cpp
     GenerationScheduler.cpp
     BodyRuntime.cpp
-    ContinentMaskRenderer.cpp
     BiomePalette.cpp
     Framebuffer.cpp
     PostProcessor.cpp

@@ -292,8 +292,18 @@ bool Application::Initialize()
     _renderer.Initialize();
     _guiManager.Initialize(_window.GetHandle());
 
-    if (!_continentMaskRenderer.Initialize())
-        std::cerr << "[Application] ContinentMaskRenderer failed to initialize (non-fatal)" << std::endl;
+    // useExistingContext=true: the library shares the app's GL context so per-patch
+    // dispatch writes into the app's own LOD buffers.
+    try
+    {
+        _libContext = std::make_unique<pg::Context>(/*useExistingContext=*/true);
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "[Application] FATAL: failed to create libplanetgen context: "
+                  << e.what() << std::endl;
+        return false;
+    }
 
     if (!_sceneFbo.Create(_window.GetWidth(), _window.GetHeight()))
     {
@@ -714,13 +724,19 @@ void Application::SwitchBody(planetgen::BodyConfig config)
     if (erosionPath.empty())
         erosionPath = "shaders/compute/erosion_earth.comp";
 
-    bool gpuReady = _terrainGenerator.Initialize(
-        _activeBody->GetHeightShaderPath(), _activeBody->GetShadingShaderPath(), erosionPath);
-    if (!gpuReady)
+    // Create the library body from the in-memory (GUI-edited) config — the library
+    // owns all terrain compute now, including the continent mask. Serialize → string
+    // so the full BodyConfig reaches the library (config as data).
     {
-        std::cerr << "[SwitchBody] FATAL: GPU terrain generator failed to initialize for "
-                  << _activeBody->GetTypeName() << " — aborting." << std::endl;
-        std::abort();
+        const std::string configJson = planetgen::BodyConfigToJson(_activeBody->Config());
+        _libBody = _libContext->CreateBodyFromJsonString(configJson);
+        if (!_libBody.IsValid())
+        {
+            std::cerr << "[SwitchBody] FATAL: libplanetgen failed to create body for "
+                      << _activeBody->GetTypeName() << ": " << _libContext->GetErrorMessage()
+                      << " — aborting." << std::endl;
+            std::abort();
+        }
     }
     _terrainStats.gpuAvailable = true;
 
@@ -732,10 +748,7 @@ void Application::SwitchBody(planetgen::BodyConfig config)
     _seaLevel = _activeBody->GetSeaLevel();
     _atmosphereSettings.enabled = _activeBody->HasAtmosphere();
 
-    _generationScheduler.Initialize(_terrainGenerator, *_activeBody, _genConfig.seed);
-
-    // Force mask regeneration on body switch
-    _lastMaskSeed = ~0u;
+    _generationScheduler.Initialize(_libBody.Handle(), _genConfig.seed);
 
     RegenerateLodSystem();
 
@@ -773,9 +786,9 @@ void Application::StopCinematic()
 
 void Application::RegenerateLodSystem()
 {
-    if (!_terrainGenerator.IsReady())
+    if (!_libBody.IsValid())
     {
-        std::cerr << "[LOD] GPU compute shader required for LOD system" << std::endl;
+        std::cerr << "[LOD] No library body — cannot build the LOD system" << std::endl;
         return;
     }
 
@@ -786,35 +799,18 @@ void Application::RegenerateLodSystem()
         SyncEarthToConfig(_activeBody->Config(),
                           _terrainSettings, _shadingSettings, _biomeSettings, _earthColors);
 
-    // Regenerate continental mask when its params change (or first time)
-    if (_activeBody && _continentMaskRenderer.IsReady())
+    // Push the (possibly GUI-edited) config to the library by recreating the body —
+    // the library re-bakes its continent mask from the new config/seed on next gen.
+    // (Mask generation is library-owned now; no app-side mask renderer.)
+    if (_activeBody && _libContext)
     {
-        const auto& sh = _activeBody->Config().shape;
-        bool paramsChanged = (!_continentMaskRenderer.HasTexture()               ||
-                              sh.continentCount          != _lastContinentCount   ||
-                              sh.continentSizeVariance   != _lastContinentSizeVariance ||
-                              sh.continentClustering     != _lastContinentClustering   ||
-                              sh.continentMaskResolution != _lastContinentMaskResolution ||
-                              _genConfig.seed            != _lastMaskSeed);
-        if (paramsChanged)
-        {
-            _continentMaskRenderer.Generate(_activeBody->Config(), _genConfig.seed);
-            _activeBody->SetContinentMaskTexture(_continentMaskRenderer.GetMaskTextureId());
-
-            _lastContinentCount          = sh.continentCount;
-            _lastContinentSizeVariance   = sh.continentSizeVariance;
-            _lastContinentClustering     = sh.continentClustering;
-            _lastContinentMaskResolution = sh.continentMaskResolution;
-            _lastMaskSeed                = _genConfig.seed;
-        }
-    }
-    else if (_activeBody)
-    {
-        // Shader not loaded — height shader sees mask unavailable
-        _activeBody->SetContinentMaskTexture(0);
+        const std::string configJson = planetgen::BodyConfigToJson(_activeBody->Config());
+        pg::Body rebuilt = _libContext->CreateBodyFromJsonString(configJson);
+        if (rebuilt.IsValid())
+            _libBody = std::move(rebuilt);
     }
 
-    _generationScheduler.SetBody(*_activeBody, _genConfig.seed);
+    _generationScheduler.SetBody(_libBody.Handle(), _genConfig.seed);
 
     auto qtConfig = BuildQuadTreeConfig();
     _quadTree.Initialize(qtConfig, _generationScheduler, _genConfig.seed);

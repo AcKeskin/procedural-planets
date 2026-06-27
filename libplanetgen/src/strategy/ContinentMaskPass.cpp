@@ -26,7 +26,7 @@ GpuTextureHandle BakeContinentMask(IComputeBackend& backend,
     p.count        = static_cast<uint32_t>(std::max(1, sh.continentCount));
     p.seed         = seed;
     p.resolution   = res;
-    p.warpOctaves  = 3u; // coastline-detail octaves (matches the app reference)
+    p.warpOctaves  = 3u; // coastline-detail octaves
     p.sizeVariance = sh.continentSizeVariance;
     p.clustering   = sh.continentClustering;
 

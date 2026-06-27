@@ -2,9 +2,8 @@
 
 #include "GlFence.h"
 #include "GpuBuffer.h"
-#include "TerrainGenerator.h"
-#include "BodyRuntime.h"
 #include "lod/SpherePatch.h"
+#include <planetgen/planetgen.h>
 #include <glm/glm.hpp>
 #include <vector>
 #include <memory>
@@ -68,10 +67,11 @@ public:
     GenerationScheduler(const GenerationScheduler&) = delete;
     GenerationScheduler& operator=(const GenerationScheduler&) = delete;
 
-    void Initialize(TerrainGenerator& terrainGen, const BodyRuntime& body, uint32_t seed);
+    // The library body the per-patch path dispatches against. The scheduler owns
+    // only LOD policy; all terrain compute lives in libplanetgen.
+    void Initialize(PgBody body, uint32_t seed);
 
-    // Update body reference without full reinit (e.g. parameter slider change)
-    void SetBody(const BodyRuntime& body, uint32_t seed);
+    void SetBody(PgBody body, uint32_t seed);
 
     void Enqueue(GenerationRequest request);
 
@@ -96,8 +96,7 @@ private:
     std::vector<GenerationTask> _inFlight;
     std::vector<CompletedGeneration> _completed;
 
-    TerrainGenerator* _terrainGen = nullptr;
-    const BodyRuntime* _body = nullptr;
+    PgBody _body = nullptr;
     uint32_t _seed = 0;
 };
 

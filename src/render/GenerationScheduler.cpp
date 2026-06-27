@@ -6,17 +6,16 @@
 namespace planets::render
 {
 
-void GenerationScheduler::Initialize(TerrainGenerator& terrainGen, const BodyRuntime& body, uint32_t seed)
+void GenerationScheduler::Initialize(PgBody body, uint32_t seed)
 {
     CancelAll();
-    _terrainGen = &terrainGen;
-    _body = &body;
+    _body = body;
     _seed = seed;
 }
 
-void GenerationScheduler::SetBody(const BodyRuntime& body, uint32_t seed)
+void GenerationScheduler::SetBody(PgBody body, uint32_t seed)
 {
-    _body = &body;
+    _body = body;
     _seed = seed;
 }
 
@@ -81,45 +80,21 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
     task.vertexBuffer.Upload(packedVertices);
     task.heightBuffer.Allocate(task.vertexCount);
     task.normalBuffer.Allocate(task.vertexCount * 3);
+    task.shadingBuffer.Allocate(task.vertexCount);
 
-    // Dispatch height compute — body sets its own uniforms
-    _terrainGen->DispatchHeightsAsync(
-        task.vertexBuffer, task.heightBuffer, task.normalBuffer, task.vertexCount, *_body, _seed);
+    // The library writes per-vertex data into these buffers GPU-resident and
+    // returns without syncing; the fence below is our completion signal. No erosion
+    // on this path — it is neighbour-coupled and would seam at patch boundaries.
+    pg_generate_patch(_body,
+                      packedVertices.data(),
+                      static_cast<uint32_t>(task.vertexCount),
+                      _seed,
+                      task.heightBuffer.GetHandle(),
+                      task.normalBuffer.GetHandle(),
+                      task.shadingBuffer.GetHandle(),
+                      nullptr);
 
-    // Erosion iterations (any body type that supports erosion)
-    if (_body->SupportsErosion() && _terrainGen->IsErosionReady())
-    {
-        int gridRes = task.request.patch->GetResolution();
-        int iterations = _body->GetErosionIterations();
-        task.erosionScratchBuffer.Allocate(task.vertexCount);
-
-        GpuBuffer<float>* readBuf = &task.heightBuffer;
-        GpuBuffer<float>* writeBuf = &task.erosionScratchBuffer;
-
-        for (int i = 0; i < iterations; ++i)
-        {
-            ComputeShader::WaitForCompletion();
-            _terrainGen->DispatchErosionAsync(*readBuf, *writeBuf, task.vertexCount, gridRes, *_body);
-            std::swap(readBuf, writeBuf);
-        }
-
-        // Ensure final result is in heightBuffer
-        if (readBuf != &task.heightBuffer)
-            std::swap(task.heightBuffer, task.erosionScratchBuffer);
-    }
-
-    // Barrier ensures height data (potentially eroded) is readable by shading
-    ComputeShader::WaitForCompletion();
-
-    // Dispatch shading compute (reads height buffer for climate model)
-    if (_terrainGen->IsShadingReady())
-    {
-        task.shadingBuffer.Allocate(task.vertexCount);
-        _terrainGen->DispatchShadingAsync(
-            task.vertexBuffer, task.shadingBuffer, task.heightBuffer, task.vertexCount, *_body, _seed);
-    }
-
-    // Single fence covers all dispatches
+    // Single fence covers the dispatch; the app owns completion tracking.
     task.fence.Place();
 }
 

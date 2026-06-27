@@ -216,6 +216,37 @@ PgBody pg_body_create_from_json(PgContext ctx, const char* json_path)
     return body;
 }
 
+PgBody pg_body_create_from_json_string(PgContext ctx, const char* json)
+{
+    if (!ctx || !json)
+        return nullptr;
+
+    // Same canonical composable path as the file variant, but the caller supplies
+    // the JSON in memory (e.g. an app's in-flight, GUI-edited config) — config as
+    // data, no filesystem round-trip.
+    planetgen::BodyConfig config;
+    const std::string err = planetgen::BodyConfigFromJson(json, config);
+    if (!err.empty())
+    {
+        ctx->SetError(PG_ERROR_JSON_PARSE_FAILED,
+                      std::string("body config parse failed: ") + err);
+        return nullptr;
+    }
+
+    auto body = new (std::nothrow) PgBody_T();
+    if (!body)
+    {
+        ctx->SetError(PG_ERROR_OUT_OF_MEMORY, "out of memory creating body");
+        return nullptr;
+    }
+
+    body->ctx = ctx;
+    body->config = config;
+    body->desc = planetgen::ProjectToBodyDesc(config);
+    ctx->ClearError();
+    return body;
+}
+
 void pg_body_destroy(PgBody body)
 {
     delete body;
