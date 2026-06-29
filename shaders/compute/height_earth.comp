@@ -547,7 +547,22 @@ float evaluateHeight(vec3 dir)
                                       mountainPersistence, mountainLacunarity, mountainMultiplier,
                                       mountainPower, mountainGain, mountainSmooth, seed + 1u);
 
-    float terrainHeight = (continentShape + ridges * mountainMask) * heightScale;
+    // Land-wide rolling detail: hills/valleys across ALL land, not just peaks. Without this
+    // the interiors stay smooth and read as flat/low-poly up close — the gated perturbation
+    // below only fires on high terrain. Faded out below sea level so the ocean stays calm.
+    // TUNING SCRATCH (consts here while dialing the look via /shot; promote to params once set).
+    const int   landDetailOctaves     = 7;
+    const float landDetailScale       = 4.0;
+    const float landDetailPersistence = 0.40;  // lower → rolling hills, not sharp snow-catching spikes
+    const float landDetailLacunarity  = 2.2;
+    const float landDetailStrength    = 0.28;  // relative to continentShape units
+    const float landDetailDetailGain  = 2.5;   // boost on the fine peak-perturbation
+    float landMask = smoothstep(-0.05, 0.15, continentShape);
+    float landDetail = fbm(dir, vec3(7777.0), landDetailOctaves, landDetailScale * globalFrequency,
+                           landDetailPersistence, landDetailLacunarity, 1.0, seed + 70u);
+    float landRelief = landDetail * landDetailStrength * landMask;
+
+    float terrainHeight = (continentShape + ridges * mountainMask + landRelief) * heightScale;
 
     float baseTerrainHeight = continentShape + ridges * mountainMask;
     float heightFactor = smoothstep(detailLowThreshold, detailHighThreshold, baseTerrainHeight);
@@ -563,7 +578,9 @@ float evaluateHeight(vec3 dir)
         ptbAmplitude *= detailPersistence;
         ptbFrequency *= detailLacunarity;
     }
-    float perturbation = perturbNoise * effectiveStrength;
+    // Scale the fine perturbation by heightScale too, so it grows with the body's relief
+    // budget and is actually visible up close (was a raw ~0.004 bump — invisible on radius 10).
+    float perturbation = perturbNoise * effectiveStrength * heightScale * landDetailDetailGain;
 
     return 1.0 + terrainHeight + perturbation;
 }

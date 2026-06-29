@@ -24,9 +24,9 @@ struct LodConfig
     // Quadtree parameters
     int meshResolution = 32;
     int maxDepth = 8;
-    float splitThreshold = 2.0f;
+    float splitThreshold = 6.0f; // split when dist < threshold*arc*radius; higher = denser geometry up close
     float hysteresis = 1.3f;
-    int maxActivePatches = 400;
+    int maxActivePatches = 600;  // headroom for the more aggressive split threshold
     float skirtFraction = 0.02f;
 };
 

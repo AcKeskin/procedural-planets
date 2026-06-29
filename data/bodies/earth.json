@@ -82,7 +82,7 @@
         "smallNoiseScale": 15.0,
         "snowBlend": 0.1,
         "snowLatitude": 0.8,
-        "snowLine": 0.85,
+        "snowLine": 0.92,
         "steepnessThreshold": 0.3,
         "temperatureExponent": 0.6,
         "temperatureLapseRate": 2.0,
@@ -90,7 +90,7 @@
         "warpStrength": 0.3
     },
     "shape": {
-        "continentBaseLevel": -0.18,
+        "continentBaseLevel": -0.08,
         "continentNoise": {
             "lacunarity": 2.0,
             "octaves": 6,
@@ -99,7 +99,7 @@
             "strength": 2.0
         },
         "globalFrequency": 1.0,
-        "heightScale": 0.07,
+        "heightScale": 0.10,
         "maskNoise": {
             "lacunarity": 1.66,
             "octaves": 3,

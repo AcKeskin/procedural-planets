@@ -34,7 +34,7 @@ namespace AppDefaults
 {
 inline constexpr float SeaLevel = 0.995f;
 inline constexpr float MoveSpeed = 75.0f;
-inline constexpr float InitialCameraDistanceMultiplier = 2.5f;
+inline constexpr float InitialCameraDistanceMultiplier = 2.0f;
 inline constexpr float MouseRotationSensitivity = 0.1f;
 inline constexpr float SprintSpeedMultiplier = 5.0f;
 inline constexpr float AutoOrbitSpeed = 5.0f;

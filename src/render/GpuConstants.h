@@ -18,7 +18,8 @@ inline constexpr float FresnelStrengthFar = 2.0f;
 inline constexpr float FresnelPower = 3.0f;
 
 // Async LOD generation budget per frame, and the ocean mesh subdivision level.
-inline constexpr int SchedulerPatchesPerFrame = 4;
+// 8/frame keeps zoom-in latency low so detail resolves quickly when the camera approaches.
+inline constexpr int SchedulerPatchesPerFrame = 8;
 inline constexpr int OceanSubdivisions = 5;
 
 } // namespace planets::render

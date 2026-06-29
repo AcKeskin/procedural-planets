@@ -274,7 +274,7 @@ bool TerrainPanel::DrawLodContent(LodConfig& lod, const TerrainStats& stats)
     edited();
     ImGui::SliderInt("Max Depth", &lod.maxDepth, 2, 10);
     edited();
-    ImGui::SliderFloat("Split Threshold", &lod.splitThreshold, 0.5f, 5.0f);
+    ImGui::SliderFloat("Split Threshold", &lod.splitThreshold, 0.5f, 12.0f);
     edited();
     ImGui::SliderFloat("Hysteresis", &lod.hysteresis, 1.0f, 2.0f);
     edited();
