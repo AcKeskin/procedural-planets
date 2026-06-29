@@ -51,7 +51,8 @@ bool TerrainPanel::DrawTerrainBlocks(BodyRuntime& body,
     auto& hd  = body.Config().heightDetail;
     auto& er  = body.Config().erosion;
 
-    // Helper: flag regen on edit commit.
+    // Regenerate only when a slider's edit is committed (mouse released), not on
+    // every drag frame — otherwise every pixel of a drag would rebuild the planet.
     auto edited = [&]() { if (ImGui::IsItemDeactivatedAfterEdit()) regen = true; };
 
     ImGui::Text("Basic Settings");

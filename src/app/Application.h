@@ -13,7 +13,6 @@
 #include "gui/DebugPanel.h"
 #include "settings/SceneSettings.h"
 #include "settings/TerrainSettings.h"
-#include "settings/SurfaceSettings.h"
 #include "settings/OceanSettings.h"
 #include "settings/AtmosphereSettings.h"
 #include "settings/CinematicSettings.h"

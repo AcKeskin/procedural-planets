@@ -13,7 +13,6 @@
 #include "settings/SceneSettings.h"
 #include "settings/OceanSettings.h"
 #include "settings/AtmosphereSettings.h"
-#include "settings/SurfaceSettings.h"
 #include <planetgen/planetgen.h>
 #include <glm/glm.hpp>
 

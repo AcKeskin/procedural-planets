@@ -5,7 +5,6 @@
 #include "PatchPool.h"
 #include "../GenerationScheduler.h"
 #include "../settings/TerrainSettings.h"
-#include "../settings/SurfaceSettings.h"
 #include <glm/glm.hpp>
 #include <vector>
 #include <unordered_set>
