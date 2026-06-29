@@ -3,12 +3,31 @@
 A GPU-accelerated procedural planet renderer built with C++17 and OpenGL. Generates realistic celestial bodies — Earth-like planets, volcanic worlds, crystalline moons — with terrain, atmosphere, oceans, and biomes, all driven by compute shaders and procedural noise.
 
 <p align="center">
-  <img src="docs/videos/spedup_cinematic_updated.gif" alt="Procedural planet cinematic" width="600">
+  <img src="docs/images/hero_earth.png" alt="Earth-like procedural planet from space" width="720">
 </p>
 
 Inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-System). The architecture and implementation are built from scratch in C++/OpenGL, but studying his approach helped shape the direction of this project.
 
 > **A note on the rendering code:** I'm not a graphics developer — I understand the rendering pipeline at a high level but not the low-level details. The rendering parts (shaders, GPU compute, the OpenGL pipeline) were built with AI assistance (Claude). The overall architecture, the library design, and the rest of the codebase are my own.
+
+## Gallery
+
+An Earth-like world turning in real time:
+
+<!--
+  VIDEO: drag-drop captures/earth.mp4 into the GitHub web editor (edit this README on
+  github.com), which uploads it to user-images.githubusercontent.com and inserts an
+  auto-playing video link. Paste that link on the line below, replacing this comment.
+-->
+_(Earth turntable video — drag-drop `captures/earth.mp4` here via the GitHub web editor.)_
+
+Different body types generated back to back — Earth, volcanic, and crystalline worlds, fully procedural:
+
+<!--
+  VIDEO: same as above — drag-drop captures/showcase.mp4 into the GitHub web editor and
+  paste the resulting user-images link on the line below.
+-->
+_(Planet-type showcase video — drag-drop `captures/showcase.mp4` here via the GitHub web editor.)_
 
 ## Features
 
