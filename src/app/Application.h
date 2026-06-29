@@ -66,6 +66,10 @@ public:
     // Returns true on a successful capture.
     bool RunCapture(const CaptureRequest& request);
 
+    // Headless cinematic: boot, warm up the LOD, then drive the turntable over
+    // request.cinematicFrames frames at a fixed dt, writing a numbered PNG sequence.
+    bool RunCinematicCapture(const CaptureRequest& request);
+
     // Apply CLI overrides before window/scene creation (size, vsync, seed, camera).
     void ApplyCaptureOverrides(const CaptureRequest& request);
 

@@ -47,6 +47,24 @@ const char* NextValue(int argc, char** argv, int& i, const char* flag)
     }
     return argv[++i];
 }
+
+// Parse a single float; false (and leaves out untouched) on trailing garbage / non-numeric.
+bool ParseFloat(const std::string& text, float& out)
+{
+    try
+    {
+        size_t consumed = 0;
+        float v = std::stof(text, &consumed);
+        if (consumed != text.size())
+            return false;
+        out = v;
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
 } // namespace
 
 CaptureRequest CaptureRequest::Parse(int argc, char** argv)
@@ -114,9 +132,73 @@ CaptureRequest CaptureRequest::Parse(int argc, char** argv)
                 }
             }
         }
+        else if (std::strcmp(arg, "--distance") == 0)
+        {
+            const char* v = NextValue(argc, argv, i, "--distance");
+            if (v && !ParseFloat(v, req.distanceMultiplier))
+                std::cerr << "[Capture] Malformed --distance '" << v << "'; keeping default." << std::endl;
+        }
+        else if (std::strcmp(arg, "--cinematic") == 0)
+        {
+            req.cinematic = true;
+        }
+        else if (std::strcmp(arg, "--out-pattern") == 0)
+        {
+            const char* v = NextValue(argc, argv, i, "--out-pattern");
+            if (v)
+                req.framePattern = v;
+        }
+        else if (std::strcmp(arg, "--cinematic-frames") == 0)
+        {
+            const char* v = NextValue(argc, argv, i, "--cinematic-frames");
+            if (v)
+                req.cinematicFrames = std::atoi(v);
+        }
+        else if (std::strcmp(arg, "--fps") == 0)
+        {
+            const char* v = NextValue(argc, argv, i, "--fps");
+            if (v && !ParseFloat(v, req.cinematicFps))
+                std::cerr << "[Capture] Malformed --fps '" << v << "'; keeping default." << std::endl;
+        }
+        else if (std::strcmp(arg, "--orbit-speed") == 0)
+        {
+            const char* v = NextValue(argc, argv, i, "--orbit-speed");
+            if (v && !ParseFloat(v, req.orbitSpeed))
+                std::cerr << "[Capture] Malformed --orbit-speed '" << v << "'; keeping default." << std::endl;
+        }
+        else if (std::strcmp(arg, "--start-yaw") == 0)
+        {
+            const char* v = NextValue(argc, argv, i, "--start-yaw");
+            if (v && !ParseFloat(v, req.startYaw))
+                std::cerr << "[Capture] Malformed --start-yaw '" << v << "'; keeping default." << std::endl;
+        }
+        else if (std::strcmp(arg, "--start-pitch") == 0)
+        {
+            const char* v = NextValue(argc, argv, i, "--start-pitch");
+            if (v && !ParseFloat(v, req.startPitch))
+                std::cerr << "[Capture] Malformed --start-pitch '" << v << "'; keeping default." << std::endl;
+        }
         else
         {
             std::cerr << "[Capture] Unknown argument '" << arg << "'; ignoring." << std::endl;
+        }
+    }
+
+    // --cinematic implies headless capture mode (it doesn't need --screenshot).
+    if (req.cinematic)
+    {
+        req.enabled = true;
+
+        if (req.framePattern.empty())
+            req.framePattern = "captures/frame_%04d.png";
+
+        // The pattern must contain exactly one numeric conversion so frames get distinct names.
+        if (req.framePattern.find('%') == std::string::npos)
+        {
+            std::cerr << "[Capture] --out-pattern '" << req.framePattern
+                      << "' has no %0Nd frame number; disabling cinematic." << std::endl;
+            req.cinematic = false;
+            req.enabled = false;
         }
     }
 

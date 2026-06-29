@@ -7,6 +7,7 @@
 #include <imgui.h>
 #include <iostream>
 #include <chrono>
+#include <cstdio>
 #include <random>
 
 namespace planets::app
@@ -92,11 +93,25 @@ bool Application::Initialize()
     // Initial generation (LOD-only; GPU is a hard requirement)
     RegenerateLodSystem();
 
-    if (_capture.enabled && _capture.hasCamera)
-        _camera.SetPosition(_capture.cameraPos);
+    if (_capture.enabled)
+    {
+        // Default capture framing: sit on the light axis looking at the planet center, so the
+        // fully-lit hemisphere faces the camera. An explicit --camera overrides the position but
+        // still looks at origin (LookAt fixes the old -Z-only capture camera).
+        const glm::vec3 target(0.0f);
+        const glm::vec3 eye =
+            _capture.hasCamera
+                ? _capture.cameraPos
+                : glm::normalize(_sceneSettings.lightDir) * (_lodConfig.planetRadius * _capture.distanceMultiplier);
+        _camera.SetMode(core::CameraMode::FreeFly);
+        _camera.SetPosition(eye);
+        _camera.LookAt(target);
+    }
     else
+    {
         _camera.SetPosition(
             glm::vec3(0.0f, 0.0f, _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier));
+    }
 
     _lastTime = static_cast<float>(glfwGetTime());
     _previousWidth = _window.GetWidth();
@@ -173,6 +188,64 @@ bool Application::RunCapture(const CaptureRequest& request)
 
     Shutdown();
     return ok;
+}
+
+bool Application::RunCinematicCapture(const CaptureRequest& request)
+{
+    ApplyCaptureOverrides(request);
+
+    if (!Initialize())
+    {
+        std::cerr << "[Cinematic] Initialization failed." << std::endl;
+        return false;
+    }
+
+    // Warm-up so the planet is populated before frame 1.
+    int warmup = (std::max)(1, _capture.frames);
+    for (int i = 0; i < warmup; ++i)
+    {
+        _window.PollEvents();
+        Render();
+        _window.SwapBuffers();
+    }
+
+    // Configure the turntable from the request, then start it. Loop mode keeps the
+    // controller from auto-stopping mid-sequence; the frame count defines the length.
+    auto& tt = _cinematicSettings.turntable;
+    if (_capture.orbitSpeed > 0.0f)
+        tt.orbitSpeed = _capture.orbitSpeed;
+    tt.startYaw = _capture.startYaw;
+    tt.startPitch = _capture.startPitch;
+    tt.durationMode = render::CinematicDurationMode::Loop;
+    StartCinematic();
+
+    // Fixed dt → deterministic, smooth motion independent of wall-clock.
+    const float dt = 1.0f / (std::max)(1.0f, _capture.cinematicFps);
+    const int frameCount = (std::max)(1, _capture.cinematicFrames);
+
+    char path[512];
+    int written = 0;
+    for (int f = 0; f < frameCount; ++f)
+    {
+        _window.PollEvents();
+        _cinematicController.Update(dt, _camera);
+        _lastTime += dt; // keep shader time deterministic too (ocean waves etc.)
+
+        std::snprintf(path, sizeof(path), _capture.framePattern.c_str(), f + 1); // 1-based
+        _capture.outputPath = path;
+        _headlessCaptureRequested = true;
+        Render();
+        _window.SwapBuffers();
+
+        if (!_headlessCaptureRequested)
+            ++written;
+    }
+
+    StopCinematic();
+
+    std::cout << "[Cinematic] Wrote " << written << "/" << frameCount << " frames." << std::endl;
+    Shutdown();
+    return written == frameCount;
 }
 
 void Application::Shutdown()

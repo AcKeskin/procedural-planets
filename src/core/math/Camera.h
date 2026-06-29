@@ -37,11 +37,18 @@ public:
     void MoveUp(float amount);
     void Rotate(float yawDelta, float pitchDelta);
 
+    // Point the camera at a world-space target (FreeFly orientation). Back-solves yaw/pitch
+    // so a subsequent delta Rotate stays continuous. Used for headless light-axis framing.
+    void LookAt(const glm::vec3& target);
+
     // Orbit controls
     void SetOrbitTarget(const glm::vec3& target);
     void OrbitRotate(float yawDelta, float pitchDelta);
     void OrbitZoom(float amount);
     void SetOrbitDistance(float distance);
+
+    // Seat the orbit camera at an absolute yaw/pitch (OrbitRotate is delta-only).
+    void SetOrbitAngles(float yaw, float pitch);
 
     // Matrix getters
     glm::mat4 GetViewMatrix() const;

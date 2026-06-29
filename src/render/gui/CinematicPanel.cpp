@@ -91,6 +91,22 @@ void CinematicPanel::DrawTurntableContent(TurntableSettings& settings, float pla
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Smooth acceleration and deceleration at start and end");
 
+    ImGui::SliderFloat("Start Yaw",
+                       &settings.startYaw,
+                       CinematicLimits::MinStartYaw,
+                       CinematicLimits::MaxStartYaw,
+                       "%.0f deg");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Horizontal angle the orbit begins from");
+
+    ImGui::SliderFloat("Start Pitch",
+                       &settings.startPitch,
+                       CinematicLimits::MinStartPitch,
+                       CinematicLimits::MaxStartPitch,
+                       "%.0f deg");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Vertical angle the orbit begins from");
+
     ImGui::Separator();
     ImGui::Text("Pitch");
 
