@@ -33,7 +33,8 @@ inline void RandomizeBodyParameters(planetgen::BodyConfig& cfg,
     // --- Tectonics ---
     tec.enabled = true;
     tec.numPlates = ri(8, 18);
-    tec.continentalFraction = rf(0.3f, 0.6f);
+    // Land/ocean split biased land-positive (earth = 0.45) so worlds aren't mostly ocean.
+    tec.continentalFraction = rf(0.42f, 0.62f);
     tec.boundaryWidth = rf(0.08f, 0.3f);
     tec.convergentMountainScale = rf(0.2f, 1.0f);
     tec.divergentRiftDepth = rf(0.1f, 0.5f);
@@ -41,12 +42,14 @@ inline void RandomizeBodyParameters(planetgen::BodyConfig& cfg,
     tec.plateElevationNoise = rf(0.05f, 0.3f);
 
     // --- Continental shape ---
+    // Strength + base level keep land above sea level (earth = 2.0 / -0.18). Lower bounds
+    // raised so continents reliably clear the waterline instead of drowning.
     sh.continentNoise.octaves     = ri(4, 7);
     sh.continentNoise.scale       = rf(0.5f, 1.5f);
-    sh.continentNoise.strength    = rf(0.8f, 2.5f);
+    sh.continentNoise.strength    = rf(1.6f, 2.6f);
     sh.continentNoise.persistence = rf(0.35f, 0.65f);
     sh.continentNoise.lacunarity  = rf(1.8f, 2.5f);
-    sh.continentBaseLevel = rf(-0.3f, 0.1f);
+    sh.continentBaseLevel = rf(-0.18f, 0.05f);
 
     sh.mountainNoise.octaves    = ri(4, 6);
     sh.mountainNoise.scale      = rf(0.8f, 2.5f);
