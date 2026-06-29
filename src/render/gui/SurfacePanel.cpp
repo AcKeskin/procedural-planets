@@ -1,15 +1,12 @@
 #include "SurfacePanel.h"
-#include "../settings/SurfaceSettings.h"
-#include "../settings/TerrainSettings.h"
 #include "../settings/OceanSettings.h"
+#include "../BodyRuntime.h"
 #include <imgui.h>
 
 namespace planets::render
 {
 
-bool SurfacePanel::Draw(BiomeSettings& biomes,
-                        EarthColors& colors,
-                        EarthShadingSettings& shading,
+bool SurfacePanel::Draw(BodyRuntime* activeBody,
                         effects::OceanSettings& ocean,
                         float& seaLevel,
                         bool& visible)
@@ -20,188 +17,95 @@ bool SurfacePanel::Draw(BiomeSettings& biomes,
     bool regen = false;
     ImGui::Begin("Surface", &visible);
 
-    if (ImGui::CollapsingHeader("Biomes", ImGuiTreeNodeFlags_DefaultOpen))
-        DrawBiomeContent(biomes);
+    if (activeBody)
+        regen |= DrawShadingBlock(*activeBody);
 
-    if (ImGui::CollapsingHeader("Colors"))
-        DrawEarthColorsContent(colors);
-
-    if (ImGui::CollapsingHeader("Shading Noise"))
-        regen |= DrawShadingContent(shading);
-
-    if (ImGui::CollapsingHeader("Ocean"))
-        DrawOceanContent(ocean, seaLevel);
+    if (activeBody && activeBody->HasSolidSurface())
+    {
+        if (ImGui::CollapsingHeader("Ocean"))
+            DrawOceanContent(ocean, seaLevel);
+    }
 
     ImGui::End();
     return regen;
 }
 
-void SurfacePanel::DrawBiomeContent(BiomeSettings& settings)
+bool SurfacePanel::DrawShadingBlock(BodyRuntime& body)
 {
-    ImGui::Checkbox("Enable Biomes", &settings.enabled);
+    bool regen = false;
+    auto& sh = body.Config().shading;
 
-    if (settings.enabled)
+    ImGui::Text("Body: %s", body.GetTypeName().c_str());
+    ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Biomes", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        ImGui::Separator();
-        ImGui::Text("Height Zones (0=sea, 1=max)");
-
-        ImGui::SliderFloat("Shore Zone", &settings.shoreHeight, 0.04f, 0.15f, "%.2f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Beach height above sea level");
-
-        ImGui::SliderFloat("Snow Line", &settings.snowLine, 0.70f, 0.95f, "%.2f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Height where snow starts on peaks");
-
-        ImGui::Separator();
-        ImGui::Text("Cliff Rock");
-
-        ImGui::SliderFloat("Rock Threshold", &settings.steepnessThreshold, 0.15f, 0.45f, "%.2f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Steepness for rock texture\nLower = more rock");
-        ImGui::SliderFloat("Rock Blend", &settings.flatToSteepBlend, 0.05f, 0.20f, "%.2f");
-
-        ImGui::Separator();
-        ImGui::Text("Polar Snow");
-
-        ImGui::SliderFloat("Snow Latitude", &settings.snowLatitude, 0.65f, 0.85f, "%.2f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Latitude for polar snow");
-        ImGui::SliderFloat("Snow Blend", &settings.snowBlend, 0.05f, 0.15f, "%.2f");
-    }
-}
-
-void SurfacePanel::DrawEarthColorsContent(EarthColors& colors)
-{
-    ImGui::Text("Shore (Beach)");
-    ImGui::ColorEdit3("Shore Low", &colors.shoreLow.x);
-    ImGui::ColorEdit3("Shore High", &colors.shoreHigh.x);
-
-    ImGui::Separator();
-    ImGui::Text("Flat Terrain A (Plains)");
-    ImGui::ColorEdit3("Flat A Low", &colors.flatLowA.x);
-    ImGui::ColorEdit3("Flat A High", &colors.flatHighA.x);
-
-    ImGui::Separator();
-    ImGui::Text("Flat Terrain B (Forest)");
-    ImGui::ColorEdit3("Flat B Low", &colors.flatLowB.x);
-    ImGui::ColorEdit3("Flat B High", &colors.flatHighB.x);
-
-    ImGui::Separator();
-    ImGui::Text("Steep Terrain (Rock)");
-    ImGui::ColorEdit3("Steep Low", &colors.steepLow.x);
-    ImGui::ColorEdit3("Steep High", &colors.steepHigh.x);
-
-    ImGui::Separator();
-    ImGui::ColorEdit3("Snow", &colors.snow.x);
-
-    ImGui::Separator();
-    if (ImGui::Button("Reset to Earth Preset"))
-    {
-        colors = EarthColors();
-    }
-}
-
-bool SurfacePanel::DrawShadingContent(EarthShadingSettings& settings)
-{
-    bool needsRegeneration = false;
-
-    ImGui::Text("Noise Scales");
-    ImGui::Separator();
-
-    ImGui::SliderFloat("Large Scale", &settings.largeNoiseScale, 0.2f, 0.7f);
-    if (ImGui::IsItemDeactivatedAfterEdit())
-        needsRegeneration = true;
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Climate zone scale");
-
-    ImGui::SliderInt("Large Octaves", &settings.largeNoiseOctaves, 2, 4);
-    if (ImGui::IsItemDeactivatedAfterEdit())
-        needsRegeneration = true;
-
-    ImGui::SliderFloat("Detail Scale", &settings.detailNoiseScale, 1.0f, 4.0f);
-    if (ImGui::IsItemDeactivatedAfterEdit())
-        needsRegeneration = true;
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Terrain texture variation");
-
-    ImGui::SliderFloat("Small Scale", &settings.smallNoiseScale, 8.0f, 25.0f);
-    if (ImGui::IsItemDeactivatedAfterEdit())
-        needsRegeneration = true;
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("High-frequency surface detail");
-
-    ImGui::SliderInt("Small Octaves", &settings.smallNoiseOctaves, 3, 6);
-    if (ImGui::IsItemDeactivatedAfterEdit())
-        needsRegeneration = true;
-
-    ImGui::SliderFloat("Warp Strength", &settings.warpStrength, 0.1f, 0.6f);
-    if (ImGui::IsItemDeactivatedAfterEdit())
-        needsRegeneration = true;
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Biome boundary irregularity");
-
-    ImGui::Separator();
-    ImGui::Text("Color Blending");
-
-    ImGui::SliderFloat("Flat Col Blend", &settings.flatColBlend, 0.8f, 2.5f);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Height threshold for low/high gradient");
-
-    ImGui::SliderFloat("Flat Col Noise", &settings.flatColBlendNoise, 0.1f, 0.5f);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Noise influence on gradient blend");
-
-    ImGui::Separator();
-    ImGui::Text("Climate Model");
-
-    if (ImGui::Checkbox("Use Climate Model", &settings.useClimateModel))
-        needsRegeneration = true;
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Replace noise-based biomes with latitude/elevation climate model");
-
-    if (settings.useClimateModel)
-    {
-        ImGui::SliderFloat("Lapse Rate", &settings.temperatureLapseRate, 0.5f, 4.0f, "%.1f");
-        if (ImGui::IsItemDeactivatedAfterEdit())
-            needsRegeneration = true;
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Temperature drop with elevation.\nHigher = snow at lower altitudes");
-
-        ImGui::SliderFloat("Moisture Scale", &settings.moistureNoiseScale, 0.5f, 3.0f, "%.1f");
-        if (ImGui::IsItemDeactivatedAfterEdit())
-            needsRegeneration = true;
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Scale of regional moisture noise variation");
-
-        ImGui::SliderFloat("Moisture Noise", &settings.moistureNoiseStrength, 0.0f, 0.4f, "%.2f");
-        if (ImGui::IsItemDeactivatedAfterEdit())
-            needsRegeneration = true;
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Strength of noise-based moisture variation");
-
-        ImGui::SliderFloat("Hadley Intensity", &settings.hadleyIntensity, 0.0f, 2.0f, "%.1f");
-        if (ImGui::IsItemDeactivatedAfterEdit())
-            needsRegeneration = true;
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(
-                "Strength of latitude-based moisture pattern\n0 = uniform, 1 = Earth-like, 2 = exaggerated");
-
-        ImGui::SliderFloat("Temp Exponent", &settings.temperatureExponent, 0.3f, 1.5f, "%.2f");
-        if (ImGui::IsItemDeactivatedAfterEdit())
-            needsRegeneration = true;
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Temperature latitude falloff\n0.3 = wide tropics, 1.5 = sharp equator-pole gradient");
-
-        ImGui::SliderFloat("Continentality", &settings.continentalityStrength, 0.0f, 0.6f, "%.2f");
-        if (ImGui::IsItemDeactivatedAfterEdit())
-            needsRegeneration = true;
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(
-                "Moisture effect of distance from coast\n0 = none, higher = drier interiors, wetter coasts");
+        ImGui::Checkbox("Enable Biomes", &sh.biomesEnabled);
+        if (sh.biomesEnabled)
+        {
+            ImGui::SliderFloat("Steepness Threshold", &sh.steepnessThreshold, 0.0f, 1.0f);
+            ImGui::SliderFloat("Flat→Steep Blend", &sh.flatToSteepBlend, 0.0f, 0.5f);
+            ImGui::SliderFloat("Snow Latitude", &sh.snowLatitude, 0.0f, 1.0f);
+            ImGui::SliderFloat("Snow Blend", &sh.snowBlend, 0.0f, 0.5f);
+            ImGui::SliderFloat("Snow Line", &sh.snowLine, 0.0f, 1.0f);
+            ImGui::SliderFloat("Shore Height", &sh.shoreHeight, 0.0f, 0.3f);
+            ImGui::SliderFloat("AO Strength", &sh.aoStrength, 0.0f, 1.0f);
+        }
     }
 
-    return needsRegeneration;
+    if (ImGui::CollapsingHeader("Shading Noise"))
+    {
+        ImGui::SliderFloat("Detail Scale", &sh.detailNoiseScale, 0.5f, 8.0f);
+        if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+        ImGui::SliderFloat("Small Scale", &sh.smallNoiseScale, 5.0f, 40.0f);
+        if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+        ImGui::SliderInt("Small Octaves", &sh.smallNoiseOctaves, 2, 8);
+        if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+        ImGui::SliderFloat("Warp Strength", &sh.warpStrength, 0.0f, 1.0f);
+        if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+    }
+
+    if (ImGui::CollapsingHeader("Climate Model"))
+    {
+        if (ImGui::Checkbox("Use Climate Model", &sh.useClimateModel)) regen = true;
+        if (sh.useClimateModel)
+        {
+            ImGui::SliderFloat("Large Scale", &sh.largeNoiseScale, 0.2f, 0.7f);
+            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            ImGui::SliderInt("Large Octaves", &sh.largeNoiseOctaves, 2, 4);
+            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            ImGui::SliderFloat("Lapse Rate", &sh.temperatureLapseRate, 0.5f, 4.0f, "%.1f");
+            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            ImGui::SliderFloat("Temp Exponent", &sh.temperatureExponent, 0.3f, 1.5f, "%.2f");
+            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            ImGui::SliderFloat("Moisture Scale", &sh.moistureNoiseScale, 0.5f, 3.0f, "%.1f");
+            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            ImGui::SliderFloat("Moisture Noise", &sh.moistureNoiseStrength, 0.0f, 0.4f, "%.2f");
+            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            ImGui::SliderFloat("Hadley Intensity", &sh.hadleyIntensity, 0.0f, 2.0f, "%.1f");
+            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            ImGui::SliderFloat("Continentality", &sh.continentalityStrength, 0.0f, 0.6f, "%.2f");
+            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+        }
+    }
+
+    if (ImGui::CollapsingHeader("Colours"))
+    {
+        ImGui::SliderFloat("Flat Col Blend", &sh.flatColBlend, 0.8f, 2.5f);
+        ImGui::SliderFloat("Flat Col Noise", &sh.flatColBlendNoise, 0.1f, 0.5f);
+        ImGui::Separator();
+        ImGui::ColorEdit3("Shore Low",  &sh.colorShoreLow.x);
+        ImGui::ColorEdit3("Shore High", &sh.colorShoreHigh.x);
+        ImGui::ColorEdit3("Flat A Low",  &sh.colorFlatLowA.x);
+        ImGui::ColorEdit3("Flat A High", &sh.colorFlatHighA.x);
+        ImGui::ColorEdit3("Flat B Low",  &sh.colorFlatLowB.x);
+        ImGui::ColorEdit3("Flat B High", &sh.colorFlatHighB.x);
+        ImGui::ColorEdit3("Steep Low",  &sh.colorSteepLow.x);
+        ImGui::ColorEdit3("Steep High", &sh.colorSteepHigh.x);
+        ImGui::ColorEdit3("Snow", &sh.colorSnow.x);
+    }
+
+    return regen;
 }
 
 void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& seaLevel)
@@ -211,7 +115,6 @@ void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& sea
     if (settings.enabled)
     {
         ImGui::Separator();
-
         ImGui::SliderFloat("Sea Level", &seaLevel, 0.9f, 1.1f, "%.3f");
 
         ImGui::Text("Colors");
@@ -221,24 +124,18 @@ void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& sea
         ImGui::Separator();
         ImGui::Text("Depth");
         ImGui::SliderFloat("Depth Multiplier", &settings.depthMultiplier, 1.0f, 30.0f);
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Controls shallow-to-deep color transition");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Controls shallow-to-deep color transition");
         ImGui::SliderFloat("Alpha Multiplier", &settings.alphaMultiplier, 10.0f, 100.0f);
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Controls transparency based on depth");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Controls transparency based on depth");
 
         ImGui::Separator();
         ImGui::Text("Reflection");
         ImGui::SliderFloat("Fresnel Power", &settings.fresnelPower, 1.5f, 3.5f);
         ImGui::SliderFloat("Smoothness", &settings.smoothness, 0.5f, 0.99f, "%.2f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Higher = sharper, more reflective highlight");
 
         ImGui::Separator();
         ImGui::Text("Waves");
         ImGui::SliderFloat("Wave Strength", &settings.waveStrength, 0.0f, 0.5f, "%.2f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Normal perturbation intensity");
         ImGui::SliderFloat("Wave Scale", &settings.waveScale, 5.0f, 50.0f);
         ImGui::SliderFloat("Wave Speed", &settings.waveSpeed, 0.1f, 2.0f, "%.1f");
     }

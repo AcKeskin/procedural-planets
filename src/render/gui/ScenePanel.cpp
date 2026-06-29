@@ -80,6 +80,19 @@ void ScenePanel::DrawLightingContent(LightingSettings& settings)
     ImGui::SliderFloat("Specular Power", &settings.specularPower, 16.0f, 64.0f, "%.0f");
 
     ImGui::Separator();
+    ImGui::Text("Atmosphere & Detail");
+
+    ImGui::SliderFloat("Detail Fade", &settings.detailFadeStart, 1.0f, 5.0f, "%.1f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Distance (planet radii) where surface detail begins fading");
+
+    ImGui::SliderFloat("Haze Strength", &settings.hazeStrength, 0.0f, 0.4f, "%.2f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Atmospheric perspective: desaturation at distance");
+
+    ImGui::ColorEdit3("Haze Color", &settings.hazeColor.x);
+
+    ImGui::Separator();
     if (ImGui::Button("Reset"))
     {
         settings = LightingSettings();

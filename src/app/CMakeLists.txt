@@ -2,6 +2,7 @@
 add_executable(procedural-planets
     Main.cpp
     Application.cpp
+    CaptureRequest.cpp
     Input.cpp
 )
 
@@ -19,4 +20,11 @@ add_custom_command(TARGET procedural-planets POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_SOURCE_DIR}/shaders
     $<TARGET_FILE_DIR:procedural-planets>/shaders
+)
+
+# Copy data directory (palettes, body configs)
+add_custom_command(TARGET procedural-planets POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/data
+    $<TARGET_FILE_DIR:procedural-planets>/data
 )

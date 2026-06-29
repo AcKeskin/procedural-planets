@@ -2,38 +2,32 @@
 
 #include <cstdint>
 
-namespace planets::core
-{
-class Planet;
-}
-
 namespace planets::render
 {
 
-struct EarthTerrainSettings;
 struct GenerationConfig;
 struct LodConfig;
 struct TerrainStats;
+class BodyRuntime;
 
+// Edits the active body's shape/tectonics/ocean-floor/height-detail/erosion blocks
+// directly on its BodyConfig — one generic path for every body type.
 class TerrainPanel
 {
 public:
-    // Returns true if planet needs regeneration
-    bool Draw(GenerationConfig& config,
-              EarthTerrainSettings& terrain,
+    bool Draw(BodyRuntime* activeBody,
+              GenerationConfig& config,
               LodConfig& lod,
               const TerrainStats& stats,
-              planets::core::Planet& planet,
               bool& visible,
               bool& randomizeRequested);
 
 private:
-    void DrawGpuContent(GenerationConfig& config, const TerrainStats& stats);
-    bool DrawEarthTerrainContent(EarthTerrainSettings& settings,
-                                 uint32_t& seed,
-                                 int& subdivisions,
-                                 bool& randomizeRequested);
-    bool DrawPlanetContent(planets::core::Planet& planet);
+    void DrawGpuContent(const TerrainStats& stats);
+    bool DrawTerrainBlocks(BodyRuntime& body,
+                           uint32_t& seed,
+                           int& subdivisions,
+                           bool& randomizeRequested);
     bool DrawLodContent(LodConfig& lod, const TerrainStats& stats);
 };
 

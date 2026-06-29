@@ -46,11 +46,8 @@ std::string CaptureManager::GenerateFilename(const std::string& extension) const
     return oss.str();
 }
 
-bool CaptureManager::CaptureScreenshot(int width, int height)
+bool CaptureManager::WritePng(const std::string& path, int width, int height)
 {
-    if (!EnsureCaptureDirectory())
-        return false;
-
     _pixelBuffer.resize(static_cast<size_t>(width) * height * CaptureDefaults::RgbChannels);
     glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, _pixelBuffer.data());
 
@@ -68,20 +65,45 @@ bool CaptureManager::CaptureScreenshot(int width, int height)
         std::copy(rowBuffer.data(), rowBuffer.data() + rowSize, bottomRow);
     }
 
-    _lastCapturePath = GenerateFilename(CaptureDefaults::PngExtension);
-
     const int stride = width * CaptureDefaults::RgbChannels;
-    const int success = stbi_write_png(
-        _lastCapturePath.c_str(), width, height, CaptureDefaults::RgbChannels, _pixelBuffer.data(), stride);
+    const int success =
+        stbi_write_png(path.c_str(), width, height, CaptureDefaults::RgbChannels, _pixelBuffer.data(), stride);
 
     if (success)
     {
-        std::cout << "[Capture] Screenshot saved: " << _lastCapturePath << std::endl;
+        _lastCapturePath = path;
+        std::cout << "[Capture] Screenshot saved: " << path << std::endl;
         return true;
     }
 
-    std::cerr << "[Capture] Failed to write PNG: " << _lastCapturePath << std::endl;
+    std::cerr << "[Capture] Failed to write PNG: " << path << std::endl;
     return false;
+}
+
+bool CaptureManager::CaptureScreenshot(int width, int height)
+{
+    if (!EnsureCaptureDirectory())
+        return false;
+
+    return WritePng(GenerateFilename(CaptureDefaults::PngExtension), width, height);
+}
+
+bool CaptureManager::CaptureScreenshotToFile(const std::string& path, int width, int height)
+{
+    // Headless path: caller gives an explicit (usually absolute) path; ensure its parent exists.
+    try
+    {
+        std::filesystem::path p(path);
+        if (p.has_parent_path())
+            std::filesystem::create_directories(p.parent_path());
+    }
+    catch (const std::filesystem::filesystem_error& e)
+    {
+        std::cerr << "[Capture] Failed to create output directory: " << e.what() << std::endl;
+        return false;
+    }
+
+    return WritePng(path, width, height);
 }
 
 } // namespace planets::render

@@ -1,0 +1,8 @@
+# Binary media — stored via Git LFS so clones don't pull every past version.
+# Applies to media added from here on; pre-existing blobs in history are untouched.
+*.gif  filter=lfs diff=lfs merge=lfs -text
+*.mp4  filter=lfs diff=lfs merge=lfs -text
+*.webm filter=lfs diff=lfs merge=lfs -text
+*.png  filter=lfs diff=lfs merge=lfs -text
+*.jpg  filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text

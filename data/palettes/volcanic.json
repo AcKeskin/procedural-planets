@@ -1,0 +1,12 @@
+{
+    "name": "Volcanic",
+    "entries": [
+        { "color": [0.95, 0.45, 0.02], "parameter": 0.0,  "label": "molten_lava" },
+        { "color": [0.80, 0.20, 0.01], "parameter": 0.1,  "label": "cooling_lava" },
+        { "color": [0.45, 0.08, 0.02], "parameter": 0.2,  "label": "hot_rock" },
+        { "color": [0.20, 0.06, 0.03], "parameter": 0.35, "label": "warm_basalt" },
+        { "color": [0.10, 0.08, 0.06], "parameter": 0.5,  "label": "dark_basalt" },
+        { "color": [0.06, 0.05, 0.05], "parameter": 0.7,  "label": "cooled_rock" },
+        { "color": [0.04, 0.03, 0.03], "parameter": 1.0,  "label": "obsidian_peak" }
+    ]
+}

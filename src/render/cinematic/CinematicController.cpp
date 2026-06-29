@@ -17,9 +17,13 @@ void CinematicController::Start(const CinematicSettings& settings, float planetR
     _startDistance = _settings.zoomStartMultiplier * planetRadius;
     _endDistance = _settings.zoomEndMultiplier * planetRadius;
     _currentDistance = _startDistance;
-    _lastPitch = 0.0f;
+
+    // Seat the camera at the chosen start angle facing the planet; _lastPitch tracks the
+    // seated pitch so the first frame's pitch delta in Update() doesn't snap.
+    _lastPitch = _settings.startPitch;
 
     camera.SetOrbitDistance(_startDistance);
+    camera.SetOrbitAngles(_settings.startYaw, _settings.startPitch);
 }
 
 void CinematicController::Stop()

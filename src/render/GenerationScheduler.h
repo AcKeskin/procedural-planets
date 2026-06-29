@@ -2,10 +2,8 @@
 
 #include "GlFence.h"
 #include "GpuBuffer.h"
-#include "TerrainGenerator.h"
 #include "lod/SpherePatch.h"
-#include "settings/TerrainSettings.h"
-#include "settings/SurfaceSettings.h"
+#include <planetgen/planetgen.h>
 #include <glm/glm.hpp>
 #include <vector>
 #include <memory>
@@ -42,6 +40,7 @@ struct GenerationTask
     // Per-task GPU buffers so multiple dispatches can coexist
     GpuBuffer<float> vertexBuffer;
     GpuBuffer<float> heightBuffer;
+    GpuBuffer<float> normalBuffer;
     GpuBuffer<float> erosionScratchBuffer;
     GpuBuffer<glm::vec4> shadingBuffer;
 
@@ -68,15 +67,11 @@ public:
     GenerationScheduler(const GenerationScheduler&) = delete;
     GenerationScheduler& operator=(const GenerationScheduler&) = delete;
 
-    void Initialize(TerrainGenerator& terrainGen,
-                    const EarthTerrainSettings& terrainSettings,
-                    const EarthShadingSettings& shadingSettings,
-                    uint32_t seed);
+    // The library body the per-patch path dispatches against. The scheduler owns
+    // only LOD policy; all terrain compute lives in libplanetgen.
+    void Initialize(PgBody body, uint32_t seed);
 
-    // Update settings without full reinit (e.g. parameter slider change)
-    void SetSettings(const EarthTerrainSettings& terrainSettings,
-                     const EarthShadingSettings& shadingSettings,
-                     uint32_t seed);
+    void SetBody(PgBody body, uint32_t seed);
 
     void Enqueue(GenerationRequest request);
 
@@ -101,9 +96,7 @@ private:
     std::vector<GenerationTask> _inFlight;
     std::vector<CompletedGeneration> _completed;
 
-    TerrainGenerator* _terrainGen = nullptr;
-    const EarthTerrainSettings* _terrainSettings = nullptr;
-    const EarthShadingSettings* _shadingSettings = nullptr;
+    PgBody _body = nullptr;
     uint32_t _seed = 0;
 };
 

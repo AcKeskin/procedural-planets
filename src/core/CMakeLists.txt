@@ -1,10 +1,8 @@
-# Core library: math, noise, generation algorithms
+# Core library: math, noise
 add_library(core STATIC
     math/Camera.cpp
     noise/SimplexNoise.cpp
     noise/FractalNoise.cpp
-    generation/NoiseLayer.cpp
-    generation/Planet.cpp
 )
 
 target_include_directories(core PUBLIC

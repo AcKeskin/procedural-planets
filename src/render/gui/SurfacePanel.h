@@ -3,29 +3,25 @@
 namespace planets::render
 {
 
-struct BiomeSettings;
-struct EarthColors;
-struct EarthShadingSettings;
+class BodyRuntime;
 
 namespace effects
 {
 struct OceanSettings;
 }
 
+// Edits the active body's shading block (noise, climate, biomes, colours) directly
+// on its BodyConfig — one generic path for every body type, no per-type branching.
 class SurfacePanel
 {
 public:
-    bool Draw(BiomeSettings& biomes,
-              EarthColors& colors,
-              EarthShadingSettings& shading,
+    bool Draw(BodyRuntime* activeBody,
               effects::OceanSettings& ocean,
               float& seaLevel,
               bool& visible);
 
 private:
-    void DrawBiomeContent(BiomeSettings& settings);
-    void DrawEarthColorsContent(EarthColors& colors);
-    bool DrawShadingContent(EarthShadingSettings& settings);
+    bool DrawShadingBlock(BodyRuntime& body);
     void DrawOceanContent(effects::OceanSettings& settings, float& seaLevel);
 };
 

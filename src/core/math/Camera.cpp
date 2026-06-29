@@ -1,6 +1,7 @@
 #include "Camera.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
+#include <cmath>
 
 namespace planets::core
 {
@@ -47,6 +48,19 @@ void Camera::Rotate(float yawDelta, float pitchDelta)
     UpdateVectors();
 }
 
+void Camera::LookAt(const glm::vec3& target)
+{
+    _forward = glm::normalize(target - _position);
+
+    glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
+    _right = glm::normalize(glm::cross(_forward, worldUp));
+    _up = glm::normalize(glm::cross(_right, _forward));
+
+    // Back-solve the Euler state so a later delta Rotate continues smoothly from here.
+    _pitch = glm::degrees(std::asin(std::clamp(_forward.y, -1.0f, 1.0f)));
+    _yaw = glm::degrees(std::atan2(_forward.z, _forward.x));
+}
+
 void Camera::SetOrbitTarget(const glm::vec3& target)
 {
     _orbitTarget = target;
@@ -85,6 +99,13 @@ void Camera::SetOrbitDistance(float distance)
 {
     _orbitDistance = std::max(distance, CameraDefaults::MinOrbitDistance);
     OrbitRotate(0.0f, 0.0f);
+}
+
+void Camera::SetOrbitAngles(float yaw, float pitch)
+{
+    _yaw = yaw;
+    _pitch = std::clamp(pitch, -CameraDefaults::MaxPitch, CameraDefaults::MaxPitch);
+    OrbitRotate(0.0f, 0.0f); // recompute position + forward from the seated angles
 }
 
 glm::mat4 Camera::GetViewMatrix() const

@@ -25,32 +25,33 @@ layout(std430, binding = 2) readonly buffer Heights
     float heightData[];
 };
 
-uniform uint numVertices;
-uniform uint seed;
-
-// Noise parameters
-uniform float largeNoiseScale;
-uniform int largeNoiseOctaves;
-uniform float detailNoiseScale;
-uniform float smallNoiseScale;
-uniform int smallNoiseOctaves;
-uniform float warpStrength;
-
-// Climate model parameters
-uniform int useClimateModel;
-uniform float temperatureLapseRate;
-uniform float temperatureExponent;
-uniform float moistureNoiseScale;
-uniform float moistureNoiseStrength;
-uniform float hadleyIntensity;
-uniform float continentalityStrength;
-
-// Height range for normalization
-uniform float heightScale;
+// Parameters UBO — matches ShadingEarthParams in ParamBlocks.h exactly
+layout(std140, binding = 3) uniform ShadingEarthParamsBlock
+{
+    // Row 0
+    uint numVertices;
+    uint seed;
+    int  useClimateModel;
+    int  largeNoiseOctaves;
+    // Row 1
+    float largeNoiseScale;
+    float detailNoiseScale;
+    float smallNoiseScale;
+    int   smallNoiseOctaves;
+    // Row 2
+    float warpStrength;
+    float temperatureLapseRate;
+    float temperatureExponent;
+    float moistureNoiseScale;
+    // Row 3
+    float moistureNoiseStrength;
+    float hadleyIntensity;
+    float continentalityStrength;
+    float heightScale;
+};
 
 const float PI = 3.14159265;
 
-// Multi-octave normalized noise (returns ~[-1,1] range, centered near 0)
 float multiOctaveNoise(vec3 pos, float scale, int octaves, uint baseSeed)
 {
     float sum = 0.0;
@@ -69,7 +70,6 @@ float multiOctaveNoise(vec3 pos, float scale, int octaves, uint baseSeed)
     return sum / maxValue;
 }
 
-// Warped noise for irregular boundaries
 float warpedNoise(vec3 pos, float scale, float warpAmount, uint baseSeed)
 {
     float warpX = snoise(pos * scale * 0.5, baseSeed) * 2.0 - 1.0;
@@ -80,41 +80,29 @@ float warpedNoise(vec3 pos, float scale, float warpAmount, uint baseSeed)
     return snoise(warpedPos * scale, baseSeed + 100u);
 }
 
-// Geographic latitude in [0, PI/2] from unit sphere direction
 float geographicLatitude(vec3 dir)
 {
     return asin(clamp(abs(dir.y), 0.0, 1.0));
 }
 
-// Temperature from latitude and elevation
-// Returns 0 (freezing) to 1 (tropical)
 float computeTemperature(vec3 dir, float normalizedHeight)
 {
     float lat = geographicLatitude(dir);
 
-    // Cosine-based temperature: warm equator, cold poles
-    // Exponent controls gradient sharpness (low = wide tropics, high = sharp falloff)
     float baseTemp = pow(cos(lat), temperatureExponent);
 
-    // Slight noise breaks perfect hemispheric symmetry
     float tempNoise = snoise(dir * 2.0, seed + 500u) * 0.08;
 
-    // Elevation cooling: only significant at high elevations
     float elevationCooling = smoothstep(0.1, 0.8, normalizedHeight) * temperatureLapseRate * 0.3;
 
     return clamp(baseTemp + tempNoise - elevationCooling, 0.0, 1.0);
 }
 
-// Moisture from Hadley circulation, elevation, and noise
-// Returns 0 (arid) to 1 (wet)
 float computeMoisture(vec3 dir, float normalizedHeight, uint baseSeed)
 {
     float lat = geographicLatitude(dir);
     float latDeg = lat * (180.0 / PI);
 
-    // Hadley cell as sum of Gaussians — continuous, no branching
-    // ITCZ convergence at equator, subtropical drying ~28deg,
-    // mid-latitude storm belt ~50deg, polar drying ~80deg
     float itcz       =  0.85 * exp(-pow(latDeg / 8.0, 2.0));
     float subtropical = -0.45 * exp(-pow((latDeg - 28.0) / 10.0, 2.0));
     float midlat     =  0.35 * exp(-pow((latDeg - 50.0) / 12.0, 2.0));
@@ -123,12 +111,9 @@ float computeMoisture(vec3 dir, float normalizedHeight, uint baseSeed)
     float hadley = clamp(0.40 + itcz + subtropical + midlat + polar, 0.05, 0.95);
     hadley = mix(0.45, hadley, hadleyIntensity);
 
-    // Continentality: gradual moisture response to elevation
-    // smoothstep avoids the sharp exponential cliff at plate boundaries
     float coastalProxy = (1.0 - smoothstep(0.0, 0.4, normalizedHeight)) * continentalityStrength;
     float interiorDrying = smoothstep(0.3, 0.7, normalizedHeight) * continentalityStrength * 0.35;
 
-    // Regional noise for variation (monsoons, continental interiors)
     float moistNoise = multiOctaveNoise(dir, moistureNoiseScale, 3, baseSeed);
     float noiseContrib = (moistNoise * 2.0 - 1.0) * moistureNoiseStrength;
 
@@ -144,17 +129,13 @@ void main()
     vec3 pos = vec3(vertexData[baseIdx], vertexData[baseIdx + 1u], vertexData[baseIdx + 2u]);
     vec3 dir = normalize(pos);
 
-    // Detail noise with domain warping
     float detailNoise = warpedNoise(dir, detailNoiseScale, warpStrength, seed + 1u);
-
-    // Small-scale noise
     float smallNoise = multiOctaveNoise(dir, smallNoiseScale, smallNoiseOctaves, seed + 2u);
 
     if (useClimateModel != 0)
     {
         float rawHeight = heightData[id];
 
-        // Raw height = 1.0 + displacement; extract displacement and normalize by scale
         float displacement = rawHeight - 1.0;
         float normalizedHeight = clamp(displacement / max(heightScale, 0.001), 0.0, 1.0);
 
@@ -165,7 +146,6 @@ void main()
     }
     else
     {
-        // Legacy mode
         float largeNoise = multiOctaveNoise(dir, largeNoiseScale, largeNoiseOctaves, seed);
 
         vec3 blendWarp;

@@ -1,0 +1,228 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+
+// Continental mask generation — distance-field approximation.
+//
+// Approach: each texel maps to a direction on the unit sphere. We seed N craton
+// cores (directions), then compute warped angular distance to the nearest core.
+// R = continentalness gradient (1=craton, 0=deep ocean), G = accretionAge
+// (normalised: 0=core, 1=margin).
+//
+// No iterative ping-pong needed — fully deterministic single-pass.
+// Clustered placement: lerp core direction toward a shared clusterCenter per clustering.
+
+layout(rg32f, binding = 0) uniform image3D continentMask;
+
+// ============================================================================
+// Params UBO — matches ContinentGrowthParams in ParamBlocks.h
+// ============================================================================
+
+layout(std140, binding = 1) uniform ContinentGrowthParamsBlock
+{
+    uint  count;
+    uint  seed;
+    uint  resolution;
+    uint  warpOctaves;  // domain-warp octaves for coastline irregularity
+    float sizeVariance;
+    float clustering;
+    float _pad0;
+    float _pad1;
+};
+
+// ============================================================================
+// Hash / noise (inline — same as height_earth.comp)
+// ============================================================================
+
+const float PI = 3.14159265359;
+const float F3 = 1.0 / 3.0;
+const float G3 = 1.0 / 6.0;
+
+const vec3 grad3[12] = vec3[12](
+    vec3(1,1,0), vec3(-1,1,0), vec3(1,-1,0), vec3(-1,-1,0),
+    vec3(1,0,1), vec3(-1,0,1), vec3(1,0,-1), vec3(-1,0,-1),
+    vec3(0,1,1), vec3(0,-1,1), vec3(0,1,-1), vec3(0,-1,-1)
+);
+
+uint ghash(uint x, uint s)
+{
+    x ^= s;
+    x = ((x >> 16) ^ x) * 0x45d9f3bu;
+    x = ((x >> 16) ^ x) * 0x45d9f3bu;
+    return (x >> 16) ^ x;
+}
+
+uint ghash3(int x, int y, int z, uint s)
+{
+    uint h = ghash(uint(x) & 0xFFu, s);
+    h = ghash(h ^ (uint(y) & 0xFFu), s);
+    h = ghash(h ^ (uint(z) & 0xFFu), s);
+    return h;
+}
+
+int gfloor(float x)
+{
+    int xi = int(x);
+    return x < float(xi) ? xi - 1 : xi;
+}
+
+float snoise3(vec3 v, uint s)
+{
+    float sk = (v.x + v.y + v.z) * F3;
+    int i = gfloor(v.x + sk);
+    int j = gfloor(v.y + sk);
+    int k = gfloor(v.z + sk);
+
+    float t = float(i + j + k) * G3;
+    float x0 = v.x - (float(i) - t);
+    float y0 = v.y - (float(j) - t);
+    float z0 = v.z - (float(k) - t);
+
+    int i1, j1, k1, i2, j2, k2;
+    if (x0 >= y0) {
+        if (y0 >= z0) { i1=1;j1=0;k1=0;i2=1;j2=1;k2=0; }
+        else if (x0 >= z0) { i1=1;j1=0;k1=0;i2=1;j2=0;k2=1; }
+        else { i1=0;j1=0;k1=1;i2=1;j2=0;k2=1; }
+    } else {
+        if (y0 < z0) { i1=0;j1=0;k1=1;i2=0;j2=1;k2=1; }
+        else if (x0 < z0) { i1=0;j1=1;k1=0;i2=0;j2=1;k2=1; }
+        else { i1=0;j1=1;k1=0;i2=1;j2=1;k2=0; }
+    }
+
+    float x1 = x0 - float(i1) + G3;
+    float y1 = y0 - float(j1) + G3;
+    float z1 = z0 - float(k1) + G3;
+    float x2 = x0 - float(i2) + 2.0*G3;
+    float y2 = y0 - float(j2) + 2.0*G3;
+    float z2 = z0 - float(k2) + 2.0*G3;
+    float x3 = x0 - 1.0 + 3.0*G3;
+    float y3 = y0 - 1.0 + 3.0*G3;
+    float z3 = z0 - 1.0 + 3.0*G3;
+
+    int gi0 = int(ghash3(i,j,k,s) % 12u);
+    int gi1 = int(ghash3(i+i1,j+j1,k+k1,s) % 12u);
+    int gi2 = int(ghash3(i+i2,j+j2,k+k2,s) % 12u);
+    int gi3 = int(ghash3(i+1,j+1,k+1,s) % 12u);
+
+    float t0 = 0.6 - x0*x0 - y0*y0 - z0*z0;
+    float n0 = (t0 < 0.0) ? 0.0 : t0*t0*t0*t0 * dot(grad3[gi0], vec3(x0,y0,z0));
+    float t1 = 0.6 - x1*x1 - y1*y1 - z1*z1;
+    float n1 = (t1 < 0.0) ? 0.0 : t1*t1*t1*t1 * dot(grad3[gi1], vec3(x1,y1,z1));
+    float t2 = 0.6 - x2*x2 - y2*y2 - z2*z2;
+    float n2 = (t2 < 0.0) ? 0.0 : t2*t2*t2*t2 * dot(grad3[gi2], vec3(x2,y2,z2));
+    float t3 = 0.6 - x3*x3 - y3*y3 - z3*z3;
+    float n3 = (t3 < 0.0) ? 0.0 : t3*t3*t3*t3 * dot(grad3[gi3], vec3(x3,y3,z3));
+
+    return (32.0 * (n0 + n1 + n2 + n3) + 1.0) * 0.5;
+}
+
+// ============================================================================
+// Core placement
+// ============================================================================
+
+// Fibonacci-sphere-like hashing for uniform distribution
+vec3 coreDirection(int idx, uint s)
+{
+    uint h1 = ghash(uint(idx) * 7u + 3u, s + 100u);
+    uint h2 = ghash(uint(idx) * 13u + 7u, s + 200u);
+
+    float theta = 2.0 * PI * float(h1) / 4294967295.0;
+    float cosLat = 2.0 * float(h2) / 4294967295.0 - 1.0;
+    float sinLat = sqrt(max(0.0, 1.0 - cosLat * cosLat));
+
+    return vec3(sinLat * cos(theta), cosLat, sinLat * sin(theta));
+}
+
+// Cluster clusterCenter — used to pull cores toward each other
+vec3 clusterCentroid(uint s)
+{
+    uint h1 = ghash(13u, s + 700u);
+    uint h2 = ghash(17u, s + 800u);
+    float theta = 2.0 * PI * float(h1) / 4294967295.0;
+    float cosLat = 2.0 * float(h2) / 4294967295.0 - 1.0;
+    float sinLat = sqrt(max(0.0, 1.0 - cosLat * cosLat));
+    return normalize(vec3(sinLat * cos(theta), cosLat, sinLat * sin(theta)));
+}
+
+// Per-core size weight [0.5, 1.5] driven by sizeVariance
+float coreSize(int idx, uint s)
+{
+    uint h = ghash(uint(idx) * 41u + 19u, s + 500u);
+    float r = float(h) / 4294967295.0;
+    return 1.0 + (r * 2.0 - 1.0) * sizeVariance;
+}
+
+// ============================================================================
+// Main
+// ============================================================================
+
+void main()
+{
+    uvec3 gid = gl_GlobalInvocationID;
+    uint res = resolution;
+
+    if (gid.x >= res || gid.y >= res || gid.z >= res)
+        return;
+
+    // Map texel to direction in [-1,1]³ → normalize to unit sphere
+    vec3 uvw = (vec3(gid) + 0.5) / float(res) * 2.0 - 1.0;
+    vec3 dir = normalize(uvw);
+
+    // Domain warp for analytic coastline irregularity
+    uint octaves = clamp(warpOctaves, 1u, 4u);
+    vec3 warpedDir = dir;
+    float warpAmp   = 0.35;
+    float warpFreq  = 1.8;
+    for (uint i = 0u; i < octaves; ++i)
+    {
+        float wx = (snoise3(dir * warpFreq + vec3(11.3, 0.0, 0.0), seed + 900u) * 2.0 - 1.0) * warpAmp;
+        float wy = (snoise3(dir * warpFreq + vec3(0.0, 17.7, 0.0), seed + 901u) * 2.0 - 1.0) * warpAmp;
+        float wz = (snoise3(dir * warpFreq + vec3(0.0, 0.0, 23.1), seed + 902u) * 2.0 - 1.0) * warpAmp;
+        warpedDir = normalize(dir + vec3(wx, wy, wz));
+        warpAmp   *= 0.5;
+        warpFreq  *= 2.0;
+    }
+
+    vec3 clusterCenter = clusterCentroid(seed);
+    uint numCores = clamp(count, 1u, 24u);
+
+    float minAngularDist  = 1e10;
+    float minAngularDist2 = 1e10;  // second-nearest for age interpolation
+    float nearSize = 1.0;
+
+    for (uint i = 0u; i < numCores; ++i)
+    {
+        // Cluster: lerp core direction toward shared clusterCenter
+        vec3 rawCore = coreDirection(int(i), seed);
+        vec3 clusteredCore = normalize(mix(rawCore, clusterCenter, clustering));
+
+        // Per-core size scales effective distance
+        float sz = coreSize(int(i), seed);
+        float angDist = acos(clamp(dot(warpedDir, clusteredCore), -1.0, 1.0)) / sz;
+
+        if (angDist < minAngularDist)
+        {
+            minAngularDist2 = minAngularDist;
+            minAngularDist  = angDist;
+            nearSize = sz;
+        }
+        else if (angDist < minAngularDist2)
+        {
+            minAngularDist2 = angDist;
+        }
+    }
+
+    // Continentalness: smooth falloff from craton core.
+    // halfAngle ≈ half the angular radius of a continent (π / numCores * sizeMultiplier).
+    float halfAngle = (PI / float(numCores)) * (1.0 + sizeVariance * 0.5);
+    halfAngle = clamp(halfAngle, 0.1, 1.2);
+
+    float t = clamp(minAngularDist / halfAngle, 0.0, 1.0);
+    float continentalness = 1.0 - smoothstep(0.0, 1.0, t);
+
+    // AccretionAge: 0 at core, grows toward the margin.
+    // Uses voronoi-like ratio: distance / (distance to boundary).
+    float boundary = (minAngularDist + minAngularDist2) * 0.5;
+    float age = (boundary > 0.001) ? clamp(minAngularDist / boundary, 0.0, 1.0) : 1.0;
+
+    imageStore(continentMask, ivec3(gid), vec4(continentalness, age, 0.0, 1.0));
+}

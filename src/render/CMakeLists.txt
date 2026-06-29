@@ -12,12 +12,10 @@ add_library(render STATIC
     gui/CinematicPanel.cpp
     Renderer.cpp
     Mesh.cpp
-    MeshGenerator.cpp
-    TerrainGenerator.cpp
     GlFence.cpp
     GenerationScheduler.cpp
-    CelestialBody.cpp
-    Earth.cpp
+    BodyRuntime.cpp
+    BiomePalette.cpp
     Framebuffer.cpp
     PostProcessor.cpp
     lod/SpherePatch.cpp
@@ -28,6 +26,12 @@ add_library(render STATIC
     effects/AtmosphereRenderer.cpp
     cinematic/CinematicController.cpp
     cinematic/CaptureManager.cpp
+    # Model and backend sources compiled directly (DLL boundary: symbols not exported via PG_API)
+    ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfig.cpp
+    ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfigProjection.cpp
+    ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfigJson.cpp
+    ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/PaletteRegistry.cpp
+    ${CMAKE_SOURCE_DIR}/libplanetgen/src/backend/ParamMappers.cpp
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
@@ -48,6 +52,8 @@ target_include_directories(render PUBLIC
 
 target_link_libraries(render PUBLIC
     core
+    planetgen
     glfw
     OpenGL::GL
+    nlohmann_json::nlohmann_json
 )

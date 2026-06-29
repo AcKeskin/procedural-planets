@@ -71,6 +71,16 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(stb)
 set(STB_INCLUDE_DIR ${stb_SOURCE_DIR})
 
+# nlohmann/json (header-only)
+message(STATUS "Fetching nlohmann/json...")
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+)
+set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # gl3w generates files in build dir, not source dir
 set(GL3W_INCLUDE_DIR ${gl3w_BINARY_DIR}/include)
 set(GL3W_SRC ${gl3w_BINARY_DIR}/src/gl3w.c)
@@ -78,7 +88,11 @@ set(GL3W_SRC ${gl3w_BINARY_DIR}/src/gl3w.c)
 # OpenGL
 find_package(OpenGL REQUIRED)
 
+# Testing
+enable_testing()
+
 # Subdirectories
 add_subdirectory(src/core)
+add_subdirectory(libplanetgen)
 add_subdirectory(src/render)
 add_subdirectory(src/app)

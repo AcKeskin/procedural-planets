@@ -48,8 +48,10 @@ public:
                     int resolution = 32,
                     float skirtFraction = 0.02f);
 
-    // Generate mesh data from heights and shading
-    void GenerateMesh(const std::vector<float>& heights, const std::vector<glm::vec4>& shadingData);
+    // Generate mesh data from heights, shading, and analytical normals
+    void GenerateMesh(const std::vector<float>& heights,
+                      const std::vector<glm::vec4>& shadingData,
+                      const std::vector<glm::vec3>& computedNormals = {});
 
     // Check if patch is visible in frustum
     bool IsVisible(const Frustum& frustum) const;

@@ -2,6 +2,7 @@
 
 #include <string>
 #include <unordered_set>
+#include <cstddef>
 #include <glm/glm.hpp>
 
 namespace planets::render
@@ -36,6 +37,10 @@ public:
     void SetVec4(const std::string& name, const glm::vec4& value) const;
     void SetVec4Array(const std::string& name, const glm::vec4* values, int count) const;
 
+    // Upload a std140 param block to a UBO and bind it.
+    // Creates the internal UBO on first call; reuses it on subsequent calls.
+    void SetParamBlock(const void* data, std::size_t sizeBytes, unsigned int binding);
+
     unsigned int GetProgram() const { return _program; }
     bool IsValid() const { return _program != 0; }
 
@@ -46,6 +51,7 @@ private:
                                    std::unordered_set<std::string>& includedFiles);
 
     unsigned int _program;
+    unsigned int _ubo;    // lazily created GL uniform buffer
 };
 
 } // namespace planets::render

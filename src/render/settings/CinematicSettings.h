@@ -20,6 +20,10 @@ inline constexpr float MinRotations = 1.0f;
 inline constexpr float MaxRotations = 10.0f;
 inline constexpr float MinDurationSeconds = 1.0f;
 inline constexpr float MaxDurationSeconds = 120.0f;
+inline constexpr float MinStartYaw = -180.0f;
+inline constexpr float MaxStartYaw = 180.0f;
+inline constexpr float MinStartPitch = -89.0f;
+inline constexpr float MaxStartPitch = 89.0f;
 } // namespace CinematicLimits
 
 enum class CinematicDurationMode
@@ -42,6 +46,11 @@ struct TurntableSettings
     bool zoomEasing = true;
     CinematicDurationMode durationMode = CinematicDurationMode::Rotations;
     float durationValue = 1.0f; // rotations or seconds depending on mode
+
+    // Orbit start angle. Defaults match the camera's resting yaw/pitch so default
+    // behaviour (begin wherever the camera is) is unchanged.
+    float startYaw = -90.0f; // matches core::CameraDefaults::Yaw
+    float startPitch = 0.0f;
 };
 
 struct CinematicSettings

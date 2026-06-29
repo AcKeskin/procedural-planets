@@ -1,0 +1,16 @@
+{
+    "name": "Earth",
+    "entries": [
+        { "color": [0.05, 0.28, 0.03], "parameter": 0.0, "label": "tropical_wet" },
+        { "color": [0.28, 0.40, 0.12], "parameter": 0.0, "label": "tropical_mid" },
+        { "color": [0.76, 0.62, 0.35], "parameter": 0.0, "label": "tropical_dry" },
+        { "color": [0.12, 0.35, 0.08], "parameter": 0.0, "label": "temperate_wet" },
+        { "color": [0.32, 0.42, 0.18], "parameter": 0.0, "label": "temperate_mid" },
+        { "color": [0.65, 0.55, 0.30], "parameter": 0.0, "label": "temperate_dry" },
+        { "color": [0.06, 0.20, 0.08], "parameter": 0.0, "label": "boreal_wet" },
+        { "color": [0.22, 0.28, 0.16], "parameter": 0.0, "label": "boreal_mid" },
+        { "color": [0.42, 0.40, 0.32], "parameter": 0.0, "label": "boreal_dry" },
+        { "color": [0.48, 0.50, 0.40], "parameter": 0.0, "label": "tundra" },
+        { "color": [0.92, 0.94, 0.97], "parameter": 0.0, "label": "ice" }
+    ]
+}

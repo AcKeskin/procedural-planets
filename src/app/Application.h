@@ -3,16 +3,8 @@
 #include "Input.h"
 #include "Window.h"
 #include "Renderer.h"
-#include "Shader.h"
-#include "Mesh.h"
-#include "TerrainGenerator.h"
-#include "GenerationScheduler.h"
 #include "ParameterRandomizer.h"
-#include "Framebuffer.h"
-#include "PostProcessor.h"
 #include "lod/PlanetQuadTree.h"
-#include "effects/OceanRenderer.h"
-#include "effects/AtmosphereRenderer.h"
 #include "gui/GuiManager.h"
 #include "gui/ScenePanel.h"
 #include "gui/TerrainPanel.h"
@@ -21,15 +13,19 @@
 #include "gui/DebugPanel.h"
 #include "settings/SceneSettings.h"
 #include "settings/TerrainSettings.h"
-#include "settings/SurfaceSettings.h"
 #include "settings/OceanSettings.h"
 #include "settings/AtmosphereSettings.h"
 #include "settings/CinematicSettings.h"
+#include "BiomePalette.h"
+#include "BodyRuntime.h"
+#include <planetgen/planetgen.hpp>
+#include <memory>
 #include "cinematic/CinematicController.h"
 #include "cinematic/CaptureManager.h"
 #include "gui/CinematicPanel.h"
 #include "math/Camera.h"
-#include "generation/Planet.h"
+#include "CaptureRequest.h"
+#include <model/PaletteRegistry.h>
 
 namespace planets::app
 {
@@ -50,6 +46,9 @@ inline constexpr float MinFarPlane = 1000.0f;
 inline constexpr float FarPlaneRadiusMultiplier = 20.0f;
 inline constexpr int OceanSubdivisions = 5;
 inline constexpr float HeightRangeMultiplier = 1.5f;
+inline constexpr int CaptureDrainMaxFrames = 240; // safety cap so a stuck queue can't hang capture
+inline constexpr float CaptureSunIntensity = 1.6f; // brighter hero exposure for captures only
+inline constexpr float CaptureAmbientLight = 0.40f;
 } // namespace AppDefaults
 
 // Owns all state, systems, and the frame loop
@@ -66,17 +65,45 @@ public:
     void Run();
     void Shutdown();
 
+    // Headless capture: boot with overrides, render warm-up frames, write one PNG, return.
+    // Returns true on a successful capture.
+    bool RunCapture(const CaptureRequest& request);
+
+    // Headless cinematic: boot, warm up the LOD, then drive the turntable over
+    // request.cinematicFrames frames at a fixed dt, writing a numbered PNG sequence.
+    bool RunCinematicCapture(const CaptureRequest& request);
+
+    // Headless generation showcase: orbit continuously while regenerating the planet
+    // (new random world) every request.holdFrames frames, across request.planets worlds.
+    bool RunGenerationShowcase(const CaptureRequest& request);
+
+    // Apply CLI overrides before window/scene creation (size, vsync, seed, camera).
+    void ApplyCaptureOverrides(const CaptureRequest& request);
+
 private:
     void ProcessInput(float deltaTime);
     void Render();
     void RenderGui();
 
-    void RegeneratePlanetCpu();
-    void RegeneratePlanetGpu();
     void RegenerateLodSystem();
     void ShuffleTerrain();
     void StartCinematic();
     void StopCinematic();
+
+    // Render frames until the LOD scheduler has no pending/in-flight work, so a capture
+    // never shoots a half-generated patch. minFrames forces a settle floor; maxFrames caps
+    // the wait so a stuck queue can't hang. Returns true if it drained before the cap.
+    bool DrainGeneration(int minFrames, int maxFrames);
+
+    // Aim the world light from over the camera's shoulder so the lit hemisphere faces the
+    // viewer (used per-frame in the cinematic when lightFollow is on).
+    void UpdateFollowLight();
+
+    // Pin capture-mode lighting exposure (re-applied after a showcase regenerate).
+    void ApplyCaptureExposure();
+
+    // Load a BodyConfig from data/bodies/<name>.json and switch to it
+    void SwitchBody(planetgen::BodyConfig config);
 
     // Build QuadTreeConfig from current LodConfig
     render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
@@ -84,22 +111,7 @@ private:
     // Core systems
     render::Window _window;
     Input _input;
-    render::Renderer _renderer;
-
-    // Shaders
-    render::Shader _planetShader;
-    render::Shader _spaceShader;
-    render::Shader _passthroughShader;
-
-    // Rendering pipeline
-    render::Framebuffer _sceneFbo;
-    render::PostProcessor _postProcessor;
-    render::Mesh _planetMesh;
-    render::TerrainGenerator _terrainGenerator;
-    render::GenerationScheduler _generationScheduler;
-    render::lod::PlanetQuadTree _quadTree;
-    render::effects::OceanRenderer _oceanRenderer;
-    render::effects::AtmosphereRenderer _atmosphereRenderer;
+    render::Renderer _renderer; // owns the draw + LOD pipeline
 
     // GUI
     render::GuiManager _guiManager;
@@ -108,15 +120,12 @@ private:
     render::SurfacePanel _surfacePanel;
     render::AtmospherePanel _atmospherePanel;
     render::DebugPanel _debugPanel;
-    // Settings (Application owns all)
+
+    // App-visual settings (generation params live in the active body's BodyConfig).
     render::SceneSettings _sceneSettings;
-    render::EarthTerrainSettings _terrainSettings;
-    render::EarthShadingSettings _shadingSettings;
     render::GenerationConfig _genConfig;
     render::LodConfig _lodConfig;
     render::TerrainStats _terrainStats;
-    render::BiomeSettings _biomeSettings;
-    render::EarthColors _earthColors;
     render::effects::OceanSettings _oceanSettings;
     render::effects::AtmosphereSettings _atmosphereSettings;
     float _seaLevel;
@@ -136,14 +145,27 @@ private:
     bool _cinematicPanelVisible = true;
     bool _screenshotRequested = false;
 
-    // CPU fallback
-    core::Planet _planet;
+    // Active body — typed config + runtime shim
+    planetgen::PaletteRegistry _paletteRegistry;
+    std::unique_ptr<render::BodyRuntime> _activeBody;
+
+    // libplanetgen context (owns GPU compute; the app generates terrain ONLY through
+    // this) + the active body handle, recreated on SwitchBody. Context uses the app's
+    // existing GL context so per-patch dispatch hits the app's LOD buffers.
+    std::unique_ptr<pg::Context> _libContext;
+    pg::Body _libBody;
+
+    int _selectedBodyType = 0; // GUI selector index
 
     // Frame state
     float _lastTime;
     float _deltaTime = 0.0f;
     int _previousWidth;
     int _previousHeight;
+
+    // Headless capture overrides (applied in Initialize when .enabled). Default = interactive.
+    CaptureRequest _capture;
+    bool _headlessCaptureRequested = false;
 };
 
 } // namespace planets::app

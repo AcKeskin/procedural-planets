@@ -6,24 +6,16 @@
 namespace planets::render
 {
 
-void GenerationScheduler::Initialize(TerrainGenerator& terrainGen,
-                                     const EarthTerrainSettings& terrainSettings,
-                                     const EarthShadingSettings& shadingSettings,
-                                     uint32_t seed)
+void GenerationScheduler::Initialize(PgBody body, uint32_t seed)
 {
     CancelAll();
-    _terrainGen = &terrainGen;
-    _terrainSettings = &terrainSettings;
-    _shadingSettings = &shadingSettings;
+    _body = body;
     _seed = seed;
 }
 
-void GenerationScheduler::SetSettings(const EarthTerrainSettings& terrainSettings,
-                                      const EarthShadingSettings& shadingSettings,
-                                      uint32_t seed)
+void GenerationScheduler::SetBody(PgBody body, uint32_t seed)
 {
-    _terrainSettings = &terrainSettings;
-    _shadingSettings = &shadingSettings;
+    _body = body;
     _seed = seed;
 }
 
@@ -75,7 +67,7 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
     const auto& unitVertices = task.request.patch->GetUnitSphereVertices();
     task.vertexCount = unitVertices.size();
 
-    // Pack vertices as flat float array (same layout as synchronous path)
+    // Pack vertices as flat float array
     std::vector<float> packedVertices;
     packedVertices.reserve(task.vertexCount * 3);
     for (const auto& v : unitVertices)
@@ -87,48 +79,22 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
 
     task.vertexBuffer.Upload(packedVertices);
     task.heightBuffer.Allocate(task.vertexCount);
+    task.normalBuffer.Allocate(task.vertexCount * 3);
+    task.shadingBuffer.Allocate(task.vertexCount);
 
-    // Dispatch height compute
-    _terrainGen->DispatchHeightsAsync(task.vertexBuffer, task.heightBuffer, task.vertexCount, _seed, *_terrainSettings);
+    // The library writes per-vertex data into these buffers GPU-resident and
+    // returns without syncing; the fence below is our completion signal. No erosion
+    // on this path — it is neighbour-coupled and would seam at patch boundaries.
+    pg_generate_patch(_body,
+                      packedVertices.data(),
+                      static_cast<uint32_t>(task.vertexCount),
+                      _seed,
+                      task.heightBuffer.GetHandle(),
+                      task.normalBuffer.GetHandle(),
+                      task.shadingBuffer.GetHandle(),
+                      nullptr);
 
-    // Erosion iterations (requires barrier between height and each iteration)
-    if (_terrainSettings->enableErosion && _terrainGen->IsErosionReady())
-    {
-        int gridRes = task.request.patch->GetResolution();
-        task.erosionScratchBuffer.Allocate(task.vertexCount);
-
-        GpuBuffer<float>* readBuf = &task.heightBuffer;
-        GpuBuffer<float>* writeBuf = &task.erosionScratchBuffer;
-
-        for (int i = 0; i < _terrainSettings->erosionIterations; ++i)
-        {
-            ComputeShader::WaitForCompletion();
-            _terrainGen->DispatchErosionAsync(*readBuf, *writeBuf, task.vertexCount, gridRes, *_terrainSettings);
-            std::swap(readBuf, writeBuf);
-        }
-
-        // Ensure final result is in heightBuffer
-        if (readBuf != &task.heightBuffer)
-            std::swap(task.heightBuffer, task.erosionScratchBuffer);
-    }
-
-    // Barrier ensures height data (potentially eroded) is readable by shading
-    ComputeShader::WaitForCompletion();
-
-    // Dispatch shading compute (reads height buffer for climate model)
-    if (_terrainGen->IsShadingReady())
-    {
-        task.shadingBuffer.Allocate(task.vertexCount);
-        _terrainGen->DispatchShadingAsync(task.vertexBuffer,
-                                          task.shadingBuffer,
-                                          task.heightBuffer,
-                                          task.vertexCount,
-                                          _seed,
-                                          *_shadingSettings,
-                                          _terrainSettings->heightScale);
-    }
-
-    // Single fence covers all dispatches
+    // Single fence covers the dispatch; the app owns completion tracking.
     task.fence.Place();
 }
 
@@ -137,6 +103,15 @@ void GenerationScheduler::CompleteTask(GenerationTask& task)
     // Readback height data from GPU
     std::vector<float> heights;
     task.heightBuffer.Download(heights);
+
+    // Readback analytical normals from GPU
+    std::vector<float> packedNormals;
+    task.normalBuffer.Download(packedNormals);
+    std::vector<glm::vec3> computedNormals(task.vertexCount);
+    for (size_t i = 0; i < task.vertexCount; ++i)
+    {
+        computedNormals[i] = glm::vec3(packedNormals[i * 3], packedNormals[i * 3 + 1], packedNormals[i * 3 + 2]);
+    }
 
     // Readback shading data from GPU
     std::vector<glm::vec4> shadingData;
@@ -149,8 +124,8 @@ void GenerationScheduler::CompleteTask(GenerationTask& task)
         shadingData.resize(task.vertexCount, glm::vec4(0.0f));
     }
 
-    // Build mesh on the patch (CPU: normals, skirts, upload VAO)
-    task.request.patch->GenerateMesh(heights, shadingData);
+    // Build mesh on the patch using GPU-computed analytical normals
+    task.request.patch->GenerateMesh(heights, shadingData, computedNormals);
 
     // Move to completed results
     _completed.push_back({task.request.targetNode, task.request.type, std::move(task.request.patch)});
