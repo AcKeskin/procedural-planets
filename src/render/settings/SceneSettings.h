@@ -9,7 +9,7 @@ namespace planets::render
 struct LightingSettings
 {
     float sunIntensity = 1.0f;
-    float ambientLight = 0.15f;
+    float ambientLight = 0.28f;
     float specularStrength = 0.0f;
     float specularPower = 32.0f;
 

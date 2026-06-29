@@ -87,8 +87,8 @@ layout(std430, binding = BIOME_PALETTE_BINDING) readonly buffer BiomePaletteBuff
 
 uniform int uPaletteSize;
 
-const vec3 DEEP_OCEAN = vec3(0.02, 0.05, 0.15);
-const vec3 SHALLOW_OCEAN = vec3(0.05, 0.15, 0.35);
+const vec3 DEEP_OCEAN = vec3(0.03, 0.09, 0.22);
+const vec3 SHALLOW_OCEAN = vec3(0.07, 0.20, 0.42);
 const vec3 COASTAL = vec3(0.12, 0.45, 0.42);
 
 // Per-fragment detail fade (set in main, read by helper functions)
