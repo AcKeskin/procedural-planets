@@ -125,6 +125,14 @@ void Renderer::DrawSpace(const RenderContext& ctx, const glm::mat4& invView, con
 
 void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProjection)
 {
+    // Generate/complete patches first: per-patch generation runs the library's
+    // compute shaders, which leave their program bound. Bind the planet shader
+    // afterwards so that compute program can't clobber the active raster program —
+    // otherwise the patch draw runs the compute program and rasterizes nothing.
+    _scheduler.ProcessFrame(SchedulerPatchesPerFrame, SchedulerPatchesPerFrame);
+    _quadTree.ApplyCompletedPatches();
+    _quadTree.Update(ctx.cameraPos, viewProjection);
+
     _planetShader.Use();
     _planetShader.SetMat4("uModel", glm::mat4(1.0f));
     _planetShader.SetMat4("uView", ctx.view);
@@ -161,9 +169,6 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
         _planetShader.SetInt("uPaletteSize", _palette.GetEntryCount());
     }
 
-    _scheduler.ProcessFrame(SchedulerPatchesPerFrame, SchedulerPatchesPerFrame);
-    _quadTree.ApplyCompletedPatches();
-    _quadTree.Update(ctx.cameraPos, viewProjection);
     _quadTree.Render(_planetShader);
 }
 
