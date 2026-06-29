@@ -73,6 +73,10 @@ public:
     // request.cinematicFrames frames at a fixed dt, writing a numbered PNG sequence.
     bool RunCinematicCapture(const CaptureRequest& request);
 
+    // Headless generation showcase: orbit continuously while regenerating the planet
+    // (new random world) every request.holdFrames frames, across request.planets worlds.
+    bool RunGenerationShowcase(const CaptureRequest& request);
+
     // Apply CLI overrides before window/scene creation (size, vsync, seed, camera).
     void ApplyCaptureOverrides(const CaptureRequest& request);
 
@@ -94,6 +98,9 @@ private:
     // Aim the world light from over the camera's shoulder so the lit hemisphere faces the
     // viewer (used per-frame in the cinematic when lightFollow is on).
     void UpdateFollowLight();
+
+    // Pin capture-mode lighting exposure (re-applied after a showcase regenerate).
+    void ApplyCaptureExposure();
 
     // Load a BodyConfig from data/bodies/<name>.json and switch to it
     void SwitchBody(planetgen::BodyConfig config);

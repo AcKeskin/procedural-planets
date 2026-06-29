@@ -91,9 +91,7 @@ bool Application::Initialize()
         if (_capture.hasLight)
             _sceneSettings.lightDir = glm::normalize(_capture.lightDir);
 
-        // Brighten capture-mode exposure to a hero look (interactive defaults untouched).
-        _sceneSettings.lighting.sunIntensity = AppDefaults::CaptureSunIntensity;
-        _sceneSettings.lighting.ambientLight = AppDefaults::CaptureAmbientLight;
+        ApplyCaptureExposure();
     }
 
     // Load earth body from JSON and initialize
@@ -161,6 +159,14 @@ void Application::Run()
 void Application::ApplyCaptureOverrides(const CaptureRequest& request)
 {
     _capture = request;
+}
+
+void Application::ApplyCaptureExposure()
+{
+    // Brighten capture-mode exposure to a hero look (interactive defaults untouched).
+    // Re-applied after a showcase regenerate, since RandomizeBodyParameters resets lighting.
+    _sceneSettings.lighting.sunIntensity = AppDefaults::CaptureSunIntensity;
+    _sceneSettings.lighting.ambientLight = AppDefaults::CaptureAmbientLight;
 }
 
 void Application::UpdateFollowLight()
@@ -290,6 +296,76 @@ bool Application::RunCinematicCapture(const CaptureRequest& request)
     std::cout << "[Cinematic] Wrote " << written << "/" << frameCount << " frames." << std::endl;
     Shutdown();
     return written == frameCount;
+}
+
+bool Application::RunGenerationShowcase(const CaptureRequest& request)
+{
+    ApplyCaptureOverrides(request);
+
+    if (!Initialize())
+    {
+        std::cerr << "[Showcase] Initialization failed." << std::endl;
+        return false;
+    }
+
+    if (!DrainGeneration(_capture.frames, AppDefaults::CaptureDrainMaxFrames))
+        std::cerr << "[Showcase] Generation did not drain within "
+                  << AppDefaults::CaptureDrainMaxFrames << " frames; starting anyway." << std::endl;
+
+    auto& tt = _cinematicSettings.turntable;
+    if (_capture.orbitSpeed > 0.0f)
+        tt.orbitSpeed = _capture.orbitSpeed;
+    tt.zoomStartMultiplier = _capture.distanceMultiplier;
+    tt.zoomEndMultiplier = _capture.distanceMultiplier;
+    tt.durationMode = render::CinematicDurationMode::Loop;
+    StartCinematic();
+
+    const float dt = 1.0f / (std::max)(1.0f, _capture.cinematicFps);
+    const int planets = (std::max)(1, _capture.planets);
+    const int hold = (std::max)(1, _capture.holdFrames);
+
+    char path[512];
+    int written = 0;
+    int frameIndex = 0;
+    for (int p = 0; p < planets; ++p)
+    {
+        // After the first world, swap to a fresh random planet mid-orbit. ShuffleTerrain
+        // also randomizes scene lighting, so re-pin the capture exposure and drain the LOD
+        // before showing the new world (else we'd capture a half-built planet).
+        if (p > 0)
+        {
+            ShuffleTerrain();
+            ApplyCaptureExposure();
+            DrainGeneration(1, AppDefaults::CaptureDrainMaxFrames);
+        }
+
+        for (int h = 0; h < hold; ++h, ++frameIndex)
+        {
+            _window.PollEvents();
+            _cinematicController.Update(dt, _camera);
+            _lastTime += dt;
+
+            if (_capture.lightFollow)
+                UpdateFollowLight();
+
+            std::snprintf(path, sizeof(path), _capture.framePattern.c_str(), frameIndex + 1);
+            _capture.outputPath = path;
+            _headlessCaptureRequested = true;
+            Render();
+            _window.SwapBuffers();
+
+            if (!_headlessCaptureRequested)
+                ++written;
+        }
+    }
+
+    StopCinematic();
+
+    const int total = planets * hold;
+    std::cout << "[Showcase] Wrote " << written << "/" << total << " frames across "
+              << planets << " planets." << std::endl;
+    Shutdown();
+    return written == total;
 }
 
 void Application::Shutdown()

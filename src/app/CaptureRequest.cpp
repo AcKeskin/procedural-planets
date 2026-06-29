@@ -199,14 +199,31 @@ CaptureRequest CaptureRequest::Parse(int argc, char** argv)
         {
             req.lightFollow = false;
         }
+        else if (std::strcmp(arg, "--showcase") == 0)
+        {
+            req.showcase = true;
+        }
+        else if (std::strcmp(arg, "--planets") == 0)
+        {
+            const char* v = NextValue(argc, argv, i, "--planets");
+            if (v)
+                req.planets = std::atoi(v);
+        }
+        else if (std::strcmp(arg, "--hold-frames") == 0)
+        {
+            const char* v = NextValue(argc, argv, i, "--hold-frames");
+            if (v)
+                req.holdFrames = std::atoi(v);
+        }
         else
         {
             std::cerr << "[Capture] Unknown argument '" << arg << "'; ignoring." << std::endl;
         }
     }
 
-    // --cinematic implies headless capture mode (it doesn't need --screenshot).
-    if (req.cinematic)
+    // --cinematic / --showcase imply headless capture mode (no --screenshot needed) and
+    // write a numbered frame sequence.
+    if (req.cinematic || req.showcase)
     {
         req.enabled = true;
 
@@ -217,8 +234,9 @@ CaptureRequest CaptureRequest::Parse(int argc, char** argv)
         if (req.framePattern.find('%') == std::string::npos)
         {
             std::cerr << "[Capture] --out-pattern '" << req.framePattern
-                      << "' has no %0Nd frame number; disabling cinematic." << std::endl;
+                      << "' has no %0Nd frame number; disabling sequence capture." << std::endl;
             req.cinematic = false;
+            req.showcase = false;
             req.enabled = false;
         }
     }

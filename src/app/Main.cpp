@@ -7,6 +7,10 @@ int main(int argc, char** argv)
 
     planets::app::Application app;
 
+    // Headless generation showcase: orbit while regenerating planets, write a sequence, exit.
+    if (request.showcase)
+        return app.RunGenerationShowcase(request) ? 0 : -1;
+
     // Headless cinematic: drive the turntable and write a numbered PNG sequence, exit.
     if (request.cinematic)
         return app.RunCinematicCapture(request) ? 0 : -1;

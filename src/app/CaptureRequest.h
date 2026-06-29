@@ -45,6 +45,14 @@ struct CaptureRequest
     float startYaw = -90.0f;       // orbit start angle (matches CameraDefaults::Yaw)
     float startPitch = 0.0f;
 
+    // --- Generation showcase (--showcase) ---
+    // Orbits continuously while regenerating the planet (new random world) every
+    // holdFrames frames, to show off generation variety + speed. Shares the cinematic
+    // flags (out-pattern, fps, orbit-speed, distance). Non-deterministic by design.
+    bool showcase = false;
+    int planets = 8;       // how many worlds to cycle through
+    int holdFrames = 60;   // frames shown per world before regenerating
+
     // Parse argv. On a malformed value, logs a warning and falls back to the default
     // (malformed --camera → hasCamera stays false → default framing). Returns the request;
     // .enabled is false if --screenshot was not supplied.
