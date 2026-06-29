@@ -3,15 +3,8 @@
 #include "Input.h"
 #include "Window.h"
 #include "Renderer.h"
-#include "Shader.h"
-#include "Mesh.h"
-#include "GenerationScheduler.h"
 #include "ParameterRandomizer.h"
-#include "Framebuffer.h"
-#include "PostProcessor.h"
 #include "lod/PlanetQuadTree.h"
-#include "effects/OceanRenderer.h"
-#include "effects/AtmosphereRenderer.h"
 #include "gui/GuiManager.h"
 #include "gui/ScenePanel.h"
 #include "gui/TerrainPanel.h"
@@ -96,20 +89,7 @@ private:
     // Core systems
     render::Window _window;
     Input _input;
-    render::Renderer _renderer;
-
-    // Shaders
-    render::Shader _planetShader;
-    render::Shader _spaceShader;
-    render::Shader _passthroughShader;
-
-    // Rendering pipeline
-    render::Framebuffer _sceneFbo;
-    render::PostProcessor _postProcessor;
-    render::GenerationScheduler _generationScheduler;
-    render::lod::PlanetQuadTree _quadTree;
-    render::effects::OceanRenderer _oceanRenderer;
-    render::effects::AtmosphereRenderer _atmosphereRenderer;
+    render::Renderer _renderer; // owns the draw + LOD pipeline
 
     // GUI
     render::GuiManager _guiManager;
@@ -130,8 +110,6 @@ private:
     render::EarthColors _earthColors;                // GUI color panel
     render::effects::OceanSettings _oceanSettings;
     render::effects::AtmosphereSettings _atmosphereSettings;
-    render::BiomePalette _biomePalette;
-    render::GpuBuffer<render::BiomeEntry> _paletteBuffer;
     float _seaLevel;
 
     // Camera

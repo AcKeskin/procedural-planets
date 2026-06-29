@@ -289,8 +289,13 @@ bool Application::Initialize()
         return false;
 
     _input.Initialize(_window.GetHandle());
-    _renderer.Initialize();
     _guiManager.Initialize(_window.GetHandle());
+
+    if (!_renderer.Initialize(_window.GetWidth(), _window.GetHeight()))
+    {
+        std::cerr << "Failed to initialize renderer" << std::endl;
+        return false;
+    }
 
     // useExistingContext=true: the library shares the app's GL context so per-patch
     // dispatch writes into the app's own LOD buffers.
@@ -302,30 +307,6 @@ bool Application::Initialize()
     {
         std::cerr << "[Application] FATAL: failed to create libplanetgen context: "
                   << e.what() << std::endl;
-        return false;
-    }
-
-    if (!_sceneFbo.Create(_window.GetWidth(), _window.GetHeight()))
-    {
-        std::cerr << "Failed to create scene framebuffer" << std::endl;
-        return false;
-    }
-
-    if (!_postProcessor.Initialize())
-    {
-        std::cerr << "Failed to initialize post-processor" << std::endl;
-        return false;
-    }
-
-    if (!_passthroughShader.LoadFromFiles("shaders/passthrough.vert", "shaders/passthrough.frag"))
-    {
-        std::cerr << "Failed to load passthrough shader" << std::endl;
-        return false;
-    }
-
-    if (!_spaceShader.LoadFromFiles("shaders/space.vert", "shaders/space.frag"))
-    {
-        std::cerr << "Failed to load space shader" << std::endl;
         return false;
     }
 
@@ -372,14 +353,12 @@ void Application::Run()
         int currentHeight = _window.GetHeight();
         if (currentWidth != _previousWidth || currentHeight != _previousHeight)
         {
-            _sceneFbo.Resize(currentWidth, currentHeight);
+            _renderer.ResizeFramebuffer(currentWidth, currentHeight);
             _previousWidth = currentWidth;
             _previousHeight = currentHeight;
         }
 
         Render();
-
-        _renderer.EndFrame();
         _window.SwapBuffers();
     }
 }
@@ -410,14 +389,12 @@ bool Application::RunCapture(const CaptureRequest& request)
 
         _window.PollEvents();
         Render();
-        _renderer.EndFrame();
         _window.SwapBuffers();
     }
 
     // Final frame: flag the capture so Render() writes the PNG at the pre-GUI point.
     _headlessCaptureRequested = true;
     Render();
-    _renderer.EndFrame();
     _window.SwapBuffers();
 
     bool ok = !_headlessCaptureRequested; // cleared once the capture ran
@@ -430,8 +407,6 @@ bool Application::RunCapture(const CaptureRequest& request)
 
 void Application::Shutdown()
 {
-    _generationScheduler.CancelAll();
-    _postProcessor.Shutdown();
     _guiManager.Shutdown();
     _renderer.Shutdown();
     _window.Shutdown();
@@ -523,102 +498,27 @@ void Application::ProcessInput(float deltaTime)
 
 void Application::Render()
 {
-    _sceneFbo.Bind();
-    _renderer.BeginFrame();
-
-    glm::mat4 model      = glm::mat4(1.0f);
-    glm::mat4 view       = _camera.GetViewMatrix();
-    glm::mat4 projection = _camera.GetProjectionMatrix(_window.GetAspectRatio());
-    glm::mat4 invView    = glm::inverse(view);
-    glm::mat4 invProjection = glm::inverse(projection);
-    glm::mat4 viewProjection = projection * view;
-
-    // Space background
-    glDepthMask(GL_FALSE);
-    _spaceShader.Use();
-    _spaceShader.SetMat4("uInvProjection", invProjection);
-    _spaceShader.SetMat4("uInvView", invView);
-    _spaceShader.SetVec3("uLightDir", _sceneSettings.lightDir);
-    _spaceShader.SetFloat("uSunSize", _sceneSettings.sunSize);
-    _spaceShader.SetVec3("uSunColor", _sceneSettings.sunColor);
-    _spaceShader.SetFloat("uStarDensity", _sceneSettings.starDensity);
-    _postProcessor.RenderQuad();
-    glDepthMask(GL_TRUE);
-
-    // Planet
-    _planetShader.Use();
-    _planetShader.SetMat4("uModel", model);
-    _planetShader.SetMat4("uView", view);
-    _planetShader.SetMat4("uProjection", projection);
-    _planetShader.SetVec3("uLightDir", _sceneSettings.lightDir);
-    _planetShader.SetVec3("uCameraPos", _camera.GetPosition());
-    _planetShader.SetFloat("uSeaLevel", _seaLevel);
-
-    // Sync GUI-edited Earth settings into the active body config before rendering
+    // Keep GUI-edited Earth settings reflected in the body config before drawing.
     if (_activeBody && _activeBody->Config().metadata.typeName == "earth")
         SyncEarthToConfig(_activeBody->Config(),
                           _terrainSettings, _shadingSettings, _biomeSettings, _earthColors);
 
-    if (_activeBody)
-        _activeBody->SetRenderUniforms(_planetShader);
+    render::RenderContext ctx;
+    ctx.view = _camera.GetViewMatrix();
+    ctx.projection = _camera.GetProjectionMatrix(_window.GetAspectRatio());
+    ctx.cameraPos = _camera.GetPosition();
+    ctx.nearPlane = _camera.GetNearPlane();
+    ctx.farPlane = _camera.GetFarPlane();
+    ctx.time = _lastTime;
+    ctx.scene = &_sceneSettings;
+    ctx.ocean = &_oceanSettings;
+    ctx.atmosphere = &_atmosphereSettings;
+    ctx.biome = &_biomeSettings;
+    ctx.body = _activeBody.get();
+    ctx.planetRadius = _lodConfig.planetRadius;
+    ctx.seaLevel = _seaLevel;
 
-    _planetShader.SetFloat("uSunIntensity", _sceneSettings.lighting.sunIntensity);
-    _planetShader.SetFloat("uAmbientLight", _sceneSettings.lighting.ambientLight);
-    _planetShader.SetFloat("uSpecularStrength", _sceneSettings.lighting.specularStrength);
-    _planetShader.SetFloat("uSpecularPower", _sceneSettings.lighting.specularPower);
-
-    _planetShader.SetFloat("uPlanetScale", _lodConfig.planetRadius);
-    _planetShader.SetFloat("uFresnelStrengthNear", AppDefaults::FresnelStrengthNear);
-    _planetShader.SetFloat("uFresnelStrengthFar", AppDefaults::FresnelStrengthFar);
-    _planetShader.SetFloat("uFresnelPow", AppDefaults::FresnelPower);
-
-    _planetShader.SetFloat("uDetailFadeStart", _sceneSettings.lighting.detailFadeStart);
-    _planetShader.SetFloat("uAOStrength", _biomeSettings.aoStrength);
-    _planetShader.SetFloat("uHazeStrength", _sceneSettings.lighting.hazeStrength);
-    _planetShader.SetVec3("uHazeColor", _sceneSettings.lighting.hazeColor);
-
-    if (_paletteBuffer.IsValid())
-    {
-        _paletteBuffer.Bind(render::BiomePaletteBindingPoint);
-        _planetShader.SetInt("uPaletteSize", _biomePalette.GetEntryCount());
-    }
-
-    _generationScheduler.ProcessFrame(AppDefaults::SchedulerPatchesPerFrame, AppDefaults::SchedulerPatchesPerFrame);
-    _quadTree.ApplyCompletedPatches();
-    _quadTree.Update(_camera.GetPosition(), viewProjection);
-    _quadTree.Render(_planetShader);
-
-    if (_activeBody && _seaLevel > 0.0f)
-    {
-        _oceanRenderer.Render(
-            view, projection, _camera.GetPosition(), _sceneSettings.lightDir, _lastTime, _oceanSettings);
-    }
-
-    _sceneFbo.Unbind();
-
-    // Atmosphere post-process
-    _renderer.BeginFrame();
-
-    float oceanRadius = _lodConfig.planetRadius * _seaLevel;
-    glm::vec3 planetCenter = glm::vec3(0.0f);
-
-    if (_atmosphereSettings.enabled)
-    {
-        _atmosphereRenderer.Render(view, projection, invView, invProjection,
-                                   _camera.GetPosition(), _sceneSettings.lightDir,
-                                   planetCenter, _lodConfig.planetRadius, oceanRadius,
-                                   _camera.GetNearPlane(), _camera.GetFarPlane(),
-                                   _atmosphereSettings,
-                                   _sceneFbo.GetColorTexture(), _sceneFbo.GetDepthTexture());
-    }
-    else
-    {
-        _passthroughShader.Use();
-        _passthroughShader.SetInt("uSceneTexture", 0);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, _sceneFbo.GetColorTexture());
-        _postProcessor.RenderQuad();
-    }
+    _renderer.DrawScene(ctx);
 
     if (_screenshotRequested)
     {
@@ -626,7 +526,7 @@ void Application::Render()
         _screenshotRequested = false;
     }
 
-    // Headless capture point: same place as F12 (scene composited, before the GUI overlay).
+    // Headless capture point: scene composited, before the GUI overlay.
     if (_headlessCaptureRequested)
     {
         _captureManager.CaptureScreenshotToFile(_capture.outputPath, _window.GetWidth(), _window.GetHeight());
@@ -677,8 +577,8 @@ void Application::RenderGui()
 
         _scenePanel.Draw(_sceneSettings, visibility.scene);
 
-        _terrainStats.patchCount = _quadTree.GetActiveLeafCount();
-        _terrainStats.visiblePatchCount = _quadTree.GetVisiblePatchCount();
+        _terrainStats.patchCount = _renderer.QuadTree().GetActiveLeafCount();
+        _terrainStats.visiblePatchCount = _renderer.QuadTree().GetVisiblePatchCount();
         _terrainStats.vertexCount = 0;
 
         bool randomize = false;
@@ -713,20 +613,8 @@ void Application::SwitchBody(planetgen::BodyConfig config)
 {
     _activeBody = std::make_unique<render::BodyRuntime>(std::move(config), _paletteRegistry);
 
-    // Load body-specific shaders
-    if (!_planetShader.LoadFromFiles(_activeBody->GetVertexShaderPath(), _activeBody->GetFragmentShaderPath()))
-    {
-        std::cerr << "[SwitchBody] Failed to load planet shader for " << _activeBody->GetTypeName() << std::endl;
-        return;
-    }
-
-    std::string erosionPath = _activeBody->GetErosionShaderPath();
-    if (erosionPath.empty())
-        erosionPath = "shaders/compute/erosion_earth.comp";
-
-    // Create the library body from the in-memory (GUI-edited) config — the library
-    // owns all terrain compute now, including the continent mask. Serialize → string
-    // so the full BodyConfig reaches the library (config as data).
+    // The library owns all terrain compute; hand it the full config as data so it
+    // bakes the continent mask from the in-memory (GUI-edited) config.
     {
         const std::string configJson = planetgen::BodyConfigToJson(_activeBody->Config());
         _libBody = _libContext->CreateBodyFromJsonString(configJson);
@@ -740,15 +628,9 @@ void Application::SwitchBody(planetgen::BodyConfig config)
     }
     _terrainStats.gpuAvailable = true;
 
-    _biomePalette = _activeBody->LoadBiomePalette();
-    if (_biomePalette.IsValid())
-        _biomePalette.UploadToGpu(_paletteBuffer);
-
     _lodConfig.planetRadius = _activeBody->GetRadius();
     _seaLevel = _activeBody->GetSeaLevel();
     _atmosphereSettings.enabled = _activeBody->HasAtmosphere();
-
-    _generationScheduler.Initialize(_libBody.Handle(), _genConfig.seed);
 
     RegenerateLodSystem();
 
@@ -786,23 +668,19 @@ void Application::StopCinematic()
 
 void Application::RegenerateLodSystem()
 {
-    if (!_libBody.IsValid())
+    if (!_activeBody || !_libBody.IsValid())
     {
-        std::cerr << "[LOD] No library body — cannot build the LOD system" << std::endl;
+        std::cerr << "[LOD] No active body — cannot build the LOD system" << std::endl;
         return;
     }
 
-    _generationScheduler.CancelAll();
-
-    // Sync earth settings if active body is earth type
-    if (_activeBody && _activeBody->Config().metadata.typeName == "earth")
+    if (_activeBody->Config().metadata.typeName == "earth")
         SyncEarthToConfig(_activeBody->Config(),
                           _terrainSettings, _shadingSettings, _biomeSettings, _earthColors);
 
-    // Push the (possibly GUI-edited) config to the library by recreating the body —
-    // the library re-bakes its continent mask from the new config/seed on next gen.
-    // (Mask generation is library-owned now; no app-side mask renderer.)
-    if (_activeBody && _libContext)
+    // Recreate the library body so it re-bakes the continent mask from the current
+    // (possibly GUI-edited) config.
+    if (_libContext)
     {
         const std::string configJson = planetgen::BodyConfigToJson(_activeBody->Config());
         pg::Body rebuilt = _libContext->CreateBodyFromJsonString(configJson);
@@ -810,19 +688,11 @@ void Application::RegenerateLodSystem()
             _libBody = std::move(rebuilt);
     }
 
-    _generationScheduler.SetBody(_libBody.Handle(), _genConfig.seed);
-
-    auto qtConfig = BuildQuadTreeConfig();
-    _quadTree.Initialize(qtConfig, _generationScheduler, _genConfig.seed);
-    _oceanRenderer.Initialize(_lodConfig.planetRadius, _seaLevel, AppDefaults::OceanSubdivisions);
-    _atmosphereRenderer.Initialize();
+    _renderer.SetActiveBody(_libBody.Handle(), *_activeBody, BuildQuadTreeConfig(), _seaLevel, _genConfig.seed);
 
     float farPlane = (std::max)(AppDefaults::MinFarPlane,
                                 _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
     _camera.SetFarPlane(farPlane);
-
-    std::cout << "[QuadTree] Enqueued " << _generationScheduler.GetPendingCount()
-              << " patches for async generation" << std::endl;
 }
 
 render::lod::QuadTreeConfig Application::BuildQuadTreeConfig() const
