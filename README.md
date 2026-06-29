@@ -77,25 +77,26 @@ All terrain, atmosphere, ocean, and scene parameters are exposed in ImGui panels
 ## Project Structure
 
 ```
-src/
+src/                    The showcase app — frame loop, LOD, rendering, GUI
 ├── core/               Platform-independent logic
 │   ├── math/           Camera system
-│   ├── noise/          Simplex and fractal noise
-│   └── generation/     Planet model, noise layers
+│   └── noise/          Simplex and fractal noise
 ├── render/             GPU rendering pipeline
-│   ├── lod/            Icosahedron patch LOD system
+│   ├── lod/            Icosahedron patch quad-tree (PlanetQuadTree, SpherePatch, PatchPool)
 │   ├── effects/        Atmosphere and ocean renderers
 │   ├── settings/       Typed configuration structs
-│   ├── gui/            Body-type-aware ImGui panels
-│   ├── Earth            Earth body (Whittaker climate, tectonic plates)
-│   ├── GenericBody      Data-driven body from JSON config
-│   ├── GenerationScheduler   Async compute dispatch with GPU fence sync
-│   └── TerrainGenerator      GPU terrain generation (delegates to libplanetgen)
-└── app/                Application entry, input handling
+│   ├── gui/            ImGui panels that edit the active body's config
+│   ├── cinematic/      Turntable controller + screenshot capture
+│   ├── Renderer             Multi-pass scene draw (space → planet → ocean → atmosphere)
+│   ├── BodyRuntime          Render-time view of the active body (no subclassing)
+│   └── GenerationScheduler  Async compute dispatch with GPU fence sync
+└── app/                Application entry, input handling, headless capture
 
 libplanetgen/           Standalone terrain generation library (DLL)
 ├── include/planetgen/  Public C API + C++ RAII wrapper
 ├── src/api/            C API implementation
+├── src/model/          BodyConfig (canonical typed body) + JSON + palette registry
+├── src/strategy/       GenerationPipeline + Height/Erosion/Shading/Palette strategies
 ├── src/backend/        Compute backend abstraction
 │   └── opengl/         OpenGL 4.5 compute implementation
 └── cmake/              Shader embedding build tools
@@ -110,7 +111,7 @@ shaders/
 └── space.*             Background rendering
 
 data/
-├── bodies/             Body type configs (volcanic.json, crystalline.json)
+├── bodies/             Body type configs (earth.json, volcanic.json, crystalline.json)
 └── palettes/           Color palettes per body type (earth.json, volcanic.json, etc.)
 ```
 
@@ -118,23 +119,22 @@ data/
 
 ### Body Type System
 
-Each celestial body type (`Earth`, `GenericBody`) inherits from `CelestialBody` and declares:
-- Which compute shaders to use for height/shading/erosion
-- Which fragment shader to use for rendering
-- How to set uniforms for its specific noise model
-- A biome palette loaded from JSON
+A body is **data, not a subclass**. The canonical definition is `BodyConfig` (in `libplanetgen/src/model/`) — a typed struct of blocks (shape, tectonics, ocean floor, shading, palette, shader paths) loaded from `data/bodies/*.json`. It is the single source of truth for what a body is.
 
-New body types are added by creating a JSON config + palette file. No code changes required for data-driven bodies.
+The app wraps the active config in a `BodyRuntime` — a render-time *adapter* (no inheritance) that exposes metadata, shader paths, and render-uniform binding. The ImGui panels edit the config in place; any edit rebuilds the body so its continent mask re-bakes.
+
+New body types are added by creating a JSON config + palette file. No code changes required.
 
 ### libplanetgen
 
-A standalone shared library that extracts the GPU compute terrain pipeline into a reusable DLL:
-- **C API** (`planetgen.h`) — opaque handles for context, body, and result; designed for C# P/Invoke
+A standalone shared library that owns the GPU compute terrain pipeline as a reusable DLL:
+- **C API** (`planetgen.h`) — opaque handles for context, body, and result; designed for C# P/Invoke and FFI
+- **Strategy pipeline** — `GenerationPipeline` runs fixed per-stage strategies (Height → Erosion → Shading → Palette); each stage is an interface, so a new stage is a new class, not a fork
 - **Embedded shaders** — compute shaders baked into the DLL at build time, no runtime file dependencies
 - **Backend abstraction** — `IComputeBackend` interface allows future Vulkan support without API changes
 - **Dual context mode** — reuses host app's GL context or creates a headless GLFW window
 
-The main application's `TerrainGenerator` delegates synchronous generation to libplanetgen while keeping the async LOD dispatch path (direct GL with fences) for the streaming pipeline.
+The app drives terrain through the library's **per-patch** entry point (`pg_generate_patch`): the same per-vertex strategies as the whole-mesh path, writing GPU-resident into the app's own LOD buffers, with no erosion (it is neighbour-coupled and would seam at patch boundaries). The app's `GenerationScheduler` owns the async dispatch and GPU fence sync.
 
 ### Generation Pipeline
 
