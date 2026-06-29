@@ -52,14 +52,10 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(imgui)
 set(IMGUI_DIR ${imgui_SOURCE_DIR})
 
-# gl3w
-message(STATUS "Fetching gl3w...")
-FetchContent_Declare(
-    gl3w
-    GIT_REPOSITORY https://github.com/skaslev/gl3w.git
-    GIT_TAG master
-)
-FetchContent_MakeAvailable(gl3w)
+# gl3w — vendored (third_party/gl3w). The upstream generator downloads the GL
+# spec from registry.khronos.org at configure time; that fetch is flaky (CI hit
+# HTTP 403) and the repo was pinned to an unstable master. gl3w is UNLICENSE,
+# so we ship the generated loader directly.
 
 # stb (single-header libraries)
 message(STATUS "Fetching stb...")
@@ -81,9 +77,8 @@ FetchContent_Declare(
 set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(nlohmann_json)
 
-# gl3w generates files in build dir, not source dir
-set(GL3W_INCLUDE_DIR ${gl3w_BINARY_DIR}/include)
-set(GL3W_SRC ${gl3w_BINARY_DIR}/src/gl3w.c)
+set(GL3W_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/gl3w/include)
+set(GL3W_SRC ${CMAKE_CURRENT_SOURCE_DIR}/third_party/gl3w/src/gl3w.c)
 
 # OpenGL
 find_package(OpenGL REQUIRED)
