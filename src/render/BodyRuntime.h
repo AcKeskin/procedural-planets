@@ -1,10 +1,9 @@
 #pragma once
 
 // The app's render-time view of the active body — owns its BodyConfig + resolved
-// palette and exposes render metadata + render-uniform binding. Terrain compute
-// (height/shading/erosion + the continent mask) is owned by libplanetgen now and
-// driven through the public per-patch path; this type no longer dispatches anything.
-// Surface is what SurfacePanel, the renderer's draw, and the frame loop need.
+// palette and exposes render metadata + render-uniform binding. Render-time only:
+// terrain compute (height/shading/erosion + the continent mask) lives in libplanetgen
+// and runs through the public per-patch path, not here.
 
 #include "BiomePalette.h"
 #include "Shader.h"

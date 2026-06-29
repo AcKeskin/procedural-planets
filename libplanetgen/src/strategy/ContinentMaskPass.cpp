@@ -71,7 +71,7 @@ GpuTextureHandle EnsureContinentMask(IComputeBackend& backend,
     if (cachedTexture != 0 && cachedKey == key)
         return cachedTexture; // cache hit
 
-    // Miss or stale: rebake. Drop the old texture first.
+    // Miss/stale: free the cached texture before rebaking so it doesn't leak.
     if (cachedTexture != 0)
         backend.DestroyTexture(cachedTexture);
 
