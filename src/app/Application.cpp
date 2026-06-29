@@ -153,6 +153,32 @@ void Application::ApplyCaptureOverrides(const CaptureRequest& request)
     _capture = request;
 }
 
+bool Application::DrainGeneration(int minFrames, int maxFrames)
+{
+    minFrames = (std::max)(1, minFrames);
+    maxFrames = (std::max)(minFrames, maxFrames);
+
+    // The quad-tree enqueues more split work as the camera-appropriate LOD resolves, so
+    // pump frames until the scheduler reports nothing pending (a few clean frames in a row,
+    // to absorb the one-frame gap between completion readback and the next Update enqueue).
+    int cleanStreak = 0;
+    int frame = 0;
+    for (; frame < maxFrames; ++frame)
+    {
+        _window.PollEvents();
+        Render();
+        _window.SwapBuffers();
+
+        const bool busy = _renderer.Scheduler().HasPendingWork();
+        cleanStreak = busy ? 0 : cleanStreak + 1;
+
+        // Settled: queue empty for a couple of frames AND past the floor.
+        if (frame + 1 >= minFrames && cleanStreak >= 2)
+            return true;
+    }
+    return false;
+}
+
 bool Application::RunCapture(const CaptureRequest& request)
 {
     ApplyCaptureOverrides(request);
@@ -163,19 +189,11 @@ bool Application::RunCapture(const CaptureRequest& request)
         return false;
     }
 
-    // Warm-up: the LOD scheduler generates patches asynchronously over several frames.
-    // Render `frames` frames so the planet is fully populated before the shot.
-    int warmup = (std::max)(1, _capture.frames);
-    for (int i = 0; i < warmup; ++i)
-    {
-        float currentTime = static_cast<float>(glfwGetTime());
-        _deltaTime = currentTime - _lastTime;
-        _lastTime = currentTime;
-
-        _window.PollEvents();
-        Render();
-        _window.SwapBuffers();
-    }
+    // Wait for the async LOD to fully populate before the shot. --frames is the settle floor;
+    // draining guarantees no half-generated patch is captured.
+    if (!DrainGeneration(_capture.frames, AppDefaults::CaptureDrainMaxFrames))
+        std::cerr << "[Capture] Generation did not drain within " << AppDefaults::CaptureDrainMaxFrames
+                  << " frames; capturing anyway." << std::endl;
 
     // Final frame: flag the capture so Render() writes the PNG at the pre-GUI point.
     _headlessCaptureRequested = true;
@@ -200,14 +218,10 @@ bool Application::RunCinematicCapture(const CaptureRequest& request)
         return false;
     }
 
-    // Warm-up so the planet is populated before frame 1.
-    int warmup = (std::max)(1, _capture.frames);
-    for (int i = 0; i < warmup; ++i)
-    {
-        _window.PollEvents();
-        Render();
-        _window.SwapBuffers();
-    }
+    // Drain the LOD so frame 1 is fully populated, not half-generated.
+    if (!DrainGeneration(_capture.frames, AppDefaults::CaptureDrainMaxFrames))
+        std::cerr << "[Cinematic] Generation did not drain within "
+                  << AppDefaults::CaptureDrainMaxFrames << " frames; starting anyway." << std::endl;
 
     // Configure the turntable from the request, then start it. Loop mode keeps the
     // controller from auto-stopping mid-sequence; the frame count defines the length.

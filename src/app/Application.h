@@ -46,6 +46,7 @@ inline constexpr float MinFarPlane = 1000.0f;
 inline constexpr float FarPlaneRadiusMultiplier = 20.0f;
 inline constexpr int OceanSubdivisions = 5;
 inline constexpr float HeightRangeMultiplier = 1.5f;
+inline constexpr int CaptureDrainMaxFrames = 240; // safety cap so a stuck queue can't hang capture
 } // namespace AppDefaults
 
 // Owns all state, systems, and the frame loop
@@ -82,6 +83,11 @@ private:
     void ShuffleTerrain();
     void StartCinematic();
     void StopCinematic();
+
+    // Render frames until the LOD scheduler has no pending/in-flight work, so a capture
+    // never shoots a half-generated patch. minFrames forces a settle floor; maxFrames caps
+    // the wait so a stuck queue can't hang. Returns true if it drained before the cap.
+    bool DrainGeneration(int minFrames, int maxFrames);
 
     // Load a BodyConfig from data/bodies/<name>.json and switch to it
     void SwitchBody(planetgen::BodyConfig config);
