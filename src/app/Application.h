@@ -49,8 +49,6 @@ inline constexpr float HeightRangeMultiplier = 1.5f;
 inline constexpr int CaptureDrainMaxFrames = 240; // safety cap so a stuck queue can't hang capture
 inline constexpr float CaptureSunIntensity = 1.6f; // brighter hero exposure for captures only
 inline constexpr float CaptureAmbientLight = 0.40f;
-inline constexpr float ShowcaseMinFrontLand = 0.25f; // reject earths with < this land on the camera-facing side
-inline constexpr int ShowcaseMaxLandRolls = 12;      // attempts before accepting whatever we got
 } // namespace AppDefaults
 
 // Owns all state, systems, and the frame loop
@@ -103,10 +101,6 @@ private:
 
     // Pin capture-mode lighting exposure (re-applied after a showcase regenerate).
     void ApplyCaptureExposure();
-
-    // Fraction of the camera-facing (+lightDir) hemisphere that is land. Used by the
-    // showcase to reject random earths whose land is hidden on the back / poles.
-    float MeasureFrontLandFraction();
 
     // Load a BodyConfig from data/bodies/<name>.json and switch to it
     void SwitchBody(planetgen::BodyConfig config);

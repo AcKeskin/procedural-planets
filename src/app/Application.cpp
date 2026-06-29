@@ -8,9 +8,7 @@
 #include <iostream>
 #include <chrono>
 #include <cstdio>
-#include <cmath>
 #include <random>
-#include <vector>
 
 namespace planets::app
 {
@@ -169,51 +167,6 @@ void Application::ApplyCaptureExposure()
     // Re-applied after a showcase regenerate, since RandomizeBodyParameters resets lighting.
     _sceneSettings.lighting.sunIntensity = AppDefaults::CaptureSunIntensity;
     _sceneSettings.lighting.ambientLight = AppDefaults::CaptureAmbientLight;
-}
-
-float Application::MeasureFrontLandFraction()
-{
-    if (!_libBody.IsValid())
-        return 0.0f;
-
-    // The "front" is the +lightDir hemisphere — the lit face the camera looks at. Sample an
-    // even sphere, generate heights, but only score points on that hemisphere so a planet
-    // with land hidden on the back/poles doesn't pass.
-    const glm::vec3 front = glm::normalize(_sceneSettings.lightDir);
-    constexpr int kSamples = 512;
-    constexpr float kGolden = 2.39996323f;
-    std::vector<float> verts;
-    std::vector<glm::vec3> dirs;
-    verts.reserve(kSamples * 3);
-    dirs.reserve(kSamples);
-    for (int i = 0; i < kSamples; ++i)
-    {
-        const float y = 1.0f - 2.0f * (i + 0.5f) / kSamples;
-        const float r = std::sqrt((std::max)(0.0f, 1.0f - y * y));
-        const float theta = kGolden * i;
-        const glm::vec3 d(r * std::cos(theta), y, r * std::sin(theta));
-        dirs.push_back(d);
-        verts.push_back(d.x);
-        verts.push_back(d.y);
-        verts.push_back(d.z);
-    }
-
-    pg::Result res = _libBody.GenerateHeights(verts.data(), kSamples, _genConfig.seed);
-    const float* heights = res.IsValid() ? res.Heights() : nullptr;
-    if (!heights)
-        return 0.0f;
-
-    int frontPoints = 0, frontLand = 0;
-    const uint32_t n = res.Count();
-    for (uint32_t i = 0; i < n && i < dirs.size(); ++i)
-    {
-        if (glm::dot(dirs[i], front) <= 0.25f) // only the camera-facing cap
-            continue;
-        ++frontPoints;
-        if (heights[i] > _seaLevel)
-            ++frontLand;
-    }
-    return frontPoints > 0 ? static_cast<float>(frontLand) / static_cast<float>(frontPoints) : 0.0f;
 }
 
 void Application::UpdateFollowLight()
@@ -384,17 +337,12 @@ bool Application::RunGenerationShowcase(const CaptureRequest& request)
         // variety; volcanic/crystalline keep their authored identity. SwitchBody resets
         // the camera + radius, so re-seat the orbit afterwards.
         const int type = p % 3;
+        // Earth segments use the authored earth.json with a stepped seed (reliably
+        // land-facing, like the hero still). Volcanic/crystalline keep their identity.
+        // Random earths placed their land on the back/poles too often to use here.
+        if (type == 0)
+            _genConfig.seed = _capture.seed + static_cast<uint32_t>(p);
         SwitchBody(LoadBodyConfig(bodyPaths[type]));
-        if (type == 0 && p > 0)
-        {
-            // Re-roll the random earth until enough land faces the camera (not just total
-            // land — that was hiding continents on the back/poles). Keeps shape random.
-            ShuffleTerrain();
-            for (int attempt = 1; attempt < AppDefaults::ShowcaseMaxLandRolls &&
-                                  MeasureFrontLandFraction() < AppDefaults::ShowcaseMinFrontLand;
-                 ++attempt)
-                ShuffleTerrain();
-        }
 
         ApplyCaptureExposure();
         StartCinematic(); // re-seat orbit target/distance for the new radius
