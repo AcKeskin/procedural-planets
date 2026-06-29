@@ -547,42 +547,30 @@ float evaluateHeight(vec3 dir)
                                       mountainPersistence, mountainLacunarity, mountainMultiplier,
                                       mountainPower, mountainGain, mountainSmooth, seed + 1u);
 
-    // Land-wide rolling detail: hills/valleys across ALL land, not just peaks. Without this
-    // the interiors stay smooth and read as flat/low-poly up close — the gated perturbation
-    // below only fires on high terrain. Faded out below sea level so the ocean stays calm.
-    // TUNING SCRATCH (consts here while dialing the look via /shot; promote to params once set).
-    const int   landDetailOctaves     = 7;
-    const float landDetailScale       = 4.0;
-    const float landDetailPersistence = 0.40;  // lower → rolling hills, not sharp snow-catching spikes
-    const float landDetailLacunarity  = 2.2;
-    const float landDetailStrength    = 0.28;  // relative to continentShape units
-    const float landDetailDetailGain  = 2.5;   // boost on the fine peak-perturbation
-    float landMask = smoothstep(-0.05, 0.15, continentShape);
-    float landDetail = fbm(dir, vec3(7777.0), landDetailOctaves, landDetailScale * globalFrequency,
-                           landDetailPersistence, landDetailLacunarity, 1.0, seed + 70u);
-    float landRelief = landDetail * landDetailStrength * landMask;
+    // --- Multi-scale land relief (the "reads huge up close, real from orbit" hierarchy) ---
+    // A proper fractal: each octave ~half the amplitude of the last, so terrain has structure
+    // at every scale (broad ridges containing finer ridges containing rock). Amplitude stays
+    // SMALL relative to continentShape — the displacement is modest; what sells detail up close
+    // is the slope (normals), not tall geometry. Masked to land so the ocean stays calm.
+    // TUNING SCRATCH (consts here while dialing via /shot; promote to params once set).
+    const int   reliefOctaves     = 9;
+    const float reliefScale       = 4.5;   // base frequency of the land relief
+    const float reliefPersistence = 0.52;  // per-octave amplitude falloff (fractal ratio)
+    const float reliefLacunarity  = 2.15;  // per-octave frequency growth
+    const float reliefStrength    = 0.32;  // overall amplitude, relative to continentShape units
+    float landMask = smoothstep(-0.04, 0.12, continentShape);
+    // Ridged fractal for mountain character (folds/valleys), blended with smooth fbm for foothills.
+    float reliefRidged = ridgeNoise(dir, vec3(7777.0), reliefOctaves, reliefScale * globalFrequency,
+                                    reliefPersistence, reliefLacunarity, 1.0, 1.6, 0.7, seed + 70u);
+    float reliefSmooth = fbm(dir, vec3(8888.0), reliefOctaves, reliefScale * globalFrequency,
+                             reliefPersistence, reliefLacunarity, 1.0, seed + 71u);
+    // Lift toward ridged on high ground (mountains), smooth on lowland (plains/foothills).
+    float highland = smoothstep(0.0, 0.35, continentShape);
+    float landRelief = mix(reliefSmooth * 0.6, reliefRidged, highland) * reliefStrength * landMask;
 
     float terrainHeight = (continentShape + ridges * mountainMask + landRelief) * heightScale;
 
-    float baseTerrainHeight = continentShape + ridges * mountainMask;
-    float heightFactor = smoothstep(detailLowThreshold, detailHighThreshold, baseTerrainHeight);
-    float effectiveStrength = mix(perturbStrengthLow, perturbStrengthHigh, heightFactor);
-    int effectiveOctaves = int(mix(float(detailOctavesLow), float(detailOctavesHigh), heightFactor) + 0.5);
-
-    float perturbNoise = 0.0;
-    float ptbAmplitude = 1.0;
-    float ptbFrequency = ptbScale;
-    for (int i = 0; i < effectiveOctaves; i++)
-    {
-        perturbNoise += (snoise(dir * ptbFrequency, seed + 10u + uint(i)) * 2.0 - 1.0) * ptbAmplitude;
-        ptbAmplitude *= detailPersistence;
-        ptbFrequency *= detailLacunarity;
-    }
-    // Scale the fine perturbation by heightScale too, so it grows with the body's relief
-    // budget and is actually visible up close (was a raw ~0.004 bump — invisible on radius 10).
-    float perturbation = perturbNoise * effectiveStrength * heightScale * landDetailDetailGain;
-
-    return 1.0 + terrainHeight + perturbation;
+    return 1.0 + terrainHeight;
 }
 
 void main()

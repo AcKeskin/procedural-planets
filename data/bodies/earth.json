@@ -82,7 +82,7 @@
         "smallNoiseScale": 15.0,
         "snowBlend": 0.1,
         "snowLatitude": 0.8,
-        "snowLine": 0.92,
+        "snowLine": 0.96,
         "steepnessThreshold": 0.3,
         "temperatureExponent": 0.6,
         "temperatureLapseRate": 2.0,
@@ -99,7 +99,7 @@
             "strength": 2.0
         },
         "globalFrequency": 1.0,
-        "heightScale": 0.10,
+        "heightScale": 0.05,
         "maskNoise": {
             "lacunarity": 1.66,
             "octaves": 3,
@@ -118,7 +118,7 @@
         },
         "mountainPower": 2.18,
         "mountainSmoothing": 1.0,
-        "normalEpsilon": 0.0001,
+        "normalEpsilon": 0.0015,
         "oceanDepthMultiplier": 5.0,
         "oceanFloorDepth": 1.36,
         "oceanFloorSmoothing": 0.5

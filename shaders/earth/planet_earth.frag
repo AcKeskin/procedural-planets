@@ -207,11 +207,13 @@ vec3 getTerrainColor(vec3 worldPos, vec3 normal, float height)
         vec3 shoreColor = mix(coldShore, warmShore, smoothstep(0.2, 0.5, temperature));
         flatColor = mix(flatColor, shoreColor, shoreBlend);
 
-        // Snow: altitude + temperature + slope model with wide transitions
-        float snowNoisePerturbation = (detailNoise - 0.5) * 0.04 * gDetailFade;
-        float effectiveSnowLine = uSnowLine - (1.0 - temperature) * 0.12 + snowNoisePerturbation;
-        float snowBlend = smoothstep(effectiveSnowLine - 0.15, effectiveSnowLine + 0.02, h);
-        float coldSnow = smoothstep(0.06, 0.01, temperature) * 0.4;
+        // Snow: altitude-driven, with a small cold-climate lowering of the line. Snow sits on
+        // genuine high ground (and true poles), not as a flat sheet over cold lowland interiors.
+        float snowNoisePerturbation = (detailNoise - 0.5) * 0.06 * gDetailFade;
+        float effectiveSnowLine = uSnowLine - (1.0 - temperature) * 0.08 + snowNoisePerturbation;
+        float snowBlend = smoothstep(effectiveSnowLine - 0.10, effectiveSnowLine + 0.04, h);
+        // Polar ice cap only at genuinely freezing latitudes (not merely "cool" interiors).
+        float coldSnow = smoothstep(0.03, 0.0, temperature) * 0.5;
         snowBlend = max(snowBlend, coldSnow);
         // Steep slopes shed snow
         float slopeShed = 1.0 - smoothstep(0.25, 0.55, steepness);
