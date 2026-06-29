@@ -127,8 +127,7 @@ CaptureRequest CaptureRequest::Parse(int argc, char** argv)
                 }
                 else
                 {
-                    std::cerr << "[Capture] Malformed --camera '" << v << "'; using default framing."
-                              << std::endl;
+                    std::cerr << "[Capture] Malformed --camera '" << v << "'; using default framing." << std::endl;
                 }
             }
         }

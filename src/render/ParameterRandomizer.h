@@ -18,17 +18,23 @@ inline void RandomizeBodyParameters(planetgen::BodyConfig& cfg,
                                     uint32_t& seed)
 {
     std::mt19937 rng(std::random_device{}());
-    auto rf = [&rng](float min, float max) { return std::uniform_real_distribution<float>(min, max)(rng); };
-    auto ri = [&rng](int min, int max) { return std::uniform_int_distribution<int>(min, max)(rng); };
+    auto rf = [&rng](float min, float max)
+    {
+        return std::uniform_real_distribution<float>(min, max)(rng);
+    };
+    auto ri = [&rng](int min, int max)
+    {
+        return std::uniform_int_distribution<int>(min, max)(rng);
+    };
 
     seed = static_cast<uint32_t>(rng());
 
-    auto& sh  = cfg.shape;
+    auto& sh = cfg.shape;
     auto& tec = cfg.tectonics;
     auto& ofl = cfg.oceanFloor;
-    auto& hd  = cfg.heightDetail;
-    auto& er  = cfg.erosion;
-    auto& sd  = cfg.shading;
+    auto& hd = cfg.heightDetail;
+    auto& er = cfg.erosion;
+    auto& sd = cfg.shading;
 
     // --- Tectonics ---
     tec.enabled = true;
@@ -45,26 +51,26 @@ inline void RandomizeBodyParameters(planetgen::BodyConfig& cfg,
     // Strength + base level keep land above sea level (earth = 2.0 / -0.18). Low scale +
     // fewer octaves favour large, contiguous continents over fragmented archipelagos, so
     // each world reads as real landmasses facing the camera (earth scale = 0.8).
-    sh.continentNoise.octaves     = ri(4, 6);
-    sh.continentNoise.scale       = rf(0.45f, 0.85f);
-    sh.continentNoise.strength    = rf(1.7f, 2.6f);
+    sh.continentNoise.octaves = ri(4, 6);
+    sh.continentNoise.scale = rf(0.45f, 0.85f);
+    sh.continentNoise.strength = rf(1.7f, 2.6f);
     sh.continentNoise.persistence = rf(0.40f, 0.55f);
-    sh.continentNoise.lacunarity  = rf(1.8f, 2.3f);
+    sh.continentNoise.lacunarity = rf(1.8f, 2.3f);
     sh.continentBaseLevel = rf(-0.14f, 0.06f);
 
-    sh.mountainNoise.octaves    = ri(4, 6);
-    sh.mountainNoise.scale      = rf(0.8f, 2.5f);
-    sh.mountainPower            = rf(1.5f, 3.0f);
-    sh.mountainGain             = rf(0.6f, 1.2f);
+    sh.mountainNoise.octaves = ri(4, 6);
+    sh.mountainNoise.scale = rf(0.8f, 2.5f);
+    sh.mountainPower = rf(1.5f, 3.0f);
+    sh.mountainGain = rf(0.6f, 1.2f);
     sh.mountainNoise.lacunarity = rf(2.0f, 5.0f);
-    sh.mountainSmoothing        = rf(0.5f, 2.0f);
-    sh.mountainBlend            = rf(0.6f, 2.0f);
+    sh.mountainSmoothing = rf(0.5f, 2.0f);
+    sh.mountainBlend = rf(0.6f, 2.0f);
 
     // Lower mask scale = larger continent blobs (earth = 1.09); keep coasts from breaking up.
-    sh.maskNoise.octaves     = ri(2, 3);
-    sh.maskNoise.scale       = rf(0.6f, 1.1f);
+    sh.maskNoise.octaves = ri(2, 3);
+    sh.maskNoise.scale = rf(0.6f, 1.1f);
     sh.maskNoise.persistence = rf(0.35f, 0.55f);
-    sh.maskNoise.lacunarity  = rf(1.4f, 2.0f);
+    sh.maskNoise.lacunarity = rf(1.4f, 2.0f);
 
     sh.oceanDepthMultiplier = rf(2.0f, 7.0f);
     sh.oceanFloorDepth = rf(0.8f, 2.0f);
@@ -76,7 +82,8 @@ inline void RandomizeBodyParameters(planetgen::BodyConfig& cfg,
     sh.mountainNoise.strength = rf(0.4f, (std::min)(1.3f, sh.continentNoise.strength * 0.7f));
     float mScaleMin = (std::max)(0.8f, sh.continentNoise.scale * 0.7f);
     float mScaleMax = (std::min)(2.5f, sh.continentNoise.scale * 1.3f);
-    if (mScaleMin > mScaleMax) mScaleMin = mScaleMax;
+    if (mScaleMin > mScaleMax)
+        mScaleMin = mScaleMax;
     sh.mountainNoise.scale = rf(mScaleMin, mScaleMax);
 
     // --- Ocean floor ---
@@ -156,9 +163,7 @@ inline void RandomizeBodyParameters(planetgen::BodyConfig& cfg,
     float azimuth = rf(-3.14159f, 3.14159f);
     float elevation = rf(0.1f, 1.2f);
     scene.lightDir = glm::normalize(glm::vec3(
-        std::cos(elevation) * std::sin(azimuth),
-        std::sin(elevation),
-        std::cos(elevation) * std::cos(azimuth)));
+        std::cos(elevation) * std::sin(azimuth), std::sin(elevation), std::cos(elevation) * std::cos(azimuth)));
 }
 
 } // namespace planets::render

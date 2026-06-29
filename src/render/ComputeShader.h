@@ -51,7 +51,7 @@ private:
                                    std::unordered_set<std::string>& includedFiles);
 
     unsigned int _program;
-    unsigned int _ubo;    // lazily created GL uniform buffer
+    unsigned int _ubo; // lazily created GL uniform buffer
 };
 
 } // namespace planets::render

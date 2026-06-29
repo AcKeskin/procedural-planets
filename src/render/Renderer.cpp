@@ -51,11 +51,8 @@ void Renderer::ResizeFramebuffer(int width, int height)
     _sceneFbo.Create(width, height);
 }
 
-bool Renderer::SetActiveBody(PgBody body,
-                             const BodyRuntime& runtime,
-                             const lod::QuadTreeConfig& quadTreeConfig,
-                             float seaLevel,
-                             uint32_t seed)
+bool Renderer::SetActiveBody(
+    PgBody body, const BodyRuntime& runtime, const lod::QuadTreeConfig& quadTreeConfig, float seaLevel, uint32_t seed)
 {
     if (!_planetShader.LoadFromFiles(runtime.GetVertexShaderPath(), runtime.GetFragmentShaderPath()))
     {
@@ -77,7 +74,7 @@ bool Renderer::SetActiveBody(PgBody body,
 
 void Renderer::DrawScene(const RenderContext& ctx)
 {
-    const glm::mat4 invView       = glm::inverse(ctx.view);
+    const glm::mat4 invView = glm::inverse(ctx.view);
     const glm::mat4 invProjection = glm::inverse(ctx.projection);
     const glm::mat4 viewProjection = ctx.projection * ctx.view;
 
@@ -94,8 +91,7 @@ void Renderer::DrawScene(const RenderContext& ctx)
 
     if (ctx.body && ctx.seaLevel > 0.0f && ctx.ocean && ctx.scene)
     {
-        _oceanRenderer.Render(ctx.view, ctx.projection, ctx.cameraPos,
-                              ctx.scene->lightDir, ctx.time, *ctx.ocean);
+        _oceanRenderer.Render(ctx.view, ctx.projection, ctx.cameraPos, ctx.scene->lightDir, ctx.time, *ctx.ocean);
     }
 
     _sceneFbo.Unbind();
@@ -172,17 +168,27 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
     _quadTree.Render(_planetShader);
 }
 
-void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx, const glm::mat4& invView,
+void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
+                                           const glm::mat4& invView,
                                            const glm::mat4& invProjection)
 {
     if (ctx.atmosphere && ctx.atmosphere->enabled && ctx.scene)
     {
         const float oceanRadius = ctx.planetRadius * ctx.seaLevel;
-        _atmosphereRenderer.Render(ctx.view, ctx.projection, invView, invProjection,
-                                   ctx.cameraPos, ctx.scene->lightDir,
-                                   glm::vec3(0.0f), ctx.planetRadius, oceanRadius,
-                                   ctx.nearPlane, ctx.farPlane, *ctx.atmosphere,
-                                   _sceneFbo.GetColorTexture(), _sceneFbo.GetDepthTexture());
+        _atmosphereRenderer.Render(ctx.view,
+                                   ctx.projection,
+                                   invView,
+                                   invProjection,
+                                   ctx.cameraPos,
+                                   ctx.scene->lightDir,
+                                   glm::vec3(0.0f),
+                                   ctx.planetRadius,
+                                   oceanRadius,
+                                   ctx.nearPlane,
+                                   ctx.farPlane,
+                                   *ctx.atmosphere,
+                                   _sceneFbo.GetColorTexture(),
+                                   _sceneFbo.GetDepthTexture());
     }
     else
     {

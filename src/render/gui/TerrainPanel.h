@@ -24,10 +24,7 @@ public:
 
 private:
     void DrawGpuContent(const TerrainStats& stats);
-    bool DrawTerrainBlocks(BodyRuntime& body,
-                           uint32_t& seed,
-                           int& subdivisions,
-                           bool& randomizeRequested);
+    bool DrawTerrainBlocks(BodyRuntime& body, uint32_t& seed, int& subdivisions, bool& randomizeRequested);
     bool DrawLodContent(LodConfig& lod, const TerrainStats& stats);
 };
 
