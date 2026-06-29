@@ -318,26 +318,32 @@ bool Application::RunGenerationShowcase(const CaptureRequest& request)
     tt.zoomStartMultiplier = _capture.distanceMultiplier;
     tt.zoomEndMultiplier = _capture.distanceMultiplier;
     tt.durationMode = render::CinematicDurationMode::Loop;
-    StartCinematic();
 
     const float dt = 1.0f / (std::max)(1.0f, _capture.cinematicFps);
     const int planets = (std::max)(1, _capture.planets);
     const int hold = (std::max)(1, _capture.holdFrames);
+
+    // Cycle the three body types for visual contrast (blue earth / red volcanic /
+    // crystalline), randomizing earth segments for extra variety.
+    static const char* bodyPaths[] = {
+        "data/bodies/earth.json", "data/bodies/volcanic.json", "data/bodies/crystalline.json"};
 
     char path[512];
     int written = 0;
     int frameIndex = 0;
     for (int p = 0; p < planets; ++p)
     {
-        // After the first world, swap to a fresh random planet mid-orbit. ShuffleTerrain
-        // also randomizes scene lighting, so re-pin the capture exposure and drain the LOD
-        // before showing the new world (else we'd capture a half-built planet).
-        if (p > 0)
-        {
-            ShuffleTerrain();
-            ApplyCaptureExposure();
-            DrainGeneration(1, AppDefaults::CaptureDrainMaxFrames);
-        }
+        // Each segment: switch to the next body type. Earth segments get randomized for
+        // variety; volcanic/crystalline keep their authored identity. SwitchBody resets
+        // the camera + radius, so re-seat the orbit afterwards.
+        const int type = p % 3;
+        SwitchBody(LoadBodyConfig(bodyPaths[type]));
+        if (type == 0 && p > 0)
+            ShuffleTerrain(); // a fresh random earth on later cycles
+
+        ApplyCaptureExposure();
+        StartCinematic(); // re-seat orbit target/distance for the new radius
+        DrainGeneration(1, AppDefaults::CaptureDrainMaxFrames);
 
         for (int h = 0; h < hold; ++h, ++frameIndex)
         {
