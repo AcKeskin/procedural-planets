@@ -8,6 +8,8 @@ A GPU-accelerated procedural planet renderer built with C++17 and OpenGL. Genera
 
 Inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-System). The architecture and implementation are built from scratch in C++/OpenGL, but studying his approach helped shape the direction of this project.
 
+> **A note on the rendering code:** I'm not a graphics developer — I understand the rendering pipeline at a high level but not the low-level details. The rendering parts (shaders, GPU compute, the OpenGL pipeline) were built with AI assistance (Claude). The overall architecture, the library design, and the rest of the codebase are my own.
+
 ## Features
 
 - **GPU Compute Terrain** — Height and shading generated in two compute shader passes, entirely on the GPU
