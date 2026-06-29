@@ -95,6 +95,9 @@ private:
 
     BiomePalette _palette;
     GpuBuffer<BiomeEntry> _paletteBuffer;
+
+    int _fbWidth = 0;
+    int _fbHeight = 0;
 };
 
 } // namespace planets::render

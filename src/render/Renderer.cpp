@@ -16,6 +16,8 @@ Renderer::~Renderer()
 bool Renderer::Initialize(int width, int height)
 {
     glEnable(GL_DEPTH_TEST);
+    _fbWidth = width;
+    _fbHeight = height;
 
     if (!_sceneFbo.Create(width, height))
     {
@@ -44,6 +46,8 @@ void Renderer::Shutdown() {}
 
 void Renderer::ResizeFramebuffer(int width, int height)
 {
+    _fbWidth = width;
+    _fbHeight = height;
     _sceneFbo.Create(width, height);
 }
 
@@ -95,6 +99,7 @@ void Renderer::DrawScene(const RenderContext& ctx)
     }
 
     _sceneFbo.Unbind();
+    glViewport(0, 0, _fbWidth, _fbHeight);
 
     glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
