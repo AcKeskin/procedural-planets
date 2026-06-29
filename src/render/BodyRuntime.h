@@ -27,37 +27,37 @@ public:
     BodyRuntime& operator=(const BodyRuntime&) = delete;
 
     // Direct config/palette access for GUI editing
-    planetgen::BodyConfig&       Config()       { return _config; }
+    planetgen::BodyConfig& Config() { return _config; }
     const planetgen::BodyConfig& Config() const { return _config; }
 
     // Shader paths
-    std::string GetHeightShaderPath()   const { return _config.shaderPaths.heightShaderPath;   }
-    std::string GetShadingShaderPath()  const { return _config.shaderPaths.shadingShaderPath;  }
-    std::string GetErosionShaderPath()  const { return _config.shaderPaths.erosionShaderPath;  }
-    std::string GetVertexShaderPath()   const { return _config.shaderPaths.vertexShaderPath;   }
+    std::string GetHeightShaderPath() const { return _config.shaderPaths.heightShaderPath; }
+    std::string GetShadingShaderPath() const { return _config.shaderPaths.shadingShaderPath; }
+    std::string GetErosionShaderPath() const { return _config.shaderPaths.erosionShaderPath; }
+    std::string GetVertexShaderPath() const { return _config.shaderPaths.vertexShaderPath; }
     std::string GetFragmentShaderPath() const { return _config.shaderPaths.fragmentShaderPath; }
 
     void SetRenderUniforms(Shader& shader) const;
 
     // Metadata
-    float       GetRadius()          const { return _config.metadata.radius;           }
-    float       GetSeaLevel()        const { return _config.metadata.seaLevel;         }
-    float       GetAtmosphereRadius() const { return _config.metadata.radius * (1.0f + _config.metadata.atmosphereHeight); }
-    bool        HasAtmosphere()      const { return _config.metadata.hasAtmosphere;    }
-    bool        HasSolidSurface()    const { return _config.metadata.hasSolidSurface;  }
-    std::string GetTypeName()        const { return _config.metadata.name;             }
-    float       GetHeightScale()     const { return _config.shape.heightScale;         }
+    float GetRadius() const { return _config.metadata.radius; }
+    float GetSeaLevel() const { return _config.metadata.seaLevel; }
+    float GetAtmosphereRadius() const { return _config.metadata.radius * (1.0f + _config.metadata.atmosphereHeight); }
+    bool HasAtmosphere() const { return _config.metadata.hasAtmosphere; }
+    bool HasSolidSurface() const { return _config.metadata.hasSolidSurface; }
+    std::string GetTypeName() const { return _config.metadata.name; }
+    float GetHeightScale() const { return _config.shape.heightScale; }
 
     // Palette
     BiomePalette LoadBiomePalette() const;
 
 private:
-    planetgen::BodyConfig       _config;
+    planetgen::BodyConfig _config;
     const planetgen::PaletteRegistry& _registry;
 
     // Cached BiomePalette converted from PaletteRegistry on construction
     mutable BiomePalette _biomePalette;
-    mutable bool         _paletteLoaded = false;
+    mutable bool _paletteLoaded = false;
 
     void EnsurePalette() const;
 };

@@ -6,10 +6,7 @@
 namespace planets::render
 {
 
-bool SurfacePanel::Draw(BodyRuntime* activeBody,
-                        effects::OceanSettings& ocean,
-                        float& seaLevel,
-                        bool& visible)
+bool SurfacePanel::Draw(BodyRuntime* activeBody, effects::OceanSettings& ocean, float& seaLevel, bool& visible)
 {
     if (!visible)
         return false;
@@ -56,36 +53,49 @@ bool SurfacePanel::DrawShadingBlock(BodyRuntime& body)
     if (ImGui::CollapsingHeader("Shading Noise"))
     {
         ImGui::SliderFloat("Detail Scale", &sh.detailNoiseScale, 0.5f, 8.0f);
-        if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            regen = true;
         ImGui::SliderFloat("Small Scale", &sh.smallNoiseScale, 5.0f, 40.0f);
-        if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            regen = true;
         ImGui::SliderInt("Small Octaves", &sh.smallNoiseOctaves, 2, 8);
-        if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            regen = true;
         ImGui::SliderFloat("Warp Strength", &sh.warpStrength, 0.0f, 1.0f);
-        if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            regen = true;
     }
 
     if (ImGui::CollapsingHeader("Climate Model"))
     {
-        if (ImGui::Checkbox("Use Climate Model", &sh.useClimateModel)) regen = true;
+        if (ImGui::Checkbox("Use Climate Model", &sh.useClimateModel))
+            regen = true;
         if (sh.useClimateModel)
         {
             ImGui::SliderFloat("Large Scale", &sh.largeNoiseScale, 0.2f, 0.7f);
-            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            if (ImGui::IsItemDeactivatedAfterEdit())
+                regen = true;
             ImGui::SliderInt("Large Octaves", &sh.largeNoiseOctaves, 2, 4);
-            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            if (ImGui::IsItemDeactivatedAfterEdit())
+                regen = true;
             ImGui::SliderFloat("Lapse Rate", &sh.temperatureLapseRate, 0.5f, 4.0f, "%.1f");
-            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            if (ImGui::IsItemDeactivatedAfterEdit())
+                regen = true;
             ImGui::SliderFloat("Temp Exponent", &sh.temperatureExponent, 0.3f, 1.5f, "%.2f");
-            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            if (ImGui::IsItemDeactivatedAfterEdit())
+                regen = true;
             ImGui::SliderFloat("Moisture Scale", &sh.moistureNoiseScale, 0.5f, 3.0f, "%.1f");
-            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            if (ImGui::IsItemDeactivatedAfterEdit())
+                regen = true;
             ImGui::SliderFloat("Moisture Noise", &sh.moistureNoiseStrength, 0.0f, 0.4f, "%.2f");
-            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            if (ImGui::IsItemDeactivatedAfterEdit())
+                regen = true;
             ImGui::SliderFloat("Hadley Intensity", &sh.hadleyIntensity, 0.0f, 2.0f, "%.1f");
-            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            if (ImGui::IsItemDeactivatedAfterEdit())
+                regen = true;
             ImGui::SliderFloat("Continentality", &sh.continentalityStrength, 0.0f, 0.6f, "%.2f");
-            if (ImGui::IsItemDeactivatedAfterEdit()) regen = true;
+            if (ImGui::IsItemDeactivatedAfterEdit())
+                regen = true;
         }
     }
 
@@ -94,13 +104,13 @@ bool SurfacePanel::DrawShadingBlock(BodyRuntime& body)
         ImGui::SliderFloat("Flat Col Blend", &sh.flatColBlend, 0.8f, 2.5f);
         ImGui::SliderFloat("Flat Col Noise", &sh.flatColBlendNoise, 0.1f, 0.5f);
         ImGui::Separator();
-        ImGui::ColorEdit3("Shore Low",  &sh.colorShoreLow.x);
+        ImGui::ColorEdit3("Shore Low", &sh.colorShoreLow.x);
         ImGui::ColorEdit3("Shore High", &sh.colorShoreHigh.x);
-        ImGui::ColorEdit3("Flat A Low",  &sh.colorFlatLowA.x);
+        ImGui::ColorEdit3("Flat A Low", &sh.colorFlatLowA.x);
         ImGui::ColorEdit3("Flat A High", &sh.colorFlatHighA.x);
-        ImGui::ColorEdit3("Flat B Low",  &sh.colorFlatLowB.x);
+        ImGui::ColorEdit3("Flat B Low", &sh.colorFlatLowB.x);
         ImGui::ColorEdit3("Flat B High", &sh.colorFlatHighB.x);
-        ImGui::ColorEdit3("Steep Low",  &sh.colorSteepLow.x);
+        ImGui::ColorEdit3("Steep Low", &sh.colorSteepLow.x);
         ImGui::ColorEdit3("Steep High", &sh.colorSteepHigh.x);
         ImGui::ColorEdit3("Snow", &sh.colorSnow.x);
     }
@@ -124,9 +134,11 @@ void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& sea
         ImGui::Separator();
         ImGui::Text("Depth");
         ImGui::SliderFloat("Depth Multiplier", &settings.depthMultiplier, 1.0f, 30.0f);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Controls shallow-to-deep color transition");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Controls shallow-to-deep color transition");
         ImGui::SliderFloat("Alpha Multiplier", &settings.alphaMultiplier, 10.0f, 100.0f);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Controls transparency based on depth");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Controls transparency based on depth");
 
         ImGui::Separator();
         ImGui::Text("Reflection");

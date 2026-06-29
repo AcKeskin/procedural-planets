@@ -71,15 +71,15 @@ public:
     Framebuffer& SceneFramebuffer() { return _sceneFbo; }
 
     GenerationScheduler& Scheduler() { return _scheduler; }
-    lod::PlanetQuadTree& QuadTree()  { return _quadTree; }
+    lod::PlanetQuadTree& QuadTree() { return _quadTree; }
 
 private:
     void DrawSpace(const RenderContext& ctx, const glm::mat4& invView, const glm::mat4& invProjection);
     void DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProjection);
-    void DrawAtmosphereOrPassthrough(const RenderContext& ctx, const glm::mat4& invView,
-                                     const glm::mat4& invProjection);
+    void
+    DrawAtmosphereOrPassthrough(const RenderContext& ctx, const glm::mat4& invView, const glm::mat4& invProjection);
 
-    Framebuffer   _sceneFbo;
+    Framebuffer _sceneFbo;
     PostProcessor _postProcessor;
 
     Shader _planetShader;

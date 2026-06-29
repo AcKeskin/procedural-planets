@@ -29,7 +29,6 @@ planetgen::BodyConfig LoadBodyConfig(const std::string& path)
 // Sync application-owned Earth GUI settings into the body's BodyConfig.
 // Earth is identified by typeName == "earth".
 
-
 } // namespace
 
 Application::Application()
@@ -77,8 +76,7 @@ bool Application::Initialize()
     }
     catch (const std::exception& e)
     {
-        std::cerr << "[Application] FATAL: failed to create libplanetgen context: "
-                  << e.what() << std::endl;
+        std::cerr << "[Application] FATAL: failed to create libplanetgen context: " << e.what() << std::endl;
         return false;
     }
 
@@ -107,10 +105,9 @@ bool Application::Initialize()
         // fully-lit hemisphere faces the camera. An explicit --camera overrides the position but
         // still looks at origin (LookAt fixes the old -Z-only capture camera).
         const glm::vec3 target(0.0f);
-        const glm::vec3 eye =
-            _capture.hasCamera
-                ? _capture.cameraPos
-                : glm::normalize(_sceneSettings.lightDir) * (_lodConfig.planetRadius * _capture.distanceMultiplier);
+        const glm::vec3 eye = _capture.hasCamera ? _capture.cameraPos
+                                                 : glm::normalize(_sceneSettings.lightDir) *
+                                                       (_lodConfig.planetRadius * _capture.distanceMultiplier);
         _camera.SetMode(core::CameraMode::FreeFly);
         _camera.SetPosition(eye);
         _camera.LookAt(target);
@@ -249,8 +246,8 @@ bool Application::RunCinematicCapture(const CaptureRequest& request)
 
     // Drain the LOD so frame 1 is fully populated, not half-generated.
     if (!DrainGeneration(_capture.frames, AppDefaults::CaptureDrainMaxFrames))
-        std::cerr << "[Cinematic] Generation did not drain within "
-                  << AppDefaults::CaptureDrainMaxFrames << " frames; starting anyway." << std::endl;
+        std::cerr << "[Cinematic] Generation did not drain within " << AppDefaults::CaptureDrainMaxFrames
+                  << " frames; starting anyway." << std::endl;
 
     // Configure the turntable from the request, then start it. Loop mode keeps the
     // controller from auto-stopping mid-sequence; the frame count defines the length.
@@ -309,8 +306,8 @@ bool Application::RunGenerationShowcase(const CaptureRequest& request)
     }
 
     if (!DrainGeneration(_capture.frames, AppDefaults::CaptureDrainMaxFrames))
-        std::cerr << "[Showcase] Generation did not drain within "
-                  << AppDefaults::CaptureDrainMaxFrames << " frames; starting anyway." << std::endl;
+        std::cerr << "[Showcase] Generation did not drain within " << AppDefaults::CaptureDrainMaxFrames
+                  << " frames; starting anyway." << std::endl;
 
     auto& tt = _cinematicSettings.turntable;
     if (_capture.orbitSpeed > 0.0f)
@@ -371,8 +368,8 @@ bool Application::RunGenerationShowcase(const CaptureRequest& request)
     StopCinematic();
 
     const int total = planets * hold;
-    std::cout << "[Showcase] Wrote " << written << "/" << total << " frames across "
-              << planets << " planets." << std::endl;
+    std::cout << "[Showcase] Wrote " << written << "/" << total << " frames across " << planets << " planets."
+              << std::endl;
     Shutdown();
     return written == total;
 }
@@ -460,12 +457,18 @@ void Application::ProcessInput(float deltaTime)
     float speedMultiplier = _input.IsKeyDown(Key::LeftShift) ? AppDefaults::SprintSpeedMultiplier : 1.0f;
     float speed = _moveSpeed * deltaTime * speedMultiplier;
 
-    if (_input.IsKeyDown(Key::W)) _camera.MoveForward(speed);
-    if (_input.IsKeyDown(Key::S)) _camera.MoveForward(-speed);
-    if (_input.IsKeyDown(Key::A)) _camera.MoveRight(-speed);
-    if (_input.IsKeyDown(Key::D)) _camera.MoveRight(speed);
-    if (_input.IsKeyDown(Key::E)) _camera.MoveUp(speed);
-    if (_input.IsKeyDown(Key::Q)) _camera.MoveUp(-speed);
+    if (_input.IsKeyDown(Key::W))
+        _camera.MoveForward(speed);
+    if (_input.IsKeyDown(Key::S))
+        _camera.MoveForward(-speed);
+    if (_input.IsKeyDown(Key::A))
+        _camera.MoveRight(-speed);
+    if (_input.IsKeyDown(Key::D))
+        _camera.MoveRight(speed);
+    if (_input.IsKeyDown(Key::E))
+        _camera.MoveUp(speed);
+    if (_input.IsKeyDown(Key::Q))
+        _camera.MoveUp(-speed);
 }
 
 void Application::Render()
@@ -552,8 +555,8 @@ void Application::RenderGui()
 
         if (randomize && _activeBody)
         {
-            render::RandomizeBodyParameters(_activeBody->Config(), _sceneSettings,
-                                            _atmosphereSettings, _genConfig.seed);
+            render::RandomizeBodyParameters(
+                _activeBody->Config(), _sceneSettings, _atmosphereSettings, _genConfig.seed);
             needsRegen = true;
         }
 
@@ -584,9 +587,8 @@ void Application::SwitchBody(planetgen::BodyConfig config)
         _libBody = _libContext->CreateBodyFromJsonString(configJson);
         if (!_libBody.IsValid())
         {
-            std::cerr << "[SwitchBody] FATAL: libplanetgen failed to create body for "
-                      << _activeBody->GetTypeName() << ": " << _libContext->GetErrorMessage()
-                      << " — aborting." << std::endl;
+            std::cerr << "[SwitchBody] FATAL: libplanetgen failed to create body for " << _activeBody->GetTypeName()
+                      << ": " << _libContext->GetErrorMessage() << " — aborting." << std::endl;
             std::abort();
         }
     }
@@ -600,19 +602,18 @@ void Application::SwitchBody(planetgen::BodyConfig config)
 
     float camDist = _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier;
     _camera.SetPosition(glm::vec3(0.0f, 0.0f, camDist));
-    float farPlane = (std::max)(AppDefaults::MinFarPlane,
-                                _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
+    float farPlane =
+        (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
     _camera.SetFarPlane(farPlane);
 
-    std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName()
-              << " (radius=" << _lodConfig.planetRadius << ")" << std::endl;
+    std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << _lodConfig.planetRadius
+              << ")" << std::endl;
 }
 
 void Application::ShuffleTerrain()
 {
     if (_activeBody)
-        render::RandomizeBodyParameters(_activeBody->Config(), _sceneSettings,
-                                        _atmosphereSettings, _genConfig.seed);
+        render::RandomizeBodyParameters(_activeBody->Config(), _sceneSettings, _atmosphereSettings, _genConfig.seed);
     RegenerateLodSystem();
 }
 
@@ -651,22 +652,22 @@ void Application::RegenerateLodSystem()
 
     _renderer.SetActiveBody(_libBody.Handle(), *_activeBody, BuildQuadTreeConfig(), _seaLevel, _genConfig.seed);
 
-    float farPlane = (std::max)(AppDefaults::MinFarPlane,
-                                _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
+    float farPlane =
+        (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
     _camera.SetFarPlane(farPlane);
 }
 
 render::lod::QuadTreeConfig Application::BuildQuadTreeConfig() const
 {
     render::lod::QuadTreeConfig config;
-    config.planetRadius    = _lodConfig.planetRadius;
+    config.planetRadius = _lodConfig.planetRadius;
     config.baseSubdivisions = _lodConfig.patchSubdivisions;
-    config.meshResolution  = _lodConfig.meshResolution;
-    config.maxDepth        = _lodConfig.maxDepth;
-    config.splitThreshold  = _lodConfig.splitThreshold;
-    config.hysteresis      = _lodConfig.hysteresis;
+    config.meshResolution = _lodConfig.meshResolution;
+    config.maxDepth = _lodConfig.maxDepth;
+    config.splitThreshold = _lodConfig.splitThreshold;
+    config.hysteresis = _lodConfig.hysteresis;
     config.maxActivePatches = _lodConfig.maxActivePatches;
-    config.skirtFraction   = _lodConfig.skirtFraction;
+    config.skirtFraction = _lodConfig.skirtFraction;
     return config;
 }
 

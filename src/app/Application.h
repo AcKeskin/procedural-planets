@@ -46,7 +46,7 @@ inline constexpr float MinFarPlane = 1000.0f;
 inline constexpr float FarPlaneRadiusMultiplier = 20.0f;
 inline constexpr int OceanSubdivisions = 5;
 inline constexpr float HeightRangeMultiplier = 1.5f;
-inline constexpr int CaptureDrainMaxFrames = 240; // safety cap so a stuck queue can't hang capture
+inline constexpr int CaptureDrainMaxFrames = 240;  // safety cap so a stuck queue can't hang capture
 inline constexpr float CaptureSunIntensity = 1.6f; // brighter hero exposure for captures only
 inline constexpr float CaptureAmbientLight = 0.40f;
 } // namespace AppDefaults

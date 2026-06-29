@@ -15,10 +15,7 @@ struct OceanSettings;
 class SurfacePanel
 {
 public:
-    bool Draw(BodyRuntime* activeBody,
-              effects::OceanSettings& ocean,
-              float& seaLevel,
-              bool& visible);
+    bool Draw(BodyRuntime* activeBody, effects::OceanSettings& ocean, float& seaLevel, bool& visible);
 
 private:
     bool DrawShadingBlock(BodyRuntime& body);

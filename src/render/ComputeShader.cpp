@@ -30,7 +30,7 @@ ComputeShader::ComputeShader(ComputeShader&& other) noexcept
     , _ubo(other._ubo)
 {
     other._program = 0;
-    other._ubo     = 0;
+    other._ubo = 0;
 }
 
 ComputeShader& ComputeShader::operator=(ComputeShader&& other) noexcept
@@ -42,9 +42,9 @@ ComputeShader& ComputeShader::operator=(ComputeShader&& other) noexcept
         if (_ubo)
             glDeleteBuffers(1, &_ubo);
         _program = other._program;
-        _ubo     = other._ubo;
+        _ubo = other._ubo;
         other._program = 0;
-        other._ubo     = 0;
+        other._ubo = 0;
     }
     return *this;
 }
