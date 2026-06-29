@@ -1,10 +1,4 @@
 
-
-
-https://github.com/user-attachments/assets/3e5ae3c8-ca75-43f0-a946-7e73bbb9b37f
-
-
-
 # Procedural Planets
 
 A GPU-accelerated procedural planet renderer built with C++17 and OpenGL. Generates realistic celestial bodies — Earth-like planets, volcanic worlds, crystalline moons — with terrain, atmosphere, oceans, and biomes, all driven by compute shaders and procedural noise.
