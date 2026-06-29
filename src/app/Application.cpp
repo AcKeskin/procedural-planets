@@ -101,40 +101,9 @@ void SyncEarthToConfig(planetgen::BodyConfig& cfg,
     er.depositionRate  = t.depositionRate;
     er.evaporationRate = t.evaporationRate;
 
-    auto& sd = cfg.shading;
-    sd.detailNoiseScale      = s.detailNoiseScale;
-    sd.smallNoiseScale       = s.smallNoiseScale;
-    sd.smallNoiseOctaves     = s.smallNoiseOctaves;
-    sd.warpStrength          = s.warpStrength;
-    sd.useClimateModel       = s.useClimateModel;
-    sd.largeNoiseScale       = s.largeNoiseScale;
-    sd.largeNoiseOctaves     = s.largeNoiseOctaves;
-    sd.temperatureLapseRate  = s.temperatureLapseRate;
-    sd.temperatureExponent   = s.temperatureExponent;
-    sd.moistureNoiseScale    = s.moistureNoiseScale;
-    sd.moistureNoiseStrength = s.moistureNoiseStrength;
-    sd.hadleyIntensity       = s.hadleyIntensity;
-    sd.continentalityStrength = s.continentalityStrength;
-    sd.flatColBlend          = s.flatColBlend;
-    sd.flatColBlendNoise     = s.flatColBlendNoise;
-    sd.biomesEnabled         = b.enabled;
-    sd.steepnessThreshold    = b.steepnessThreshold;
-    sd.flatToSteepBlend      = b.flatToSteepBlend;
-    sd.snowLatitude          = b.snowLatitude;
-    sd.snowBlend             = b.snowBlend;
-    sd.snowLine              = b.snowLine;
-    sd.shoreHeight           = b.shoreHeight;
-    sd.coastalDepthRange     = b.coastalDepthRange;
-    sd.aoStrength            = b.aoStrength;
-    sd.colorShoreLow         = c.shoreLow;
-    sd.colorShoreHigh        = c.shoreHigh;
-    sd.colorFlatLowA         = c.flatLowA;
-    sd.colorFlatHighA        = c.flatHighA;
-    sd.colorFlatLowB         = c.flatLowB;
-    sd.colorFlatHighB        = c.flatHighB;
-    sd.colorSteepLow         = c.steepLow;
-    sd.colorSteepHigh        = c.steepHigh;
-    sd.colorSnow             = c.snow;
+    // Shading/biome/colour fields are edited directly on the config by SurfacePanel —
+    // no loose-struct mirror to sync here. (Terrain fields above remain until
+    // TerrainPanel is converted the same way.)
 }
 
 // Populate app-owned GUI settings from a BodyConfig (on body switch for earth)
@@ -592,8 +561,7 @@ void Application::RenderGui()
             needsRegen = true;
         }
 
-        needsRegen |= _surfacePanel.Draw(_activeBody.get(), _biomeSettings, _earthColors,
-                                         _shadingSettings, _oceanSettings, _seaLevel, visibility.surface);
+        needsRegen |= _surfacePanel.Draw(_activeBody.get(), _oceanSettings, _seaLevel, visibility.surface);
         _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
         _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
 
