@@ -43,6 +43,7 @@ jobs:
         run: |
           $exe = "build/bin/Release/procedural-planets.exe"
           $shaders = "build/bin/Release/shaders"
+          $data = "build/bin/Release/data"
 
           if (!(Test-Path $exe)) {
             Write-Error "Executable not found at $exe"
@@ -52,10 +53,15 @@ jobs:
             Write-Error "Shaders directory not found at $shaders"
             exit 1
           }
+          if (!(Test-Path $data)) {
+            Write-Error "Data directory not found at $data"
+            exit 1
+          }
 
           $size = '{0:N2} MB' -f ((Get-Item $exe).Length / 1MB)
           $count = (Get-ChildItem $shaders -Recurse -File).Count
-          Write-Host "Build verified: $exe ($size), $count shader files"
+          $dataCount = (Get-ChildItem $data -Recurse -File).Count
+          Write-Host "Build verified: $exe ($size), $count shader files, $dataCount data files"
 
       # Stage a clean release package (exe + shaders + textures).
       - name: Stage release package
@@ -66,6 +72,10 @@ jobs:
 
           Copy-Item "build/bin/Release/procedural-planets.exe" $dir
           Copy-Item "build/bin/Release/shaders" "$dir/shaders" -Recurse
+
+          # data/ (palettes, body configs) is a runtime requirement — the app
+          # resolves it next to the exe, same as shaders.
+          Copy-Item "build/bin/Release/data" "$dir/data" -Recurse
 
           # Remove non-runtime files from shaders
           Get-ChildItem "$dir/shaders" -Filter "CLAUDE.md" -Recurse |
