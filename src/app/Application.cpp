@@ -27,84 +27,6 @@ planetgen::BodyConfig LoadBodyConfig(const std::string& path)
 
 // Sync application-owned Earth GUI settings into the body's BodyConfig.
 // Earth is identified by typeName == "earth".
-void SyncEarthToConfig(planetgen::BodyConfig& cfg,
-                       const render::EarthTerrainSettings& t,
-                       const render::EarthShadingSettings& s,
-                       const render::BiomeSettings& b,
-                       const render::EarthColors& c)
-{
-    auto& sh = cfg.shape;
-    sh.continentNoise  = { t.continentScale, t.continentOctaves, t.continentPersistence,
-                            t.continentLacunarity, t.continentStrength };
-    sh.mountainNoise   = { t.mountainScale, t.mountainOctaves, t.mountainPersistence,
-                            t.mountainLacunarity, t.mountainStrength };
-    sh.maskNoise       = { t.maskScale, t.maskOctaves, t.maskPersistence,
-                            t.maskLacunarity, 1.0f };
-    sh.heightScale             = t.heightScale;
-    sh.continentCount          = t.continentCount;
-    sh.continentSizeVariance   = t.continentSizeVariance;
-    sh.continentClustering     = t.continentClustering;
-    sh.continentMaskResolution = t.continentMaskResolution;
-    sh.oceanDepthMultiplier = t.oceanDepthMultiplier;
-    sh.oceanFloorDepth      = t.oceanFloorDepth;
-    sh.oceanFloorSmoothing  = t.oceanFloorSmoothing;
-    sh.mountainBlend        = t.mountainBlend;
-    sh.continentBaseLevel   = t.continentBaseLevel;
-    sh.globalFrequency      = t.globalFrequency;
-    sh.normalEpsilon        = t.normalEpsilon;
-    sh.mountainPower        = t.mountainPower;
-    sh.mountainGain         = t.mountainGain;
-    sh.mountainSmoothing    = t.mountainSmoothing;
-
-    auto& tec = cfg.tectonics;
-    tec.enabled               = t.useTectonics;
-    tec.numPlates             = t.numPlates;
-    tec.continentalFraction   = t.continentalFraction;
-    tec.boundaryWidth         = t.boundaryWidth;
-    tec.convergentMountainScale = t.convergentMountainScale;
-    tec.divergentRiftDepth    = t.divergentRiftDepth;
-    tec.coastlineNoise        = t.coastlineNoise;
-    tec.plateElevationNoise   = t.plateElevationNoise;
-
-    auto& ofl = cfg.oceanFloor;
-    ofl.enabled           = t.useOceanFloor;
-    ofl.shelfWidth        = t.shelfWidth;
-    ofl.oceanRidgeOctaves = t.oceanRidgeOctaves;
-    ofl.oceanRidgeScale   = t.oceanRidgeScale;
-    ofl.oceanRidgeStrength = t.oceanRidgeStrength;
-    ofl.oceanRidgePower   = t.oceanRidgePower;
-    ofl.oceanRidgeGain    = t.oceanRidgeGain;
-    ofl.trenchOctaves     = t.trenchOctaves;
-    ofl.trenchScale       = t.trenchScale;
-    ofl.trenchDepth       = t.trenchDepth;
-    ofl.abyssalOctaves    = t.abyssalOctaves;
-    ofl.abyssalScale      = t.abyssalScale;
-    ofl.abyssalStrength   = t.abyssalStrength;
-
-    auto& hd = cfg.heightDetail;
-    hd.detailLowThreshold  = t.detailLowThreshold;
-    hd.detailHighThreshold = t.detailHighThreshold;
-    hd.perturbStrengthLow  = t.perturbStrengthLow;
-    hd.perturbStrengthHigh = t.perturbStrengthHigh;
-    hd.detailOctavesLow    = t.detailOctavesLow;
-    hd.detailOctavesHigh   = t.detailOctavesHigh;
-    hd.detailPersistence   = t.detailPersistence;
-    hd.detailLacunarity    = t.detailLacunarity;
-    hd.perturbScale        = t.perturbScale;
-
-    auto& er = cfg.erosion;
-    er.enabled         = t.enableErosion;
-    er.iterations      = t.erosionIterations;
-    er.thermalRate     = t.thermalErosionRate;
-    er.thermalThreshold = t.thermalThreshold;
-    er.hydraulicRate   = t.hydraulicErosionRate;
-    er.depositionRate  = t.depositionRate;
-    er.evaporationRate = t.evaporationRate;
-
-    // Shading/biome/colour fields are edited directly on the config by SurfacePanel —
-    // no loose-struct mirror to sync here. (Terrain fields above remain until
-    // TerrainPanel is converted the same way.)
-}
 
 // Populate app-owned GUI settings from a BodyConfig (on body switch for earth)
 void SyncConfigToEarth(const planetgen::BodyConfig& cfg,
@@ -467,11 +389,6 @@ void Application::ProcessInput(float deltaTime)
 
 void Application::Render()
 {
-    // Keep GUI-edited Earth settings reflected in the body config before drawing.
-    if (_activeBody && _activeBody->Config().metadata.typeName == "earth")
-        SyncEarthToConfig(_activeBody->Config(),
-                          _terrainSettings, _shadingSettings, _biomeSettings, _earthColors);
-
     render::RenderContext ctx;
     ctx.view = _camera.GetViewMatrix();
     ctx.projection = _camera.GetProjectionMatrix(_window.GetAspectRatio());
@@ -552,7 +469,7 @@ void Application::RenderGui()
 
         bool randomize = false;
         bool needsRegen =
-            _terrainPanel.Draw(_genConfig, _terrainSettings, _lodConfig, _terrainStats, visibility.terrain, randomize);
+            _terrainPanel.Draw(_activeBody.get(), _genConfig, _lodConfig, _terrainStats, visibility.terrain, randomize);
 
         if (randomize)
         {
@@ -641,10 +558,6 @@ void Application::RegenerateLodSystem()
         std::cerr << "[LOD] No active body — cannot build the LOD system" << std::endl;
         return;
     }
-
-    if (_activeBody->Config().metadata.typeName == "earth")
-        SyncEarthToConfig(_activeBody->Config(),
-                          _terrainSettings, _shadingSettings, _biomeSettings, _earthColors);
 
     // Recreate the library body so it re-bakes the continent mask from the current
     // (possibly GUI-edited) config.
