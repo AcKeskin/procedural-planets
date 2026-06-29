@@ -99,15 +99,11 @@ private:
     render::AtmospherePanel _atmospherePanel;
     render::DebugPanel _debugPanel;
 
-    // Settings (Application owns all)
+    // App-visual settings (generation params live in the active body's BodyConfig).
     render::SceneSettings _sceneSettings;
-    render::EarthTerrainSettings _terrainSettings;   // GUI terrain panel edits these for Earth
-    render::EarthShadingSettings _shadingSettings;   // GUI surface panel edits these for Earth
     render::GenerationConfig _genConfig;
     render::LodConfig _lodConfig;
     render::TerrainStats _terrainStats;
-    render::BiomeSettings _biomeSettings;            // GUI biome panel
-    render::EarthColors _earthColors;                // GUI color panel
     render::effects::OceanSettings _oceanSettings;
     render::effects::AtmosphereSettings _atmosphereSettings;
     float _seaLevel;

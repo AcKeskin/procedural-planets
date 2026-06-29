@@ -28,126 +28,6 @@ planetgen::BodyConfig LoadBodyConfig(const std::string& path)
 // Sync application-owned Earth GUI settings into the body's BodyConfig.
 // Earth is identified by typeName == "earth".
 
-// Populate app-owned GUI settings from a BodyConfig (on body switch for earth)
-void SyncConfigToEarth(const planetgen::BodyConfig& cfg,
-                       render::EarthTerrainSettings& t,
-                       render::EarthShadingSettings& s,
-                       render::BiomeSettings& b,
-                       render::EarthColors& c)
-{
-    const auto& sh = cfg.shape;
-    t.continentScale       = sh.continentNoise.scale;
-    t.continentOctaves     = sh.continentNoise.octaves;
-    t.continentPersistence = sh.continentNoise.persistence;
-    t.continentLacunarity  = sh.continentNoise.lacunarity;
-    t.continentStrength    = sh.continentNoise.strength;
-    t.mountainScale        = sh.mountainNoise.scale;
-    t.mountainOctaves      = sh.mountainNoise.octaves;
-    t.mountainPersistence  = sh.mountainNoise.persistence;
-    t.mountainLacunarity   = sh.mountainNoise.lacunarity;
-    t.mountainStrength     = sh.mountainNoise.strength;
-    t.maskScale            = sh.maskNoise.scale;
-    t.maskOctaves          = sh.maskNoise.octaves;
-    t.maskPersistence      = sh.maskNoise.persistence;
-    t.maskLacunarity       = sh.maskNoise.lacunarity;
-    t.heightScale             = sh.heightScale;
-    t.continentCount          = sh.continentCount;
-    t.continentSizeVariance   = sh.continentSizeVariance;
-    t.continentClustering     = sh.continentClustering;
-    t.continentMaskResolution = sh.continentMaskResolution;
-    t.oceanDepthMultiplier = sh.oceanDepthMultiplier;
-    t.oceanFloorDepth      = sh.oceanFloorDepth;
-    t.oceanFloorSmoothing  = sh.oceanFloorSmoothing;
-    t.mountainBlend        = sh.mountainBlend;
-    t.continentBaseLevel   = sh.continentBaseLevel;
-    t.globalFrequency      = sh.globalFrequency;
-    t.normalEpsilon        = sh.normalEpsilon;
-    t.mountainPower        = sh.mountainPower;
-    t.mountainGain         = sh.mountainGain;
-    t.mountainSmoothing    = sh.mountainSmoothing;
-
-    const auto& tec = cfg.tectonics;
-    t.useTectonics           = tec.enabled;
-    t.numPlates              = tec.numPlates;
-    t.continentalFraction    = tec.continentalFraction;
-    t.boundaryWidth          = tec.boundaryWidth;
-    t.convergentMountainScale = tec.convergentMountainScale;
-    t.divergentRiftDepth     = tec.divergentRiftDepth;
-    t.coastlineNoise         = tec.coastlineNoise;
-    t.plateElevationNoise    = tec.plateElevationNoise;
-
-    const auto& ofl = cfg.oceanFloor;
-    t.useOceanFloor       = ofl.enabled;
-    t.shelfWidth          = ofl.shelfWidth;
-    t.oceanRidgeOctaves   = ofl.oceanRidgeOctaves;
-    t.oceanRidgeScale     = ofl.oceanRidgeScale;
-    t.oceanRidgeStrength  = ofl.oceanRidgeStrength;
-    t.oceanRidgePower     = ofl.oceanRidgePower;
-    t.oceanRidgeGain      = ofl.oceanRidgeGain;
-    t.trenchOctaves       = ofl.trenchOctaves;
-    t.trenchScale         = ofl.trenchScale;
-    t.trenchDepth         = ofl.trenchDepth;
-    t.abyssalOctaves      = ofl.abyssalOctaves;
-    t.abyssalScale        = ofl.abyssalScale;
-    t.abyssalStrength     = ofl.abyssalStrength;
-
-    const auto& hd = cfg.heightDetail;
-    t.detailLowThreshold  = hd.detailLowThreshold;
-    t.detailHighThreshold = hd.detailHighThreshold;
-    t.perturbStrengthLow  = hd.perturbStrengthLow;
-    t.perturbStrengthHigh = hd.perturbStrengthHigh;
-    t.detailOctavesLow    = hd.detailOctavesLow;
-    t.detailOctavesHigh   = hd.detailOctavesHigh;
-    t.detailPersistence   = hd.detailPersistence;
-    t.detailLacunarity    = hd.detailLacunarity;
-    t.perturbScale        = hd.perturbScale;
-
-    const auto& er = cfg.erosion;
-    t.enableErosion      = er.enabled;
-    t.erosionIterations  = er.iterations;
-    t.thermalErosionRate = er.thermalRate;
-    t.thermalThreshold   = er.thermalThreshold;
-    t.hydraulicErosionRate = er.hydraulicRate;
-    t.depositionRate     = er.depositionRate;
-    t.evaporationRate    = er.evaporationRate;
-
-    const auto& sd = cfg.shading;
-    s.detailNoiseScale      = sd.detailNoiseScale;
-    s.smallNoiseScale       = sd.smallNoiseScale;
-    s.smallNoiseOctaves     = sd.smallNoiseOctaves;
-    s.warpStrength          = sd.warpStrength;
-    s.useClimateModel       = sd.useClimateModel;
-    s.largeNoiseScale       = sd.largeNoiseScale;
-    s.largeNoiseOctaves     = sd.largeNoiseOctaves;
-    s.temperatureLapseRate  = sd.temperatureLapseRate;
-    s.temperatureExponent   = sd.temperatureExponent;
-    s.moistureNoiseScale    = sd.moistureNoiseScale;
-    s.moistureNoiseStrength = sd.moistureNoiseStrength;
-    s.hadleyIntensity       = sd.hadleyIntensity;
-    s.continentalityStrength = sd.continentalityStrength;
-    s.flatColBlend          = sd.flatColBlend;
-    s.flatColBlendNoise     = sd.flatColBlendNoise;
-
-    b.enabled           = sd.biomesEnabled;
-    b.steepnessThreshold = sd.steepnessThreshold;
-    b.flatToSteepBlend  = sd.flatToSteepBlend;
-    b.snowLatitude      = sd.snowLatitude;
-    b.snowBlend         = sd.snowBlend;
-    b.snowLine          = sd.snowLine;
-    b.shoreHeight       = sd.shoreHeight;
-    b.coastalDepthRange = sd.coastalDepthRange;
-    b.aoStrength        = sd.aoStrength;
-
-    c.shoreLow  = sd.colorShoreLow;
-    c.shoreHigh = sd.colorShoreHigh;
-    c.flatLowA  = sd.colorFlatLowA;
-    c.flatHighA = sd.colorFlatHighA;
-    c.flatLowB  = sd.colorFlatLowB;
-    c.flatHighB = sd.colorFlatHighB;
-    c.steepLow  = sd.colorSteepLow;
-    c.steepHigh = sd.colorSteepHigh;
-    c.snow      = sd.colorSnow;
-}
 
 } // namespace
 
@@ -207,7 +87,6 @@ bool Application::Initialize()
 
     // Load earth body from JSON and initialize
     auto earthCfg = LoadBodyConfig("data/bodies/earth.json");
-    SyncConfigToEarth(earthCfg, _terrainSettings, _shadingSettings, _biomeSettings, _earthColors);
     SwitchBody(std::move(earthCfg));
 
     // Initial generation (LOD-only; GPU is a hard requirement)
@@ -443,7 +322,6 @@ void Application::RenderGui()
                 {
                 case 0:
                     newCfg = LoadBodyConfig("data/bodies/earth.json");
-                    SyncConfigToEarth(newCfg, _terrainSettings, _shadingSettings, _biomeSettings, _earthColors);
                     break;
                 case 1:
                     newCfg = LoadBodyConfig("data/bodies/volcanic.json");
