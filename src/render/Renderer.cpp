@@ -78,6 +78,10 @@ void Renderer::DrawScene(const RenderContext& ctx)
     const glm::mat4 viewProjection = ctx.projection * ctx.view;
 
     _sceneFbo.Bind();
+    // ImGui leaves depth-test disabled; the planet must write depth so the
+    // atmosphere pass can tell surface from sky. Re-enable it each frame.
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
     glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
