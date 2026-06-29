@@ -399,7 +399,6 @@ void Application::Render()
     ctx.scene = &_sceneSettings;
     ctx.ocean = &_oceanSettings;
     ctx.atmosphere = &_atmosphereSettings;
-    ctx.biome = &_biomeSettings;
     ctx.body = _activeBody.get();
     ctx.planetRadius = _lodConfig.planetRadius;
     ctx.seaLevel = _seaLevel;
@@ -471,10 +470,10 @@ void Application::RenderGui()
         bool needsRegen =
             _terrainPanel.Draw(_activeBody.get(), _genConfig, _lodConfig, _terrainStats, visibility.terrain, randomize);
 
-        if (randomize)
+        if (randomize && _activeBody)
         {
-            render::RandomizeEarthParameters(_terrainSettings, _shadingSettings, _biomeSettings,
-                                             _sceneSettings, _atmosphereSettings, _oceanSettings, _genConfig.seed);
+            render::RandomizeBodyParameters(_activeBody->Config(), _sceneSettings,
+                                            _atmosphereSettings, _genConfig.seed);
             needsRegen = true;
         }
 
@@ -531,8 +530,9 @@ void Application::SwitchBody(planetgen::BodyConfig config)
 
 void Application::ShuffleTerrain()
 {
-    render::RandomizeEarthParameters(_terrainSettings, _shadingSettings, _biomeSettings,
-                                     _sceneSettings, _atmosphereSettings, _oceanSettings, _genConfig.seed);
+    if (_activeBody)
+        render::RandomizeBodyParameters(_activeBody->Config(), _sceneSettings,
+                                        _atmosphereSettings, _genConfig.seed);
     RegenerateLodSystem();
 }
 

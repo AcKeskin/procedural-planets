@@ -34,9 +34,8 @@ struct RenderContext
     const SceneSettings* scene = nullptr;
     const effects::OceanSettings* ocean = nullptr;
     const effects::AtmosphereSettings* atmosphere = nullptr;
-    const BiomeSettings* biome = nullptr;
 
-    const BodyRuntime* body = nullptr; // null when no body loaded
+    const BodyRuntime* body = nullptr; // null when no body loaded; carries shading/AO via Config()
     float planetRadius = 1.0f;
     float seaLevel = 0.0f;
 };

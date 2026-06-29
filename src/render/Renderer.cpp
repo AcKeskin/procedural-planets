@@ -160,8 +160,8 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
     _planetShader.SetFloat("uFresnelStrengthFar", FresnelStrengthFar);
     _planetShader.SetFloat("uFresnelPow", FresnelPower);
 
-    if (ctx.biome)
-        _planetShader.SetFloat("uAOStrength", ctx.biome->aoStrength);
+    if (ctx.body)
+        _planetShader.SetFloat("uAOStrength", ctx.body->Config().shading.aoStrength);
 
     if (_paletteBuffer.IsValid())
     {
