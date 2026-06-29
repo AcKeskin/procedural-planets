@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/e0000087-ca0b-43f4-9cd6-19047486c3be
+
 # Procedural Planets
 
 A GPU-accelerated procedural planet renderer built with C++17 and OpenGL. Generates realistic celestial bodies — Earth-like planets, volcanic worlds, crystalline moons — with terrain, atmosphere, oceans, and biomes, all driven by compute shaders and procedural noise.
@@ -14,20 +18,18 @@ Inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-S
 
 An Earth-like world turning in real time:
 
-<!--
-  VIDEO: drag-drop captures/earth.mp4 into the GitHub web editor (edit this README on
-  github.com), which uploads it to user-images.githubusercontent.com and inserts an
-  auto-playing video link. Paste that link on the line below, replacing this comment.
--->
-_(Earth turntable video — drag-drop `captures/earth.mp4` here via the GitHub web editor.)_
+https://github.com/user-attachments/assets/ebe561bd-8c4f-4574-84cc-a6a2f2054e71
+
+_(Earth turntable video)_
 
 Different body types generated back to back — Earth, volcanic, and crystalline worlds, fully procedural:
 
-<!--
-  VIDEO: same as above — drag-drop captures/showcase.mp4 into the GitHub web editor and
-  paste the resulting user-images link on the line below.
--->
-_(Planet-type showcase video — drag-drop `captures/showcase.mp4` here via the GitHub web editor.)_
+
+
+https://github.com/user-attachments/assets/895fe468-6541-4f7e-b797-4cf7dd774165
+
+
+_(Planet-type showcase video)_
 
 ## Features
 
