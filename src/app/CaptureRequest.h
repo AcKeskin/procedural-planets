@@ -26,6 +26,16 @@ struct CaptureRequest
     // fully-lit hemisphere faces the camera.
     float distanceMultiplier = 2.2f;
 
+    // --light x,y,z overrides the world light direction for the shot (otherwise the
+    // SceneSettings default is used). Lets you aim the sun for a still.
+    bool hasLight = false;
+    glm::vec3 lightDir{0.0f};
+
+    // Camera-follow light: keep the light at a fixed offset from the view axis so the
+    // lit hemisphere always faces the camera. Default on for the cinematic (a turntable
+    // otherwise rotates through the dark side). --no-light-follow disables it.
+    bool lightFollow = true;
+
     // --- Headless cinematic sequence (--cinematic) ---
     bool cinematic = false;        // drive the turntable and write a numbered PNG sequence
     std::string framePattern;      // printf pattern with one %0Nd, e.g. out/frame_%04d.png

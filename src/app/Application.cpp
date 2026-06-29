@@ -84,7 +84,17 @@ bool Application::Initialize()
 
     // Capture mode: seed must be set before generation so the shot is deterministic.
     if (_capture.enabled)
+    {
         _genConfig.seed = _capture.seed;
+
+        // Explicit --light aims the sun; otherwise the default light-axis framing applies.
+        if (_capture.hasLight)
+            _sceneSettings.lightDir = glm::normalize(_capture.lightDir);
+
+        // Brighten capture-mode exposure to a hero look (interactive defaults untouched).
+        _sceneSettings.lighting.sunIntensity = AppDefaults::CaptureSunIntensity;
+        _sceneSettings.lighting.ambientLight = AppDefaults::CaptureAmbientLight;
+    }
 
     // Load earth body from JSON and initialize
     auto earthCfg = LoadBodyConfig("data/bodies/earth.json");
@@ -151,6 +161,19 @@ void Application::Run()
 void Application::ApplyCaptureOverrides(const CaptureRequest& request)
 {
     _capture = request;
+}
+
+void Application::UpdateFollowLight()
+{
+    // Match the well-lit still's geometry: the lit hemisphere faces the camera when the
+    // light direction points from the planet toward the eye (eye ∥ +lightDir). Tilt it
+    // up-and-to-the-side for a key-light terminator (shape, not a flat disc).
+    const glm::vec3 toEye = glm::normalize(_camera.GetPosition()); // camera looks at origin
+    const glm::vec3 right = _camera.GetRight();
+    const glm::vec3 up = _camera.GetUp();
+    // Small offset: enough terminator for shape, but keep most of the disc (incl. limbs
+    // where land sits during the orbit) lit.
+    _sceneSettings.lightDir = glm::normalize(toEye + up * 0.18f + right * 0.12f);
 }
 
 bool Application::DrainGeneration(int minFrames, int maxFrames)
@@ -230,6 +253,9 @@ bool Application::RunCinematicCapture(const CaptureRequest& request)
         tt.orbitSpeed = _capture.orbitSpeed;
     tt.startYaw = _capture.startYaw;
     tt.startPitch = _capture.startPitch;
+    // --distance sets the orbit radius (multiplier of planet radius); hold it across the orbit.
+    tt.zoomStartMultiplier = _capture.distanceMultiplier;
+    tt.zoomEndMultiplier = _capture.distanceMultiplier;
     tt.durationMode = render::CinematicDurationMode::Loop;
     StartCinematic();
 
@@ -244,6 +270,10 @@ bool Application::RunCinematicCapture(const CaptureRequest& request)
         _window.PollEvents();
         _cinematicController.Update(dt, _camera);
         _lastTime += dt; // keep shader time deterministic too (ocean waves etc.)
+
+        // Keep the lit hemisphere facing the camera so the turntable never goes dark.
+        if (_capture.lightFollow)
+            UpdateFollowLight();
 
         std::snprintf(path, sizeof(path), _capture.framePattern.c_str(), f + 1); // 1-based
         _capture.outputPath = path;

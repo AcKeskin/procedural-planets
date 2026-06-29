@@ -47,6 +47,8 @@ inline constexpr float FarPlaneRadiusMultiplier = 20.0f;
 inline constexpr int OceanSubdivisions = 5;
 inline constexpr float HeightRangeMultiplier = 1.5f;
 inline constexpr int CaptureDrainMaxFrames = 240; // safety cap so a stuck queue can't hang capture
+inline constexpr float CaptureSunIntensity = 1.6f; // brighter hero exposure for captures only
+inline constexpr float CaptureAmbientLight = 0.40f;
 } // namespace AppDefaults
 
 // Owns all state, systems, and the frame loop
@@ -88,6 +90,10 @@ private:
     // never shoots a half-generated patch. minFrames forces a settle floor; maxFrames caps
     // the wait so a stuck queue can't hang. Returns true if it drained before the cap.
     bool DrainGeneration(int minFrames, int maxFrames);
+
+    // Aim the world light from over the camera's shoulder so the lit hemisphere faces the
+    // viewer (used per-frame in the cinematic when lightFollow is on).
+    void UpdateFollowLight();
 
     // Load a BodyConfig from data/bodies/<name>.json and switch to it
     void SwitchBody(planetgen::BodyConfig config);

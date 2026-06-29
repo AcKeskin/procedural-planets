@@ -178,6 +178,27 @@ CaptureRequest CaptureRequest::Parse(int argc, char** argv)
             if (v && !ParseFloat(v, req.startPitch))
                 std::cerr << "[Capture] Malformed --start-pitch '" << v << "'; keeping default." << std::endl;
         }
+        else if (std::strcmp(arg, "--light") == 0)
+        {
+            const char* v = NextValue(argc, argv, i, "--light");
+            if (v)
+            {
+                glm::vec3 dir;
+                if (ParseVec3(v, dir) && glm::length(dir) > 0.0f)
+                {
+                    req.lightDir = dir;
+                    req.hasLight = true;
+                }
+                else
+                {
+                    std::cerr << "[Capture] Malformed --light '" << v << "'; using default light." << std::endl;
+                }
+            }
+        }
+        else if (std::strcmp(arg, "--no-light-follow") == 0)
+        {
+            req.lightFollow = false;
+        }
         else
         {
             std::cerr << "[Capture] Unknown argument '" << arg << "'; ignoring." << std::endl;
