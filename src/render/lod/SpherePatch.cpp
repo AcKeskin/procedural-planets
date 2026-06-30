@@ -170,6 +170,8 @@ void SpherePatch::GenerateMesh(const std::vector<float>& heights,
         bool oddJ = (j & 1) != 0;
         int i0 = i - (oddI ? 1 : 0), i1 = i + (oddI ? 1 : 0);
         int j0 = j - (oddJ ? 1 : 0), j1 = j + (oddJ ? 1 : 0);
+        // i0/j0 need no low clamp: an odd index is >= 1, so i-1 >= 0 always. Only the high side
+        // can overrun when an odd index sits on the last row/col.
         i1 = std::min(i1, _resolution - 1);
         j1 = std::min(j1, _resolution - 1);
         if (oddI && oddJ) // diagonal: average the four even corners

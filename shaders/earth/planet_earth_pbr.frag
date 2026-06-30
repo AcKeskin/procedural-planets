@@ -235,9 +235,10 @@ void main()
     color = applyHaze(color, uHazeColor, N, lightDir,
                       camDist, uPlanetScale, uHazeStrength, uAmbientLight, uSunIntensity);
 
-    // gentle Reinhard tonemap so highlights roll off instead of clipping (no specular boost)
+    // Reinhard roll-off so highlights don't clip, then a mild gamma lift to keep midtones from
+    // going muddy. No specular boost (the earlier *1.6 was lifting grazing specular into sheen).
     color = color / (color + vec3(0.8));
-    color = pow(color, vec3(0.9));   // mild lift
+    color = pow(color, vec3(0.9));
 
     FragColor = vec4(color, 1.0);
 }

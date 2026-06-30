@@ -10,6 +10,16 @@ namespace planets::render::lod
 // Per-frame decay of a newborn patch's morph-in ramp (~20 frames to full detail at 60fps).
 static constexpr float MorphInDecayPerFrame = 0.05f;
 
+float PlanetQuadTree::SplitDistance(const QuadTreeNode& node) const
+{
+    return _config.splitThreshold * node.GetArcLength() * _config.planetRadius;
+}
+
+float PlanetQuadTree::MergeDistance(const QuadTreeNode& node) const
+{
+    return SplitDistance(node) * _config.hysteresis;
+}
+
 // Icosahedron vertices (golden ratio based)
 static const float PHI = (1.0f + std::sqrt(5.0f)) / 2.0f;
 
@@ -170,8 +180,7 @@ void PlanetQuadTree::TraverseAndUpdate(QuadTreeNode& node, const glm::vec3& came
 
     glm::vec3 scaledCenter = node.GetCenter() * _config.planetRadius;
     float distance = glm::length(cameraPos - scaledCenter);
-    float arcLength = node.GetArcLength();
-    float splitDistance = _config.splitThreshold * arcLength * _config.planetRadius;
+    float splitDistance = SplitDistance(node);
 
     if (node.IsLeaf())
     {
@@ -218,7 +227,7 @@ void PlanetQuadTree::TraverseAndUpdate(QuadTreeNode& node, const glm::vec3& came
             }
         }
 
-        float mergeDistance = splitDistance * _config.hysteresis;
+        float mergeDistance = MergeDistance(node);
         bool shouldMerge = allChildrenAreLeaves && distance > mergeDistance;
 
         if (shouldMerge && !IsPending(&node))
@@ -298,8 +307,8 @@ void PlanetQuadTree::Render(const Shader& shader) const
             // distance. At the merge boundary the fine mesh has collapsed onto the coarse parent
             // grid, so the coarse<->fine swap is invisible. Same split/merge math as the LOD update.
             float distance = glm::length(_lastCameraPos - node->GetCenter() * _config.planetRadius);
-            float splitDistance = _config.splitThreshold * node->GetArcLength() * _config.planetRadius;
-            float mergeDistance = splitDistance * _config.hysteresis;
+            float splitDistance = SplitDistance(*node);
+            float mergeDistance = MergeDistance(*node);
             float distanceMorph = (mergeDistance > splitDistance)
                               ? glm::clamp((distance - splitDistance) / (mergeDistance - splitDistance), 0.0f, 1.0f)
                               : 0.0f;

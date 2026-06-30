@@ -72,6 +72,10 @@ private:
     // Check if every leaf in subtree has a patch
     bool IsSubtreeReady(const QuadTreeNode& node) const;
 
+    // LOD distance thresholds for a node — single source of truth for split/merge/morph.
+    float SplitDistance(const QuadTreeNode& node) const;
+    float MergeDistance(const QuadTreeNode& node) const;
+
     std::vector<std::unique_ptr<QuadTreeNode>> _roots;
     QuadTreeConfig _config;
     PatchPool _patchPool;
