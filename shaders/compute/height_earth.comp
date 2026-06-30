@@ -587,7 +587,19 @@ float evaluateHeight(vec3 dir)
                            0.45, 2.2, 1.0, seed + 73u) * 0.13;
     float rangeRelief = (mtnStructure + mtnTexture * smoothstep(0.1, 0.5, mtnStructure));
 
-    float landRelief = (plains + rangeRelief * rangeStrength * rangeMask) * landMask;
+    // Fine surface detail across ALL land: high-frequency ISOTROPIC fbm (no fixed-axis smear, so
+    // no fur) at small amplitude — gives crisp rock/ground texture up close. Frequency stays
+    // resolvable by the central-difference normal step (eps 0.003 → frequencies up to ~150 read
+    // cleanly), so it sharpens close-ups without aliasing into speckle. Slightly stronger on
+    // mountains (rockier) than on plains. Vanishes at orbit scale as sparse vertices average it.
+    const float surfaceDetailScale    = 22.0;  // high frequency → fine rock grain
+    const float surfaceDetailStrength = 0.05;  // small vs the structural relief above
+    float surfaceDetail = fbm(dir, vec3(5151.0), 4, surfaceDetailScale * globalFrequency,
+                              0.5, 2.3, 1.0, seed + 74u);
+    float detailGain = mix(0.5, 1.0, rangeMask); // rockier in ranges, gentler on plains
+    float fineDetail = surfaceDetail * surfaceDetailStrength * detailGain;
+
+    float landRelief = (plains + rangeRelief * rangeStrength * rangeMask + fineDetail) * landMask;
 
     float terrainHeight = (continentShape + ridges * mountainMask + landRelief) * heightScale;
 
