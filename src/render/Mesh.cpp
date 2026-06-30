@@ -132,6 +132,11 @@ void Mesh::Upload(const MeshData& data)
     glVertexAttribPointer(
         3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, shadingData)));
 
+    // Geomorph target position (coarse-grid position)
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(
+        4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, morphPosition)));
+
     glBindVertexArray(0);
 }
 

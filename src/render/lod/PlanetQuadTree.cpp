@@ -284,6 +284,17 @@ void PlanetQuadTree::Render(const Shader& shader) const
         const SpherePatch* patch = node->GetPatch();
         if (patch && patch->IsVisible(_currentFrustum))
         {
+            // Geomorph factor: 0 at full detail, ramping to 1 as the patch nears its merge
+            // distance. At the merge boundary the fine mesh has collapsed onto the coarse parent
+            // grid, so the coarse<->fine swap is invisible. Same split/merge math as the LOD update.
+            float distance = glm::length(_lastCameraPos - node->GetCenter() * _config.planetRadius);
+            float splitDistance = _config.splitThreshold * node->GetArcLength() * _config.planetRadius;
+            float mergeDistance = splitDistance * _config.hysteresis;
+            float morph = (mergeDistance > splitDistance)
+                              ? glm::clamp((distance - splitDistance) / (mergeDistance - splitDistance), 0.0f, 1.0f)
+                              : 0.0f;
+            shader.SetFloat("uMorphFactor", morph);
+
             patch->Render();
             ++visibleCount;
         }
