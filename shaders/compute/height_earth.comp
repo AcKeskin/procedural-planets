@@ -560,8 +560,10 @@ float evaluateHeight(vec3 dir)
     // bold ridgelines (low octave count); fine surface comes from smooth fbm (rounded, not creased).
     // TUNING SCRATCH (consts here while dialing via /shot; promote to params once set).
     const float reliefScale       = 4.0;   // base frequency of the land relief
-    const float plainsStrength    = 0.10;  // gentle rolling on ALL land (low)
-    const float rangeStrength     = 0.85;  // tall mountain structure, only inside ranges
+    const float plainsStrength    = 0.06;  // gentle rolling on ALL land (low)
+    const float rangeStrength     = 0.30;  // mountain structure inside ranges — kept a small
+                                           // fraction of radius (peak*heightScale ≈ 2% of R) so
+                                           // ranges read as ridges on a globe, not a relief map
     const float rangeScale        = 1.6;   // LOW frequency → few, broad ranges
     const float rangeCoverage     = 0.35;  // fraction of land that is mountainous
 
@@ -601,7 +603,13 @@ float evaluateHeight(vec3 dir)
 
     float landRelief = (plains + rangeRelief * rangeStrength * rangeMask + fineDetail) * landMask;
 
-    float terrainHeight = (continentShape + ridges * mountainMask + landRelief) * heightScale;
+    // The tectonic `ridges` term is a SECOND mountain system (plate-boundary uplift). Keep it as
+    // a low-weight accent only — at full weight it stacked with rangeRelief to ~1.7x and made
+    // peaks 10% of the radius (the "exaggerated relief map" look). 0.25 keeps boundary character
+    // without doubling the height.
+    float tectonicUplift = ridges * mountainMask * 0.25;
+
+    float terrainHeight = (continentShape + tectonicUplift + landRelief) * heightScale;
 
     return 1.0 + terrainHeight;
 }
