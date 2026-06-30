@@ -49,7 +49,7 @@
     },
     "shaderPaths": {
         "erosion": "shaders/compute/erosion_earth.comp",
-        "fragment": "shaders/earth/planet_earth.frag",
+        "fragment": "shaders/earth/planet_earth_pbr.frag",
         "height": "shaders/compute/height_earth.comp",
         "shading": "shaders/compute/shading_earth.comp",
         "vertex": "shaders/earth/planet_earth.vert"
