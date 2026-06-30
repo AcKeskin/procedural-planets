@@ -161,11 +161,13 @@ void SpherePatch::GenerateMesh(const std::vector<float>& heights,
     // Geomorph target height per vertex: the height the patch would have at HALF resolution
     // (its parent LOD). Odd grid rows/cols sit between coarse samples, so their morph height is
     // the average of the even neighbours that survive decimation. Even/even points are unchanged.
-    auto heightAt = [&](int i, int j) -> float {
+    auto heightAt = [&](int i, int j) -> float
+    {
         size_t idx = static_cast<size_t>(j) * _resolution + i;
         return idx < heights.size() ? heights[idx] : 1.0f;
     };
-    auto morphHeightAt = [&](int i, int j) -> float {
+    auto morphHeightAt = [&](int i, int j) -> float
+    {
         bool oddI = (i & 1) != 0;
         bool oddJ = (j & 1) != 0;
         int i0 = i - (oddI ? 1 : 0), i1 = i + (oddI ? 1 : 0);

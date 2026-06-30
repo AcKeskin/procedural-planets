@@ -12,7 +12,7 @@ struct Vertex
     glm::vec3 position;
     glm::vec3 normal;
     glm::vec2 uv;
-    glm::vec4 shadingData; // biome, detail, fine, warp noise
+    glm::vec4 shadingData;   // biome, detail, fine, warp noise
     glm::vec3 morphPosition; // position on the 2x-decimated grid; vertex shader morphs to this
                              // as the patch nears its merge distance, hiding the LOD pop
 };

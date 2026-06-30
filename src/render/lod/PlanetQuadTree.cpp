@@ -309,9 +309,10 @@ void PlanetQuadTree::Render(const Shader& shader) const
             float distance = glm::length(_lastCameraPos - node->GetCenter() * _config.planetRadius);
             float splitDistance = SplitDistance(*node);
             float mergeDistance = MergeDistance(*node);
-            float distanceMorph = (mergeDistance > splitDistance)
-                              ? glm::clamp((distance - splitDistance) / (mergeDistance - splitDistance), 0.0f, 1.0f)
-                              : 0.0f;
+            float distanceMorph =
+                (mergeDistance > splitDistance)
+                    ? glm::clamp((distance - splitDistance) / (mergeDistance - splitDistance), 0.0f, 1.0f)
+                    : 0.0f;
             // A freshly-born patch (morphIn≈1) overrides distance: it starts coarse and eases down,
             // so closing in fast can't snap it to full detail before it has grown in.
             float morph = (std::max)(distanceMorph, node->GetMorphIn());
