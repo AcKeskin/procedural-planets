@@ -560,7 +560,11 @@ float evaluateHeight(vec3 dir)
     // bold ridgelines (low octave count); fine surface comes from smooth fbm (rounded, not creased).
     // TUNING SCRATCH (consts here while dialing via /shot; promote to params once set).
     const float reliefScale       = 4.0;   // base frequency of the land relief
-    const float plainsStrength    = 0.06;  // gentle rolling on ALL land (low)
+    const float plainsStrength    = 0.06;  // broad gentle roll over ALL land (low)
+    const float hillsStrength      = 0.15;  // continuous hills/valleys EVERYWHERE — the mid-band
+                                            // that gives terrain form up close. Still small vs
+                                            // radius (peak ≈ 1% of R) so the orbit limb stays round.
+    const float hillsScale         = 9.0;   // between plains and fine grain → human-scale undulation
     const float rangeStrength     = 0.30;  // mountain structure inside ranges — kept a small
                                            // fraction of radius (peak*heightScale ≈ 2% of R) so
                                            // ranges read as ridges on a globe, not a relief map
@@ -572,6 +576,15 @@ float evaluateHeight(vec3 dir)
     // Plains: gentle smooth roll everywhere on land (centered ~0, so it doesn't lift).
     float plains = fbm(dir, vec3(8888.0), 5, reliefScale * globalFrequency,
                        0.5, 2.1, 1.0, seed + 71u) * plainsStrength;
+
+    // Hills: continuous undulation across ALL land — the form that makes a low fly-over read as
+    // real terrain instead of a flat green shelf. Mixed fbm + a touch of ridged noise so valleys
+    // carve and ridgelines rise (not pure rounded bumps). Centered near 0 so it doesn't lift land.
+    float hillsBase  = fbm(dir, vec3(3434.0), 5, hillsScale * globalFrequency,
+                           0.5, 2.1, 1.0, seed + 75u) - 0.5;
+    float hillsRidge = ridgeNoise(dir, vec3(9090.0), 3, hillsScale * 1.3 * globalFrequency,
+                                  0.5, 2.0, 1.0, 1.5, 0.6, seed + 76u) - 0.4;
+    float hills = (hillsBase + hillsRidge * 0.5) * hillsStrength;
 
     // Range mask: low-frequency field thresholded so mountains cluster into a few belts.
     float rangeField = fbm(dir, vec3(2200.0), 4, rangeScale * globalFrequency,
@@ -601,7 +614,7 @@ float evaluateHeight(vec3 dir)
     float detailGain = mix(0.5, 1.0, rangeMask); // rockier in ranges, gentler on plains
     float fineDetail = surfaceDetail * surfaceDetailStrength * detailGain;
 
-    float landRelief = (plains + rangeRelief * rangeStrength * rangeMask + fineDetail) * landMask;
+    float landRelief = (plains + hills + rangeRelief * rangeStrength * rangeMask + fineDetail) * landMask;
 
     // The tectonic `ridges` term is a SECOND mountain system (plate-boundary uplift). Keep it as
     // a low-weight accent only — at full weight it stacked with rangeRelief to ~1.7x and made

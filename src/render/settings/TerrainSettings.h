@@ -26,7 +26,9 @@ struct LodConfig
     int maxDepth = 8;
     float splitThreshold = 6.0f; // split when dist < threshold*arc*radius; higher = denser geometry up close
     float hysteresis = 1.3f;
-    int maxActivePatches = 600;  // headroom for the more aggressive split threshold
+    int maxActivePatches = 2000; // generous budget so near-surface patches all reach full depth
+                                 // (at 600 the budget ran out before close patches subdivided →
+                                 // coarse facets + seam cracks next to detailed neighbours)
     float skirtFraction = 0.02f;
 };
 

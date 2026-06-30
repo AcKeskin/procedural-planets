@@ -197,23 +197,35 @@ void main()
     mat.albedo    = mix(mat.albedo, snow.albedo, snowW);
     mat.roughness = mix(mat.roughness, snow.roughness, snowW);
 
-    // --- procedural DETAIL NORMAL: perturb the geometric normal with a HIGH-frequency noise
-    // gradient so flat ground catches light as fine grain, not rounded blobs. Strength is small
-    // (a slight roughening), faded at orbital distance so sparse far vertices don't shimmer. ---
-    float bumpScale = 60.0;                          // fine grain (was 8 → blobs an eighth of R)
-    float e = 0.5 / bumpScale;
-    float nC = triplanarFbm(vWorldPos, bumpScale, 3, w);
-    float nX = triplanarFbm(vWorldPos + vec3(e, 0, 0), bumpScale, 3, w);
-    float nY = triplanarFbm(vWorldPos + vec3(0, e, 0), bumpScale, 3, w);
-    float nZ = triplanarFbm(vWorldPos + vec3(0, 0, e), bumpScale, 3, w);
-    vec3 grad = vec3(nX - nC, nY - nC, nZ - nC) / e;
+    // --- procedural DETAIL NORMAL: perturb the geometric normal with a high-frequency noise
+    // gradient so flat ground catches light as fine grain. CENTRAL difference (sample both sides
+    // per axis) — a forward difference is asymmetric at noise extrema and spikes the normal into
+    // specular RINGS (same forward-vs-central lesson as the vertex normals). Clamp the gradient so
+    // an extremum can't throw the normal toward the light. Faded out at orbital distance. ---
+    // eps is a SMALL fraction of a noise cell (cell size = 1/bumpScale in world space). Sampling a
+    // full cell apart (the earlier bug) washed the gradient out; a tenth-cell step resolves it.
+    float bumpScale = 45.0;
+    float e = 0.1 / bumpScale;
+    float nXp = triplanarFbm(vWorldPos + vec3(e, 0, 0), bumpScale, 3, w);
+    float nXm = triplanarFbm(vWorldPos - vec3(e, 0, 0), bumpScale, 3, w);
+    float nYp = triplanarFbm(vWorldPos + vec3(0, e, 0), bumpScale, 3, w);
+    float nYm = triplanarFbm(vWorldPos - vec3(0, e, 0), bumpScale, 3, w);
+    float nZp = triplanarFbm(vWorldPos + vec3(0, 0, e), bumpScale, 3, w);
+    float nZm = triplanarFbm(vWorldPos - vec3(0, 0, e), bumpScale, 3, w);
+    vec3 grad = vec3(nXp - nXm, nYp - nYm, nZp - nZm) / (2.0 * e);
     grad -= geoN * dot(grad, geoN);                  // keep perturbation tangential
-    float bumpStrength = mix(0.0, 0.04, detailFade) * (1.0 - snowW * 0.6);
+    grad = clamp(grad, vec3(-8.0), vec3(8.0));        // cap extremum spikes (ring source) but allow grain
+    float bumpStrength = mix(0.0, 0.025, detailFade) * (1.0 - snowW * 0.6);
     vec3 N = normalize(geoN - grad * bumpStrength);
 
     // --- Cook-Torrance shading ---
+    // Ground (grass/soil/sand) is near-matte: real surfaces have almost no specular lobe, and a
+    // tight lobe over the bumped normal is exactly what rings. Floor roughness high on non-rock so
+    // the specular highlight stays broad and faint. Snow/wet rock keep a little more glint.
+    float matte = max(rockW, snowW);
+    float roughness = clamp(mat.roughness, mix(0.85, 0.4, matte), 1.0);
     float ao = calcSphericalAO(N, sphereNormal, uAOStrength);
-    vec3 lit = cookTorrance(mat.albedo, 0.0, clamp(mat.roughness, 0.05, 1.0),
+    vec3 lit = cookTorrance(mat.albedo, 0.0, roughness,
                             N, viewDir, lightDir, vec3(uSunIntensity));
     vec3 ambient = mat.albedo * uAmbientLight * ao;
     vec3 color = lit + ambient;
@@ -223,8 +235,9 @@ void main()
     color = applyHaze(color, uHazeColor, N, lightDir,
                       camDist, uPlanetScale, uHazeStrength, uAmbientLight, uSunIntensity);
 
-    // mild tonemap so PBR highlights don't clip harshly
-    color = color / (color + vec3(0.6)) * 1.6;
+    // gentle Reinhard tonemap so highlights roll off instead of clipping (no specular boost)
+    color = color / (color + vec3(0.8));
+    color = pow(color, vec3(0.9));   // mild lift
 
     FragColor = vec4(color, 1.0);
 }
