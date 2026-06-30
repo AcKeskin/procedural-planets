@@ -118,7 +118,7 @@
         },
         "mountainPower": 2.18,
         "mountainSmoothing": 1.0,
-        "normalEpsilon": 0.0015,
+        "normalEpsilon": 0.003,
         "oceanDepthMultiplier": 5.0,
         "oceanFloorDepth": 1.36,
         "oceanFloorSmoothing": 0.5

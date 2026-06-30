@@ -543,9 +543,11 @@ float evaluateHeight(vec3 dir)
         }
     }
 
-    float ridges = smoothedRidgeNoise(dir, mountainOffset, mountainLayers, mtnScale,
-                                      mountainPersistence, mountainLacunarity, mountainMultiplier,
-                                      mountainPower, mountainGain, mountainSmooth, seed + 1u);
+    // Plain ridge noise — NOT smoothedRidgeNoise, whose fixed-axis 5-tap average combed every
+    // ridge the same direction (the "fur" artifact). mountainSmooth is now unused for this term.
+    float ridges = ridgeNoise(dir, mountainOffset, mountainLayers, mtnScale,
+                              mountainPersistence, mountainLacunarity, mountainMultiplier,
+                              mountainPower, mountainGain, seed + 1u);
 
     // --- Bimodal land relief: mostly-low plains + LOCALIZED mountain ranges ---
     // Real continents are largely low plains with mountains concentrated in ranges, not a
@@ -553,21 +555,21 @@ float evaluateHeight(vec3 dir)
     // so snow (altitude-driven) whited out everything. Here a low-frequency RANGE MASK gates
     // the tall ridged relief — peaks rise only where the mask is high (~a third of the land),
     // leaving flats between. Amplitude stays small vs radius so orbit reads as a round planet.
+    // Mountain relief is split into STRUCTURE + TEXTURE to avoid the "fur" artifact: deep stacks
+    // of ridge noise pile hairline creases into a combed mat. Ridge noise only carries the few
+    // bold ridgelines (low octave count); fine surface comes from smooth fbm (rounded, not creased).
     // TUNING SCRATCH (consts here while dialing via /shot; promote to params once set).
-    const int   reliefOctaves     = 9;
-    const float reliefScale       = 4.5;   // base frequency of the land relief
-    const float reliefPersistence = 0.5;   // per-octave amplitude falloff (fractal ratio)
-    const float reliefLacunarity  = 2.15;  // per-octave frequency growth
+    const float reliefScale       = 4.0;   // base frequency of the land relief
     const float plainsStrength    = 0.10;  // gentle rolling on ALL land (low)
-    const float rangeStrength     = 0.85;  // tall ridged relief, only inside ranges
+    const float rangeStrength     = 0.85;  // tall mountain structure, only inside ranges
     const float rangeScale        = 1.6;   // LOW frequency → few, broad ranges
     const float rangeCoverage     = 0.35;  // fraction of land that is mountainous
 
     float landMask = smoothstep(-0.04, 0.12, continentShape);
 
-    // Plains: gentle multi-octave roll everywhere on land (centered ~0, so it doesn't lift).
-    float plains = fbm(dir, vec3(8888.0), reliefOctaves, reliefScale * globalFrequency,
-                       reliefPersistence, reliefLacunarity, 1.0, seed + 71u) * plainsStrength;
+    // Plains: gentle smooth roll everywhere on land (centered ~0, so it doesn't lift).
+    float plains = fbm(dir, vec3(8888.0), 5, reliefScale * globalFrequency,
+                       0.5, 2.1, 1.0, seed + 71u) * plainsStrength;
 
     // Range mask: low-frequency field thresholded so mountains cluster into a few belts.
     float rangeField = fbm(dir, vec3(2200.0), 4, rangeScale * globalFrequency,
@@ -575,9 +577,15 @@ float evaluateHeight(vec3 dir)
     float rangeMask = smoothstep(1.0 - rangeCoverage - 0.18, 1.0 - rangeCoverage + 0.18,
                                  rangeField * 0.5 + 0.5);
 
-    // Ridged fractal = the mountain character (folds/valleys), only inside the ranges.
-    float rangeRelief = ridgeNoise(dir, vec3(7777.0), reliefOctaves, reliefScale * globalFrequency,
-                                   reliefPersistence, reliefLacunarity, 1.0, 1.7, 0.7, seed + 70u);
+    // Mountain STRUCTURE: few bold ridgelines (4 octaves only — NOT a deep stack, which furs).
+    float mtnStructure = ridgeNoise(dir, vec3(7777.0), 4, reliefScale * 0.9 * globalFrequency,
+                                    0.5, 2.2, 1.0, 1.5, 0.65, seed + 70u);
+    // Mountain TEXTURE: smooth higher-frequency fbm for rounded rock detail (no creases).
+    // Kept modest so per-vertex steepness stays smooth — sharp fine texture made the snowline
+    // shed snow in a combed pattern ("fur").
+    float mtnTexture = fbm(dir, vec3(6161.0), 3, reliefScale * 2.2 * globalFrequency,
+                           0.45, 2.2, 1.0, seed + 73u) * 0.13;
+    float rangeRelief = (mtnStructure + mtnTexture * smoothstep(0.1, 0.5, mtnStructure));
 
     float landRelief = (plains + rangeRelief * rangeStrength * rangeMask) * landMask;
 
@@ -604,18 +612,21 @@ void main()
     tangentA = normalize(tangentA);
     vec3 tangentB = cross(dir, tangentA);
 
+    // CENTRAL difference (sample both sides on each axis), not forward difference. A forward
+    // difference is biased toward +tangentA/+tangentB and combs fine height noise into directional
+    // streaks (the "fur"). Central differencing is symmetric → no directional bias.
     float eps = normalEpsilon;
-    vec3 dirA = normalize(dir + tangentA * eps);
-    vec3 dirB = normalize(dir + tangentB * eps);
+    vec3 dirAp = normalize(dir + tangentA * eps);
+    vec3 dirAm = normalize(dir - tangentA * eps);
+    vec3 dirBp = normalize(dir + tangentB * eps);
+    vec3 dirBm = normalize(dir - tangentB * eps);
 
-    float hA = evaluateHeight(dirA);
-    float hB = evaluateHeight(dirB);
+    vec3 pAp = dirAp * evaluateHeight(dirAp);
+    vec3 pAm = dirAm * evaluateHeight(dirAm);
+    vec3 pBp = dirBp * evaluateHeight(dirBp);
+    vec3 pBm = dirBm * evaluateHeight(dirBm);
 
-    vec3 pCenter = dir * h;
-    vec3 pA = dirA * hA;
-    vec3 pB = dirB * hB;
-
-    vec3 n = normalize(cross(pA - pCenter, pB - pCenter));
+    vec3 n = normalize(cross(pAp - pAm, pBp - pBm));
 
     if (dot(n, dir) < 0.0)
         n = -n;
