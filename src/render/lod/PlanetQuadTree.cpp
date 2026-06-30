@@ -2,9 +2,13 @@
 #include "../Shader.h"
 #include <iostream>
 #include <cmath>
+#include <algorithm>
 
 namespace planets::render::lod
 {
+
+// Per-frame decay of a newborn patch's morph-in ramp (~20 frames to full detail at 60fps).
+static constexpr float MorphInDecayPerFrame = 0.05f;
 
 // Icosahedron vertices (golden ratio based)
 static const float PHI = (1.0f + std::sqrt(5.0f)) / 2.0f;
@@ -139,6 +143,11 @@ void PlanetQuadTree::ApplyCompletedPatches()
             _patchPool.Release(result.targetNode->ReleasePatch());
 
         result.targetNode->SetPatch(std::move(result.patch));
+
+        // A newly generated split-child starts collapsed onto its parent shape and morphs up,
+        // so a fast approach can't snap it in at full displacement (the close-in flicker).
+        if (result.type == GenerationType::Split)
+            result.targetNode->BeginMorphIn();
     }
 }
 
@@ -192,6 +201,7 @@ void PlanetQuadTree::TraverseAndUpdate(QuadTreeNode& node, const glm::vec3& came
         else
         {
             ++_activeLeafCount;
+            node.DecayMorphIn(MorphInDecayPerFrame); // ease a newly-born patch up to full detail
         }
     }
     else
@@ -290,9 +300,12 @@ void PlanetQuadTree::Render(const Shader& shader) const
             float distance = glm::length(_lastCameraPos - node->GetCenter() * _config.planetRadius);
             float splitDistance = _config.splitThreshold * node->GetArcLength() * _config.planetRadius;
             float mergeDistance = splitDistance * _config.hysteresis;
-            float morph = (mergeDistance > splitDistance)
+            float distanceMorph = (mergeDistance > splitDistance)
                               ? glm::clamp((distance - splitDistance) / (mergeDistance - splitDistance), 0.0f, 1.0f)
                               : 0.0f;
+            // A freshly-born patch (morphIn≈1) overrides distance: it starts coarse and eases down,
+            // so closing in fast can't snap it to full detail before it has grown in.
+            float morph = (std::max)(distanceMorph, node->GetMorphIn());
             shader.SetFloat("uMorphFactor", morph);
 
             patch->Render();
