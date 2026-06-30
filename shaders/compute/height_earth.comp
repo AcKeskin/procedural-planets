@@ -547,26 +547,39 @@ float evaluateHeight(vec3 dir)
                                       mountainPersistence, mountainLacunarity, mountainMultiplier,
                                       mountainPower, mountainGain, mountainSmooth, seed + 1u);
 
-    // --- Multi-scale land relief (the "reads huge up close, real from orbit" hierarchy) ---
-    // A proper fractal: each octave ~half the amplitude of the last, so terrain has structure
-    // at every scale (broad ridges containing finer ridges containing rock). Amplitude stays
-    // SMALL relative to continentShape — the displacement is modest; what sells detail up close
-    // is the slope (normals), not tall geometry. Masked to land so the ocean stays calm.
+    // --- Bimodal land relief: mostly-low plains + LOCALIZED mountain ranges ---
+    // Real continents are largely low plains with mountains concentrated in ranges, not a
+    // uniformly-lifted plateau. A uniform fbm lift was the bug: it raised the whole interior,
+    // so snow (altitude-driven) whited out everything. Here a low-frequency RANGE MASK gates
+    // the tall ridged relief — peaks rise only where the mask is high (~a third of the land),
+    // leaving flats between. Amplitude stays small vs radius so orbit reads as a round planet.
     // TUNING SCRATCH (consts here while dialing via /shot; promote to params once set).
     const int   reliefOctaves     = 9;
     const float reliefScale       = 4.5;   // base frequency of the land relief
-    const float reliefPersistence = 0.52;  // per-octave amplitude falloff (fractal ratio)
+    const float reliefPersistence = 0.5;   // per-octave amplitude falloff (fractal ratio)
     const float reliefLacunarity  = 2.15;  // per-octave frequency growth
-    const float reliefStrength    = 0.32;  // overall amplitude, relative to continentShape units
+    const float plainsStrength    = 0.10;  // gentle rolling on ALL land (low)
+    const float rangeStrength     = 0.85;  // tall ridged relief, only inside ranges
+    const float rangeScale        = 1.6;   // LOW frequency → few, broad ranges
+    const float rangeCoverage     = 0.35;  // fraction of land that is mountainous
+
     float landMask = smoothstep(-0.04, 0.12, continentShape);
-    // Ridged fractal for mountain character (folds/valleys), blended with smooth fbm for foothills.
-    float reliefRidged = ridgeNoise(dir, vec3(7777.0), reliefOctaves, reliefScale * globalFrequency,
-                                    reliefPersistence, reliefLacunarity, 1.0, 1.6, 0.7, seed + 70u);
-    float reliefSmooth = fbm(dir, vec3(8888.0), reliefOctaves, reliefScale * globalFrequency,
-                             reliefPersistence, reliefLacunarity, 1.0, seed + 71u);
-    // Lift toward ridged on high ground (mountains), smooth on lowland (plains/foothills).
-    float highland = smoothstep(0.0, 0.35, continentShape);
-    float landRelief = mix(reliefSmooth * 0.6, reliefRidged, highland) * reliefStrength * landMask;
+
+    // Plains: gentle multi-octave roll everywhere on land (centered ~0, so it doesn't lift).
+    float plains = fbm(dir, vec3(8888.0), reliefOctaves, reliefScale * globalFrequency,
+                       reliefPersistence, reliefLacunarity, 1.0, seed + 71u) * plainsStrength;
+
+    // Range mask: low-frequency field thresholded so mountains cluster into a few belts.
+    float rangeField = fbm(dir, vec3(2200.0), 4, rangeScale * globalFrequency,
+                           0.5, 2.0, 1.0, seed + 72u);
+    float rangeMask = smoothstep(1.0 - rangeCoverage - 0.18, 1.0 - rangeCoverage + 0.18,
+                                 rangeField * 0.5 + 0.5);
+
+    // Ridged fractal = the mountain character (folds/valleys), only inside the ranges.
+    float rangeRelief = ridgeNoise(dir, vec3(7777.0), reliefOctaves, reliefScale * globalFrequency,
+                                   reliefPersistence, reliefLacunarity, 1.0, 1.7, 0.7, seed + 70u);
+
+    float landRelief = (plains + rangeRelief * rangeStrength * rangeMask) * landMask;
 
     float terrainHeight = (continentShape + ridges * mountainMask + landRelief) * heightScale;
 

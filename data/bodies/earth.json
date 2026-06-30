@@ -99,7 +99,7 @@
             "strength": 2.0
         },
         "globalFrequency": 1.0,
-        "heightScale": 0.05,
+        "heightScale": 0.06,
         "maskNoise": {
             "lacunarity": 1.66,
             "octaves": 3,
