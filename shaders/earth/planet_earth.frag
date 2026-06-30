@@ -207,14 +207,19 @@ vec3 getTerrainColor(vec3 worldPos, vec3 normal, float height)
         vec3 shoreColor = mix(coldShore, warmShore, smoothstep(0.2, 0.5, temperature));
         flatColor = mix(flatColor, shoreColor, shoreBlend);
 
-        // Snow: altitude + temperature + slope model with wide transitions
-        float snowNoisePerturbation = (detailNoise - 0.5) * 0.04 * gDetailFade;
-        float effectiveSnowLine = uSnowLine - (1.0 - temperature) * 0.12 + snowNoisePerturbation;
-        float snowBlend = smoothstep(effectiveSnowLine - 0.15, effectiveSnowLine + 0.02, h);
-        float coldSnow = smoothstep(0.06, 0.01, temperature) * 0.4;
+        // Snow: altitude-driven first. Climate only mildly lowers the line, so a cold continent
+        // gets snowy PEAKS, not a fully glaciated sheet. Snow sits on genuine high ground.
+        // Keep the altitude band WIDE so fine height texture can't thread the green/snow border
+        // in and out (that rapid threshold-crossing is what read as a combed "fur" edge).
+        float snowNoisePerturbation = (detailNoise - 0.5) * 0.03 * gDetailFade;
+        float effectiveSnowLine = uSnowLine - (1.0 - temperature) * 0.04 + snowNoisePerturbation;
+        float snowBlend = smoothstep(effectiveSnowLine - 0.22, effectiveSnowLine + 0.06, h);
+        // Polar ice cap only at genuinely freezing latitudes (not merely "cool" interiors).
+        float coldSnow = smoothstep(0.02, 0.0, temperature) * 0.4;
         snowBlend = max(snowBlend, coldSnow);
-        // Steep slopes shed snow
-        float slopeShed = 1.0 - smoothstep(0.25, 0.55, steepness);
+        // Steep slopes shed snow — but gently and never fully, so per-vertex steepness wobble at
+        // the snowline doesn't carve fine combed fingers (the "fur"). Wide transition, floored.
+        float slopeShed = 1.0 - smoothstep(0.45, 0.85, steepness) * 0.6;
         snowBlend *= slopeShed;
         flatColor = mix(flatColor, uSnowColor, snowBlend);
     }

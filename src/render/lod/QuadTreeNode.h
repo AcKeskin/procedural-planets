@@ -49,6 +49,13 @@ public:
     std::unique_ptr<SpherePatch> ReleasePatch();
     bool HasPatch() const { return _patch != nullptr; }
 
+    // Geomorph "birth" ramp: 1 right after a split-child gets its patch, decayed toward 0 each
+    // frame. A freshly generated fine patch starts collapsed onto the parent shape and eases to
+    // full detail, so a fast approach can't snap it in at full displacement.
+    void BeginMorphIn() { _morphIn = 1.0f; }
+    void DecayMorphIn(float amount) { _morphIn = (_morphIn > amount) ? _morphIn - amount : 0.0f; }
+    float GetMorphIn() const { return _morphIn; }
+
     // Accessors
     int GetDepth() const { return _depth; }
     const glm::vec3& GetCenter() const { return _center; }
@@ -80,6 +87,9 @@ private:
 
     // Renderable patch (only valid for leaf nodes)
     std::unique_ptr<SpherePatch> _patch;
+
+    // Birth ramp for geomorph-in (see BeginMorphIn)
+    float _morphIn = 0.0f;
 };
 
 } // namespace planets::render::lod

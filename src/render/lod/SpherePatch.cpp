@@ -158,15 +158,46 @@ void SpherePatch::GenerateMesh(const std::vector<float>& heights,
 
     bool hasComputedNormals = computedNormals.size() == _vertices.size();
 
+    // Geomorph target height per vertex: the height the patch would have at HALF resolution
+    // (its parent LOD). Odd grid rows/cols sit between coarse samples, so their morph height is
+    // the average of the even neighbours that survive decimation. Even/even points are unchanged.
+    auto heightAt = [&](int i, int j) -> float {
+        size_t idx = static_cast<size_t>(j) * _resolution + i;
+        return idx < heights.size() ? heights[idx] : 1.0f;
+    };
+    auto morphHeightAt = [&](int i, int j) -> float {
+        bool oddI = (i & 1) != 0;
+        bool oddJ = (j & 1) != 0;
+        int i0 = i - (oddI ? 1 : 0), i1 = i + (oddI ? 1 : 0);
+        int j0 = j - (oddJ ? 1 : 0), j1 = j + (oddJ ? 1 : 0);
+        // i0/j0 need no low clamp: an odd index is >= 1, so i-1 >= 0 always. Only the high side
+        // can overrun when an odd index sits on the last row/col.
+        i1 = std::min(i1, _resolution - 1);
+        j1 = std::min(j1, _resolution - 1);
+        if (oddI && oddJ) // diagonal: average the four even corners
+            return 0.25f * (heightAt(i0, j0) + heightAt(i1, j0) + heightAt(i0, j1) + heightAt(i1, j1));
+        if (oddI)
+            return 0.5f * (heightAt(i0, j) + heightAt(i1, j));
+        if (oddJ)
+            return 0.5f * (heightAt(i, j0) + heightAt(i, j1));
+        return heightAt(i, j);
+    };
+
     for (size_t i = 0; i < _vertices.size(); ++i)
     {
         float h = (i < heights.size()) ? heights[i] : 1.0f;
         glm::vec3 pos = _vertices[i] * _planetRadius * h;
 
+        int gx = static_cast<int>(i % _resolution);
+        int gy = static_cast<int>(i / _resolution);
+        float morphH = morphHeightAt(gx, gy);
+        glm::vec3 morphPos = _vertices[i] * _planetRadius * morphH;
+
         meshData.vertices[i].position = pos;
         meshData.vertices[i].normal = hasComputedNormals ? computedNormals[i] : glm::vec3(0.0f);
         meshData.vertices[i].uv = glm::vec2(h, 0.0f); // Store height in UV.x for shader access
         meshData.vertices[i].shadingData = (i < shadingData.size()) ? shadingData[i] : glm::vec4(0.0f);
+        meshData.vertices[i].morphPosition = morphPos;
     }
 
     // Generate indices
@@ -232,6 +263,9 @@ void SpherePatch::AppendSkirtGeometry(MeshData& meshData,
             // Offset toward planet center
             glm::vec3 radialDir = glm::normalize(originalVert.position);
             skirtVert.position = originalVert.position - radialDir * skirtDepth;
+            // Morph target offset the same way so skirts collapse with the surface, not independently
+            glm::vec3 morphRadial = glm::normalize(originalVert.morphPosition);
+            skirtVert.morphPosition = originalVert.morphPosition - morphRadial * skirtDepth;
 
             meshData.vertices.push_back(skirtVert);
         }

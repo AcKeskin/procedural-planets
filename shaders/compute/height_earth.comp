@@ -543,29 +543,88 @@ float evaluateHeight(vec3 dir)
         }
     }
 
-    float ridges = smoothedRidgeNoise(dir, mountainOffset, mountainLayers, mtnScale,
-                                      mountainPersistence, mountainLacunarity, mountainMultiplier,
-                                      mountainPower, mountainGain, mountainSmooth, seed + 1u);
+    // Plain ridge noise — NOT smoothedRidgeNoise, whose fixed-axis 5-tap average combed every
+    // ridge the same direction (the "fur" artifact). mountainSmooth is now unused for this term.
+    float ridges = ridgeNoise(dir, mountainOffset, mountainLayers, mtnScale,
+                              mountainPersistence, mountainLacunarity, mountainMultiplier,
+                              mountainPower, mountainGain, seed + 1u);
 
-    float terrainHeight = (continentShape + ridges * mountainMask) * heightScale;
+    // --- Bimodal land relief: mostly-low plains + LOCALIZED mountain ranges ---
+    // Real continents are largely low plains with mountains concentrated in ranges, not a
+    // uniformly-lifted plateau. A uniform fbm lift was the bug: it raised the whole interior,
+    // so snow (altitude-driven) whited out everything. Here a low-frequency RANGE MASK gates
+    // the tall ridged relief — peaks rise only where the mask is high (~a third of the land),
+    // leaving flats between. Amplitude stays small vs radius so orbit reads as a round planet.
+    // Mountain relief is split into STRUCTURE + TEXTURE to avoid the "fur" artifact: deep stacks
+    // of ridge noise pile hairline creases into a combed mat. Ridge noise only carries the few
+    // bold ridgelines (low octave count); fine surface comes from smooth fbm (rounded, not creased).
+    // TUNING SCRATCH (consts here while dialing via /shot; promote to params once set).
+    const float reliefScale       = 4.0;   // base frequency of the land relief
+    const float plainsStrength    = 0.06;  // broad gentle roll over ALL land (low)
+    const float hillsStrength      = 0.15;  // continuous hills/valleys EVERYWHERE — the mid-band
+                                            // that gives terrain form up close. Still small vs
+                                            // radius (peak ≈ 1% of R) so the orbit limb stays round.
+    const float hillsScale         = 9.0;   // between plains and fine grain → human-scale undulation
+    const float rangeStrength     = 0.30;  // mountain structure inside ranges — kept a small
+                                           // fraction of radius (peak*heightScale ≈ 2% of R) so
+                                           // ranges read as ridges on a globe, not a relief map
+    const float rangeScale        = 1.6;   // LOW frequency → few, broad ranges
+    const float rangeCoverage     = 0.35;  // fraction of land that is mountainous
 
-    float baseTerrainHeight = continentShape + ridges * mountainMask;
-    float heightFactor = smoothstep(detailLowThreshold, detailHighThreshold, baseTerrainHeight);
-    float effectiveStrength = mix(perturbStrengthLow, perturbStrengthHigh, heightFactor);
-    int effectiveOctaves = int(mix(float(detailOctavesLow), float(detailOctavesHigh), heightFactor) + 0.5);
+    float landMask = smoothstep(-0.04, 0.12, continentShape);
 
-    float perturbNoise = 0.0;
-    float ptbAmplitude = 1.0;
-    float ptbFrequency = ptbScale;
-    for (int i = 0; i < effectiveOctaves; i++)
-    {
-        perturbNoise += (snoise(dir * ptbFrequency, seed + 10u + uint(i)) * 2.0 - 1.0) * ptbAmplitude;
-        ptbAmplitude *= detailPersistence;
-        ptbFrequency *= detailLacunarity;
-    }
-    float perturbation = perturbNoise * effectiveStrength;
+    // Plains: gentle smooth roll everywhere on land (centered ~0, so it doesn't lift).
+    float plains = fbm(dir, vec3(8888.0), 5, reliefScale * globalFrequency,
+                       0.5, 2.1, 1.0, seed + 71u) * plainsStrength;
 
-    return 1.0 + terrainHeight + perturbation;
+    // Hills: continuous undulation across ALL land — the form that makes a low fly-over read as
+    // real terrain instead of a flat green shelf. Mixed fbm + a touch of ridged noise so valleys
+    // carve and ridgelines rise (not pure rounded bumps). Centered near 0 so it doesn't lift land.
+    float hillsBase  = fbm(dir, vec3(3434.0), 5, hillsScale * globalFrequency,
+                           0.5, 2.1, 1.0, seed + 75u) - 0.5;
+    float hillsRidge = ridgeNoise(dir, vec3(9090.0), 3, hillsScale * 1.3 * globalFrequency,
+                                  0.5, 2.0, 1.0, 1.5, 0.6, seed + 76u) - 0.4;
+    float hills = (hillsBase + hillsRidge * 0.5) * hillsStrength;
+
+    // Range mask: low-frequency field thresholded so mountains cluster into a few belts.
+    float rangeField = fbm(dir, vec3(2200.0), 4, rangeScale * globalFrequency,
+                           0.5, 2.0, 1.0, seed + 72u);
+    float rangeMask = smoothstep(1.0 - rangeCoverage - 0.18, 1.0 - rangeCoverage + 0.18,
+                                 rangeField * 0.5 + 0.5);
+
+    // Mountain STRUCTURE: few bold ridgelines (4 octaves only — NOT a deep stack, which furs).
+    float mtnStructure = ridgeNoise(dir, vec3(7777.0), 4, reliefScale * 0.9 * globalFrequency,
+                                    0.5, 2.2, 1.0, 1.5, 0.65, seed + 70u);
+    // Mountain TEXTURE: smooth higher-frequency fbm for rounded rock detail (no creases).
+    // Kept modest so per-vertex steepness stays smooth — sharp fine texture made the snowline
+    // shed snow in a combed pattern ("fur").
+    float mtnTexture = fbm(dir, vec3(6161.0), 3, reliefScale * 2.2 * globalFrequency,
+                           0.45, 2.2, 1.0, seed + 73u) * 0.13;
+    float rangeRelief = (mtnStructure + mtnTexture * smoothstep(0.1, 0.5, mtnStructure));
+
+    // Fine surface detail across ALL land: high-frequency ISOTROPIC fbm (no fixed-axis smear, so
+    // no fur) at small amplitude — gives crisp rock/ground texture up close. Frequency stays
+    // resolvable by the central-difference normal step (eps 0.003 → frequencies up to ~150 read
+    // cleanly), so it sharpens close-ups without aliasing into speckle. Slightly stronger on
+    // mountains (rockier) than on plains. Vanishes at orbit scale as sparse vertices average it.
+    const float surfaceDetailScale    = 22.0;  // high frequency → fine rock grain
+    const float surfaceDetailStrength = 0.05;  // small vs the structural relief above
+    float surfaceDetail = fbm(dir, vec3(5151.0), 4, surfaceDetailScale * globalFrequency,
+                              0.5, 2.3, 1.0, seed + 74u);
+    float detailGain = mix(0.5, 1.0, rangeMask); // rockier in ranges, gentler on plains
+    float fineDetail = surfaceDetail * surfaceDetailStrength * detailGain;
+
+    float landRelief = (plains + hills + rangeRelief * rangeStrength * rangeMask + fineDetail) * landMask;
+
+    // The tectonic `ridges` term is a SECOND mountain system (plate-boundary uplift). Keep it as
+    // a low-weight accent only — at full weight it stacked with rangeRelief to ~1.7x and made
+    // peaks 10% of the radius (the "exaggerated relief map" look). 0.25 keeps boundary character
+    // without doubling the height.
+    float tectonicUplift = ridges * mountainMask * 0.25;
+
+    float terrainHeight = (continentShape + tectonicUplift + landRelief) * heightScale;
+
+    return 1.0 + terrainHeight;
 }
 
 void main()
@@ -586,18 +645,21 @@ void main()
     tangentA = normalize(tangentA);
     vec3 tangentB = cross(dir, tangentA);
 
+    // CENTRAL difference (sample both sides on each axis), not forward difference. A forward
+    // difference is biased toward +tangentA/+tangentB and combs fine height noise into directional
+    // streaks (the "fur"). Central differencing is symmetric → no directional bias.
     float eps = normalEpsilon;
-    vec3 dirA = normalize(dir + tangentA * eps);
-    vec3 dirB = normalize(dir + tangentB * eps);
+    vec3 dirAp = normalize(dir + tangentA * eps);
+    vec3 dirAm = normalize(dir - tangentA * eps);
+    vec3 dirBp = normalize(dir + tangentB * eps);
+    vec3 dirBm = normalize(dir - tangentB * eps);
 
-    float hA = evaluateHeight(dirA);
-    float hB = evaluateHeight(dirB);
+    vec3 pAp = dirAp * evaluateHeight(dirAp);
+    vec3 pAm = dirAm * evaluateHeight(dirAm);
+    vec3 pBp = dirBp * evaluateHeight(dirBp);
+    vec3 pBm = dirBm * evaluateHeight(dirBm);
 
-    vec3 pCenter = dir * h;
-    vec3 pA = dirA * hA;
-    vec3 pB = dirB * hB;
-
-    vec3 n = normalize(cross(pA - pCenter, pB - pCenter));
+    vec3 n = normalize(cross(pAp - pAm, pBp - pBm));
 
     if (dot(n, dir) < 0.0)
         n = -n;

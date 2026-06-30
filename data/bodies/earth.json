@@ -49,7 +49,7 @@
     },
     "shaderPaths": {
         "erosion": "shaders/compute/erosion_earth.comp",
-        "fragment": "shaders/earth/planet_earth.frag",
+        "fragment": "shaders/earth/planet_earth_pbr.frag",
         "height": "shaders/compute/height_earth.comp",
         "shading": "shaders/compute/shading_earth.comp",
         "vertex": "shaders/earth/planet_earth.vert"
@@ -82,7 +82,7 @@
         "smallNoiseScale": 15.0,
         "snowBlend": 0.1,
         "snowLatitude": 0.8,
-        "snowLine": 0.85,
+        "snowLine": 0.96,
         "steepnessThreshold": 0.3,
         "temperatureExponent": 0.6,
         "temperatureLapseRate": 2.0,
@@ -90,7 +90,7 @@
         "warpStrength": 0.3
     },
     "shape": {
-        "continentBaseLevel": -0.18,
+        "continentBaseLevel": -0.08,
         "continentNoise": {
             "lacunarity": 2.0,
             "octaves": 6,
@@ -99,7 +99,7 @@
             "strength": 2.0
         },
         "globalFrequency": 1.0,
-        "heightScale": 0.07,
+        "heightScale": 0.06,
         "maskNoise": {
             "lacunarity": 1.66,
             "octaves": 3,
@@ -118,7 +118,7 @@
         },
         "mountainPower": 2.18,
         "mountainSmoothing": 1.0,
-        "normalEpsilon": 0.0001,
+        "normalEpsilon": 0.003,
         "oceanDepthMultiplier": 5.0,
         "oceanFloorDepth": 1.36,
         "oceanFloorSmoothing": 0.5
