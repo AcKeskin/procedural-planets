@@ -83,13 +83,18 @@ void SharedPatchTopology::Build(int resolution)
     // block of `res` skirt ids sitting at [interior + edge*res, ...). Triangle wiring mirrors
     // SpherePatch::AppendSkirtGeometry (edge0,skirt0,edge1) + (edge1,skirt0,skirt1). The source
     // interior id for a skirt vertex is baked here and re-derived identically in the VS.
-    auto interiorEdgeId = [res](int edge, int k) -> uint32_t {
+    auto interiorEdgeId = [res](int edge, int k) -> uint32_t
+    {
         switch (edge)
         {
-        case 0: return static_cast<uint32_t>(k);                              // bottom: row 0
-        case 1: return static_cast<uint32_t>(res - 1) * res + k;              // top: row res-1
-        case 2: return static_cast<uint32_t>(k) * res;                        // left: col 0
-        default: return static_cast<uint32_t>(k) * res + (res - 1);           // right: col res-1
+        case 0:
+            return static_cast<uint32_t>(k); // bottom: row 0
+        case 1:
+            return static_cast<uint32_t>(res - 1) * res + k; // top: row res-1
+        case 2:
+            return static_cast<uint32_t>(k) * res; // left: col 0
+        default:
+            return static_cast<uint32_t>(k) * res + (res - 1); // right: col res-1
         }
     };
 

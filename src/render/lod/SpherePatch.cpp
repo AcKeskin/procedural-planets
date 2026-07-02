@@ -122,9 +122,9 @@ void SpherePatch::GenerateGridVertices(int resolution, std::vector<glm::vec3>& v
 }
 
 void SpherePatch::AdoptBuffers(GpuBuffer<float>&& positionBuffer,
-                              GpuBuffer<float>&& heightBuffer,
-                              GpuBuffer<float>&& normalBuffer,
-                              GpuBuffer<glm::vec4>&& shadingBuffer)
+                               GpuBuffer<float>&& heightBuffer,
+                               GpuBuffer<float>&& normalBuffer,
+                               GpuBuffer<glm::vec4>&& shadingBuffer)
 {
     _positionBuffer = std::move(positionBuffer);
     _heightBuffer = std::move(heightBuffer);
