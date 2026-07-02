@@ -1,12 +1,19 @@
 #pragma once
 
-#include "../Mesh.h"
+#include "../GpuBuffer.h"
 #include <glm/glm.hpp>
 #include <vector>
 #include <array>
 
+namespace planets::render
+{
+class Shader;
+}
+
 namespace planets::render::lod
 {
+
+class SharedPatchTopology;
 
 // Axis-aligned bounding box for frustum culling
 struct AABB
@@ -48,16 +55,23 @@ public:
                     int resolution = 32,
                     float skirtFraction = 0.02f);
 
-    // Generate mesh data from heights, shading, and analytical normals
-    void GenerateMesh(const std::vector<float>& heights,
-                      const std::vector<glm::vec4>& shadingData,
-                      const std::vector<glm::vec3>& computedNormals = {});
+    // Take ownership of the compute-written GPU buffers (GPU-resident render path). The buffers
+    // outlive the generation task and live as long as the patch; the draw binds them directly,
+    // no readback. The culling AABB is derived conservatively from the unit-sphere grid extents
+    // × a height margin (no CPU height copy — the data stays on the GPU). Marks the patch drawable.
+    void AdoptBuffers(GpuBuffer<float>&& positionBuffer,
+                      GpuBuffer<float>&& heightBuffer,
+                      GpuBuffer<float>&& normalBuffer,
+                      GpuBuffer<glm::vec4>&& shadingBuffer);
+
+    bool IsDrawable() const { return _drawable; }
 
     // Check if patch is visible in frustum
     bool IsVisible(const Frustum& frustum) const;
 
-    // Render the patch
-    void Render() const;
+    // Render the patch: bind the compute-written SSBOs, set per-patch uniforms, draw over the
+    // shared topology. uMorphFactor is set by the caller (LOD state, not patch-owned).
+    void Render(const Shader& shader, const SharedPatchTopology& topology) const;
 
     // Accessors
     const glm::vec3& GetCenter() const { return _center; }
@@ -66,15 +80,9 @@ public:
 
     // Get vertices for height generation (unit sphere positions)
     const std::vector<glm::vec3>& GetUnitSphereVertices() const { return _vertices; }
-    int GetVertexCount() const { return static_cast<int>(_vertices.size()); }
-    int GetResolution() const { return _resolution; }
 
 private:
     void GenerateGridVertices(int resolution, std::vector<glm::vec3>& vertices);
-    void GenerateGridIndices(int resolution, std::vector<uint32_t>& indices);
-    void AppendSkirtGeometry(MeshData& meshData,
-                             const std::vector<float>& heights,
-                             const std::vector<glm::vec4>& shadingData);
 
     glm::vec3 _v0, _v1, _v2;   // Base triangle vertices (unit sphere)
     glm::vec3 _center;         // Patch center on unit sphere
@@ -85,8 +93,13 @@ private:
     AABB _boundingBox;
 
     std::vector<glm::vec3> _vertices; // Unit sphere positions
-    Mesh _mesh;
-    bool _generated = false;
+
+    // GPU-resident render path: the compute-written buffers, owned for the patch's lifetime.
+    GpuBuffer<float> _positionBuffer;
+    GpuBuffer<float> _heightBuffer;
+    GpuBuffer<float> _normalBuffer;
+    GpuBuffer<glm::vec4> _shadingBuffer;
+    bool _drawable = false;
 };
 
 } // namespace planets::render::lod

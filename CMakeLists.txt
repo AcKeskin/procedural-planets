@@ -14,6 +14,9 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 # Compiler warnings (WX- to allow warnings during development)
 if(MSVC)
     add_compile_options(/W4 /WX-)
+    # gl3w drags in <windows.h> transitively; its min/max macros clobber std::min/max and
+    # glm::min/max at any call site that also includes a GL header. NOMINMAX suppresses them.
+    add_compile_definitions(NOMINMAX)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()

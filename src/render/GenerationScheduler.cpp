@@ -1,7 +1,6 @@
 #include "GenerationScheduler.h"
 #include "lod/QuadTreeNode.h"
 #include <algorithm>
-#include <iostream>
 
 namespace planets::render
 {
@@ -100,34 +99,13 @@ void GenerationScheduler::DispatchTask(GenerationTask& task)
 
 void GenerationScheduler::CompleteTask(GenerationTask& task)
 {
-    // Readback height data from GPU
-    std::vector<float> heights;
-    task.heightBuffer.Download(heights);
+    // GPU-resident: the fence has signaled, so the compute-written buffers are ready. Move them
+    // into the patch — no readback, no CPU mesh build. The patch binds them directly at draw.
+    task.request.patch->AdoptBuffers(std::move(task.vertexBuffer),
+                                     std::move(task.heightBuffer),
+                                     std::move(task.normalBuffer),
+                                     std::move(task.shadingBuffer));
 
-    // Readback analytical normals from GPU
-    std::vector<float> packedNormals;
-    task.normalBuffer.Download(packedNormals);
-    std::vector<glm::vec3> computedNormals(task.vertexCount);
-    for (size_t i = 0; i < task.vertexCount; ++i)
-    {
-        computedNormals[i] = glm::vec3(packedNormals[i * 3], packedNormals[i * 3 + 1], packedNormals[i * 3 + 2]);
-    }
-
-    // Readback shading data from GPU
-    std::vector<glm::vec4> shadingData;
-    if (task.shadingBuffer.IsValid())
-    {
-        task.shadingBuffer.Download(shadingData);
-    }
-    else
-    {
-        shadingData.resize(task.vertexCount, glm::vec4(0.0f));
-    }
-
-    // Build mesh on the patch using GPU-computed analytical normals
-    task.request.patch->GenerateMesh(heights, shadingData, computedNormals);
-
-    // Move to completed results
     _completed.push_back({task.request.targetNode, task.request.type, std::move(task.request.patch)});
 }
 

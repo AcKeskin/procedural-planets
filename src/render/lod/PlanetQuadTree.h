@@ -2,6 +2,7 @@
 
 #include "QuadTreeNode.h"
 #include "SpherePatch.h"
+#include "SharedPatchTopology.h"
 #include "PatchPool.h"
 #include "../GenerationScheduler.h"
 #include "../settings/TerrainSettings.h"
@@ -79,6 +80,7 @@ private:
     std::vector<std::unique_ptr<QuadTreeNode>> _roots;
     QuadTreeConfig _config;
     PatchPool _patchPool;
+    SharedPatchTopology _topology; // shared grid+skirt indices for every patch at meshResolution
 
     GenerationScheduler* _scheduler = nullptr;
     uint32_t _seed = 0;

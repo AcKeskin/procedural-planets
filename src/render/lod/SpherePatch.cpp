@@ -1,12 +1,12 @@
 #include "SpherePatch.h"
+#include "PatchBindings.h"
+#include "SharedPatchTopology.h"
+#include "../Shader.h"
 #include <cmath>
 #include <algorithm>
 
 namespace planets::render::lod
 {
-
-using planets::render::MeshData;
-using planets::render::Vertex;
 
 bool AABB::Contains(const glm::vec3& point) const
 {
@@ -121,110 +121,32 @@ void SpherePatch::GenerateGridVertices(int resolution, std::vector<glm::vec3>& v
     }
 }
 
-void SpherePatch::GenerateGridIndices(int resolution, std::vector<uint32_t>& indices)
+void SpherePatch::AdoptBuffers(GpuBuffer<float>&& positionBuffer,
+                              GpuBuffer<float>&& heightBuffer,
+                              GpuBuffer<float>&& normalBuffer,
+                              GpuBuffer<glm::vec4>&& shadingBuffer)
 {
-    indices.clear();
-    indices.reserve((resolution - 1) * (resolution - 1) * 6);
+    _positionBuffer = std::move(positionBuffer);
+    _heightBuffer = std::move(heightBuffer);
+    _normalBuffer = std::move(normalBuffer);
+    _shadingBuffer = std::move(shadingBuffer);
 
-    for (int j = 0; j < resolution - 1; ++j)
-    {
-        for (int i = 0; i < resolution - 1; ++i)
-        {
-            uint32_t topLeft = j * resolution + i;
-            uint32_t topRight = topLeft + 1;
-            uint32_t bottomLeft = (j + 1) * resolution + i;
-            uint32_t bottomRight = bottomLeft + 1;
-
-            // First triangle
-            indices.push_back(topLeft);
-            indices.push_back(bottomLeft);
-            indices.push_back(topRight);
-
-            // Second triangle
-            indices.push_back(topRight);
-            indices.push_back(bottomLeft);
-            indices.push_back(bottomRight);
-        }
-    }
-}
-
-void SpherePatch::GenerateMesh(const std::vector<float>& heights,
-                               const std::vector<glm::vec4>& shadingData,
-                               const std::vector<glm::vec3>& computedNormals)
-{
-    // Apply heights and scale to planet radius
-    MeshData meshData;
-    meshData.vertices.resize(_vertices.size());
-
-    bool hasComputedNormals = computedNormals.size() == _vertices.size();
-
-    // Geomorph target height per vertex: the height the patch would have at HALF resolution
-    // (its parent LOD). Odd grid rows/cols sit between coarse samples, so their morph height is
-    // the average of the even neighbours that survive decimation. Even/even points are unchanged.
-    auto heightAt = [&](int i, int j) -> float {
-        size_t idx = static_cast<size_t>(j) * _resolution + i;
-        return idx < heights.size() ? heights[idx] : 1.0f;
-    };
-    auto morphHeightAt = [&](int i, int j) -> float {
-        bool oddI = (i & 1) != 0;
-        bool oddJ = (j & 1) != 0;
-        int i0 = i - (oddI ? 1 : 0), i1 = i + (oddI ? 1 : 0);
-        int j0 = j - (oddJ ? 1 : 0), j1 = j + (oddJ ? 1 : 0);
-        // i0/j0 need no low clamp: an odd index is >= 1, so i-1 >= 0 always. Only the high side
-        // can overrun when an odd index sits on the last row/col.
-        i1 = std::min(i1, _resolution - 1);
-        j1 = std::min(j1, _resolution - 1);
-        if (oddI && oddJ) // diagonal: average the four even corners
-            return 0.25f * (heightAt(i0, j0) + heightAt(i1, j0) + heightAt(i0, j1) + heightAt(i1, j1));
-        if (oddI)
-            return 0.5f * (heightAt(i0, j) + heightAt(i1, j));
-        if (oddJ)
-            return 0.5f * (heightAt(i, j0) + heightAt(i, j1));
-        return heightAt(i, j);
-    };
-
-    for (size_t i = 0; i < _vertices.size(); ++i)
-    {
-        float h = (i < heights.size()) ? heights[i] : 1.0f;
-        glm::vec3 pos = _vertices[i] * _planetRadius * h;
-
-        int gx = static_cast<int>(i % _resolution);
-        int gy = static_cast<int>(i / _resolution);
-        float morphH = morphHeightAt(gx, gy);
-        glm::vec3 morphPos = _vertices[i] * _planetRadius * morphH;
-
-        meshData.vertices[i].position = pos;
-        meshData.vertices[i].normal = hasComputedNormals ? computedNormals[i] : glm::vec3(0.0f);
-        meshData.vertices[i].uv = glm::vec2(h, 0.0f); // Store height in UV.x for shader access
-        meshData.vertices[i].shadingData = (i < shadingData.size()) ? shadingData[i] : glm::vec4(0.0f);
-        meshData.vertices[i].morphPosition = morphPos;
-    }
-
-    // Generate indices
-    GenerateGridIndices(_resolution, meshData.indices);
-
-    // Only fall back to geometric normals if analytical normals were not provided
-    if (!hasComputedNormals)
-    {
-        meshData.RecalculateNormals();
-    }
-
-    // Append skirt geometry to hide cracks between LOD levels
-    AppendSkirtGeometry(meshData, heights, shadingData);
-
-    // Update bounding box
+    // Conservative culling AABB from the unit-sphere grid extents scaled by radius, widened by a
+    // height margin. Height is a multiplier ~1.0 (ocean depth below, peaks a few % above); the
+    // margin over-covers so a displaced vertex never escapes the box. Over-large is safe for
+    // culling — it can only draw an off-screen patch, never wrongly cull a visible one.
+    constexpr float kHeightMargin = 0.2f;
+    const float lo = _planetRadius * (1.0f - kHeightMargin);
+    const float hi = _planetRadius * (1.0f + kHeightMargin);
     _boundingBox.min = glm::vec3(std::numeric_limits<float>::max());
     _boundingBox.max = glm::vec3(std::numeric_limits<float>::lowest());
-
-    for (const auto& vert : meshData.vertices)
+    for (const glm::vec3& unit : _vertices)
     {
-        _boundingBox.min = glm::min(_boundingBox.min, vert.position);
-        _boundingBox.max = glm::max(_boundingBox.max, vert.position);
+        _boundingBox.min = glm::min(_boundingBox.min, glm::min(unit * lo, unit * hi));
+        _boundingBox.max = glm::max(_boundingBox.max, glm::max(unit * lo, unit * hi));
     }
 
-    // Upload mesh
-    _mesh.Upload(meshData);
-    _generated = true;
+    _drawable = true;
 }
 
 bool SpherePatch::IsVisible(const Frustum& frustum) const
@@ -232,98 +154,23 @@ bool SpherePatch::IsVisible(const Frustum& frustum) const
     return frustum.Intersects(_boundingBox);
 }
 
-void SpherePatch::Render() const
+void SpherePatch::Render(const Shader& shader, const SharedPatchTopology& topology) const
 {
-    if (_generated)
-    {
-        _mesh.Draw();
-    }
-}
+    if (!_drawable)
+        return;
 
-void SpherePatch::AppendSkirtGeometry(MeshData& meshData,
-                                      const std::vector<float>& heights,
-                                      const std::vector<glm::vec4>& shadingData)
-{
-    // Skirt depth proportional to patch angular size
+    _positionBuffer.Bind(kPatchPositionBinding);
+    _heightBuffer.Bind(kPatchHeightBinding);
+    _normalBuffer.Bind(kPatchNormalBinding);
+    _shadingBuffer.Bind(kPatchShadingBinding);
+
+    // Skirt depth matches the old CPU AppendSkirtGeometry: fraction of patch arc length × radius.
     const float skirtDepth = _skirtFraction * _angularSize * _planetRadius;
-    const int res = _resolution;
-    const uint32_t baseVertexCount = static_cast<uint32_t>(meshData.vertices.size());
+    shader.SetInt("uResolution", _resolution);
+    shader.SetFloat("uPlanetRadius", _planetRadius);
+    shader.SetFloat("uSkirtDepth", skirtDepth);
 
-    // Helper to add skirt edge
-    auto AddSkirtEdge = [&](const std::vector<uint32_t>& edgeIndices)
-    {
-        const uint32_t skirtStartIndex = static_cast<uint32_t>(meshData.vertices.size());
-
-        // Create skirt vertices by duplicating edge vertices and pushing them toward planet center
-        for (uint32_t edgeIdx : edgeIndices)
-        {
-            const Vertex& originalVert = meshData.vertices[edgeIdx];
-            Vertex skirtVert = originalVert;
-
-            // Offset toward planet center
-            glm::vec3 radialDir = glm::normalize(originalVert.position);
-            skirtVert.position = originalVert.position - radialDir * skirtDepth;
-            // Morph target offset the same way so skirts collapse with the surface, not independently
-            glm::vec3 morphRadial = glm::normalize(originalVert.morphPosition);
-            skirtVert.morphPosition = originalVert.morphPosition - morphRadial * skirtDepth;
-
-            meshData.vertices.push_back(skirtVert);
-        }
-
-        // Create triangles connecting edge to skirt
-        for (size_t i = 0; i < edgeIndices.size() - 1; ++i)
-        {
-            uint32_t edge0 = edgeIndices[i];
-            uint32_t edge1 = edgeIndices[i + 1];
-            uint32_t skirt0 = skirtStartIndex + static_cast<uint32_t>(i);
-            uint32_t skirt1 = skirt0 + 1;
-
-            // Two triangles per quad segment
-            meshData.indices.push_back(edge0);
-            meshData.indices.push_back(skirt0);
-            meshData.indices.push_back(edge1);
-
-            meshData.indices.push_back(edge1);
-            meshData.indices.push_back(skirt0);
-            meshData.indices.push_back(skirt1);
-        }
-    };
-
-    // Bottom edge: row 0
-    std::vector<uint32_t> bottomEdge;
-    bottomEdge.reserve(res);
-    for (int i = 0; i < res; ++i)
-    {
-        bottomEdge.push_back(i);
-    }
-    AddSkirtEdge(bottomEdge);
-
-    // Top edge: row (res-1)
-    std::vector<uint32_t> topEdge;
-    topEdge.reserve(res);
-    for (int i = 0; i < res; ++i)
-    {
-        topEdge.push_back((res - 1) * res + i);
-    }
-    AddSkirtEdge(topEdge);
-
-    // Left edge: column 0
-    std::vector<uint32_t> leftEdge;
-    leftEdge.reserve(res);
-    for (int j = 0; j < res; ++j)
-    {
-        leftEdge.push_back(j * res);
-    }
-    AddSkirtEdge(leftEdge);
-
-    // Right edge: column (res-1)
-    std::vector<uint32_t> rightEdge;
-    rightEdge.reserve(res);
-    for (int j = 0; j < res; ++j)
-    {
-        rightEdge.push_back(j * res + (res - 1));
-    }
-    AddSkirtEdge(rightEdge);
+    topology.Draw();
 }
 
 } // namespace planets::render::lod

@@ -73,6 +73,9 @@ void PlanetQuadTree::Initialize(const QuadTreeConfig& config, GenerationSchedule
     _pendingNodes.clear();
     _roots.clear();
 
+    // All patches share one grid+skirt topology at meshResolution; only the SSBO bindings vary.
+    _topology.Build(_config.meshResolution);
+
     BuildRootNodes(_config.baseSubdivisions);
 
     std::cout << "[PlanetQuadTree] Created " << _roots.size() << " root nodes" << std::endl;
@@ -317,7 +320,7 @@ void PlanetQuadTree::Render(const Shader& shader) const
             float morph = (std::max)(distanceMorph, node->GetMorphIn());
             shader.SetFloat("uMorphFactor", morph);
 
-            patch->Render();
+            patch->Render(shader, _topology);
             ++visibleCount;
         }
     }
