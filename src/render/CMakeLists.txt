@@ -22,6 +22,7 @@ add_library(render STATIC
     lod/QuadTreeNode.cpp
     lod/PlanetQuadTree.cpp
     lod/PatchPool.cpp
+    lod/SharedPatchTopology.cpp
     effects/OceanRenderer.cpp
     effects/AtmosphereRenderer.cpp
     cinematic/CinematicController.cpp
