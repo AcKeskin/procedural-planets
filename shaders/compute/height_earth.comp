@@ -408,9 +408,11 @@ float evaluateHeight(vec3 dir)
             float continentalness = maskSample.r;   // [0,1]: 1=craton, 0=ocean
             float accretionAge    = maskSample.g;   // [0,1]: 0=core, 1=margin
 
-            // Threshold with smooth gradient: >0.5 = continental
-            float maskThreshold = 0.5;
-            float continentFactor = smoothstep(maskThreshold - 0.2, maskThreshold + 0.2, continentalness);
+            // Threshold with smooth gradient: land where continentalness exceeds it. Lowered from
+            // 0.5 to 0.4 to lift land coverage toward Earth-like (~30%) and widen coastal shelves so
+            // coasts read as gradients rather than hard-pasted edges.
+            float maskThreshold = 0.4;
+            float continentFactor = smoothstep(maskThreshold - 0.22, maskThreshold + 0.22, continentalness);
 
             float nearBaseElev = mix(-0.5, 0.5, continentFactor);
             float interiorNoise = fbm(dir, continentOffset, continentLayers, contScale,

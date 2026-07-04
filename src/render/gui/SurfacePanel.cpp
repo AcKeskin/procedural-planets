@@ -140,7 +140,6 @@ void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& sea
         ImGui::Separator();
         ImGui::Text("Reflection");
         ImGui::SliderFloat("Fresnel Power", &settings.fresnelPower, 1.5f, 3.5f);
-        ImGui::SliderFloat("Smoothness", &settings.smoothness, 0.5f, 0.99f, "%.2f");
 
         ImGui::Separator();
         ImGui::Text("Waves");

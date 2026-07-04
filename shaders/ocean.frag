@@ -13,7 +13,6 @@ uniform vec3 uDeepColor;
 uniform vec3 uShallowColor;
 uniform float uFresnelPower;
 uniform float uDepthMultiplier;
-uniform float uSmoothness;
 uniform float uWaveStrength;
 uniform float uWaveScale;
 uniform float uWaveSpeed;
@@ -69,17 +68,21 @@ void main()
     float diffuse = max(dot(sphereNormal, lightDir), 0.0);
     oceanColor *= uAmbientLight + diffuse * uSunIntensity;
 
-    // Sun-tinted specular glint (wave normal for shimmer). Sun-of-record color, gated by day so it
-    // only glints on the lit side.
+    // Sun glitter. A single tight specular lobe over a near-mirror surface collapses to a hard
+    // vertical band (the reflection locus is a thin great circle). Real sea glitter is a BROAD soft
+    // patch — countless wave facets scatter the sun over a range of angles. Model that as a wide
+    // Blinn-Phong lobe (the patch) plus a smaller sharp lobe (individual glints), both over the wave
+    // normal so they shimmer.
     vec3 halfVec = normalize(viewDir + lightDir);
-    float specularAngle = acos(max(dot(halfVec, waveNormal), 0.0));
-    float specularExponent = specularAngle / max(1.0 - uSmoothness, 0.01);
-    float specularHighlight = exp(-specularExponent * specularExponent);
+    float ndh = max(dot(waveNormal, halfVec), 0.0);
+    float glitterPatch = pow(ndh, 60.0);    // broad soft sun-glitter region
+    float glitterSharp = pow(ndh, 900.0);   // tight sparkle within it
+    float glint = glitterPatch * 0.5 + glitterSharp * 0.5;
 
     // Grazing angles pick up a cool sky reflection, not just a brighten.
     vec3 skyTint = vec3(0.15, 0.28, 0.42);
     oceanColor = mix(oceanColor, oceanColor + skyTint, fresnel * 0.6);
-    oceanColor += uSunColor * (specularHighlight * diffuse) * 1.2;
+    oceanColor += uSunColor * glint * diffuse * 0.9;
 
     // Shoreline foam: a bright surf band in the shallowest water (near the coastline), animated,
     // fading out into open water. Keyed on the real bathymetry so it follows the actual coast.
