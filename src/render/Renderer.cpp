@@ -73,7 +73,7 @@ bool Renderer::SetActiveBody(
     _scheduler.Initialize(body, seed);
 
     _quadTree.Initialize(quadTreeConfig, _scheduler, seed);
-    _oceanRenderer.Initialize(quadTreeConfig.planetRadius, seaLevel, OceanSubdivisions);
+    _oceanRenderer.Initialize(quadTreeConfig.planetRadius, seaLevel, OceanSubdivisions, body, seed);
     _atmosphereRenderer.Initialize();
     return true;
 }
@@ -102,7 +102,15 @@ void Renderer::DrawScene(const RenderContext& ctx)
 
     if (ctx.body && ctx.seaLevel > 0.0f && ctx.ocean && ctx.scene)
     {
-        _oceanRenderer.Render(ctx.view, ctx.projection, ctx.cameraPos, ctx.scene->lightDir, ctx.time, *ctx.ocean);
+        _oceanRenderer.Render(ctx.view,
+                              ctx.projection,
+                              ctx.cameraPos,
+                              ctx.scene->lightDir,
+                              ctx.scene->sunColor,
+                              ctx.scene->lighting.sunIntensity,
+                              ctx.scene->lighting.ambientLight,
+                              ctx.time,
+                              *ctx.ocean);
     }
 
     _sceneFbo.Unbind();

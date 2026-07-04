@@ -9,8 +9,8 @@ namespace planets::render::effects
 struct OceanSettings
 {
     bool enabled = true;
-    glm::vec3 deepColor = glm::vec3(0.01f, 0.03f, 0.1f);
-    glm::vec3 shallowColor = glm::vec3(0.1f, 0.4f, 0.6f);
+    glm::vec3 deepColor = glm::vec3(0.02f, 0.09f, 0.22f);
+    glm::vec3 shallowColor = glm::vec3(0.08f, 0.42f, 0.55f);
     float fresnelPower = 2.0f;
     float depthMultiplier = 10.0f;
     float alphaMultiplier = 70.0f;
