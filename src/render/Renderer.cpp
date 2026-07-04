@@ -246,11 +246,19 @@ void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
     }
     else
     {
+        // Present the scene FBO directly. Depth test must be OFF here: the default framebuffer's
+        // depth was cleared to 0 under reversed-Z GL_GREATER, so a depth-tested fullscreen quad
+        // fails and nothing draws (the atmosphere pass disables depth for the same reason — without
+        // this the whole scene blanks to the clear colour when the atmosphere is disabled).
+        glDisable(GL_DEPTH_TEST);
+        glDepthMask(GL_FALSE);
         _passthroughShader.Use();
         _passthroughShader.SetInt("uSceneTexture", 0);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, _sceneFbo.GetColorTexture());
         _postProcessor.RenderQuad();
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_TRUE);
     }
 }
 
