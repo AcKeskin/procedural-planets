@@ -80,6 +80,10 @@ void ScenePanel::DrawLightingContent(LightingSettings& settings)
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Width of the soft day/night twilight band (0 = hard edge)");
 
+    ImGui::SliderFloat("Night Lights", &settings.nightLightStrength, 0.0f, 2.0f, "%.2f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Emissive city lights on the habitable night side (0 = off)");
+
     ImGui::Separator();
     ImGui::Text("Specular");
 

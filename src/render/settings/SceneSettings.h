@@ -16,6 +16,11 @@ struct LightingSettings
     // Celestial lighting: soft terminator band half-width (0 = hard edge)
     float terminatorSoftness = 0.08f;
 
+    // Emissive city lights on the habitable night side (0 = off). Default off: they read well on the
+    // truly dark hemisphere but the ambient-lit night terrain makes them show on dim land at some
+    // framings, so it's opt-in via the Scene panel until the night side reads darker.
+    float nightLightStrength = 0.0f;
+
     // Distance in planet radii where detail noise begins fading
     float detailFadeStart = 2.0f;
 

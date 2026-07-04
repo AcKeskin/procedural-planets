@@ -22,6 +22,7 @@ out vec4 FragColor;
 uniform vec3  uLightDir;
 uniform vec3  uSunColor;          // warms the key light; reddens through the dusk band
 uniform float uTerminatorSoftness; // half-width of the soft day/night band (0 = hard edge)
+uniform float uNightLightStrength; // emissive city lights on the night side (0 = off)
 uniform vec3  uCameraPos;
 uniform float uSeaLevel;
 uniform vec2  uHeightMinMax;
@@ -242,6 +243,16 @@ void main()
                          uPlanetScale, uFresnelStrengthNear, uFresnelStrengthFar, uFresnelPow);
     color = applyHaze(color, uHazeColor, N, lightDir,
                       camDist, uPlanetScale, uHazeStrength, uAmbientLight, uSunIntensity);
+
+    // Night-side city lights on habitable land: temperate, moist-enough, low-elevation ground
+    // (where settlements sit), never snow/desert/mountain. Land-only here by construction (ocean
+    // returned early). Warm sodium-lamp color, hard-gated to the night side inside nightLights().
+    float habitability = uNightLightStrength
+                       * smoothstep(0.35, 0.6, temperature) * (1.0 - smoothstep(0.75, 0.95, temperature))
+                       * smoothstep(0.2, 0.5, moisture)
+                       * (1.0 - smoothstep(0.3, 0.6, h))   // low elevation
+                       * (1.0 - snowW);
+    color += nightLights(normalize(vWorldPos), day, habitability, vec3(1.0, 0.8, 0.45));
 
     // Reinhard roll-off so highlights don't clip, then a mild gamma lift to keep midtones from
     // going muddy. No specular boost (the earlier *1.6 was lifting grazing specular into sheen).

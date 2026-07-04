@@ -160,6 +160,7 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
         _planetShader.SetVec3("uLightDir", ctx.scene->lightDir);
         _planetShader.SetVec3("uSunColor", ctx.scene->sunColor);
         _planetShader.SetFloat("uTerminatorSoftness", ctx.scene->lighting.terminatorSoftness);
+        _planetShader.SetFloat("uNightLightStrength", ctx.scene->lighting.nightLightStrength);
         _planetShader.SetFloat("uSunIntensity", ctx.scene->lighting.sunIntensity);
         _planetShader.SetFloat("uAmbientLight", ctx.scene->lighting.ambientLight);
         _planetShader.SetFloat("uSpecularStrength", ctx.scene->lighting.specularStrength);
