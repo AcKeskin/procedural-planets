@@ -6,6 +6,7 @@
 #include "../../render/settings/TerrainSettings.h"
 #include "../../render/settings/OceanSettings.h"
 #include "../../render/settings/AtmosphereSettings.h"
+#include "../../render/settings/CloudSettings.h"
 
 #include <planetgen/planetgen.hpp>
 
@@ -28,6 +29,7 @@ struct ParamTargets
     render::SceneSettings* scene = nullptr;
     render::effects::OceanSettings* ocean = nullptr;
     render::effects::AtmosphereSettings* atmosphere = nullptr;
+    render::effects::CloudSettings* clouds = nullptr;
     render::LodConfig* lod = nullptr;
     render::GenerationConfig* gen = nullptr;
     float* seaLevel = nullptr;

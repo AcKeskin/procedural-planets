@@ -160,6 +160,16 @@ const std::unordered_map<std::string, Entry>& Table()
         {"atmosphere.ditherStrength", {false, SET_FLOAT(t.atmosphere->ditherStrength)}},
         {"atmosphere.ditherScale", {false, SET_FLOAT(t.atmosphere->ditherScale)}},
 
+        // ---- clouds (real-time) ----
+        {"clouds.enabled", {false, SET_BOOL(t.clouds->enabled)}},
+        {"clouds.altitude", {false, SET_FLOAT(t.clouds->altitude)}},
+        {"clouds.coverage", {false, SET_FLOAT(t.clouds->coverage)}},
+        {"clouds.density", {false, SET_FLOAT(t.clouds->density)}},
+        {"clouds.speed", {false, SET_FLOAT(t.clouds->speed)}},
+        {"clouds.scale", {false, SET_FLOAT(t.clouds->scale)}},
+        {"clouds.color", {false, SET_VEC3(t.clouds->color)}},
+        {"clouds.shadowStrength", {false, SET_FLOAT(t.clouds->shadowStrength)}},
+
         // ---- sea level (real-time) ----
         {"seaLevel", {false, [](const ParamTargets& t, const ParamValue& v) -> bool {
                           if (!t.seaLevel) return false;
