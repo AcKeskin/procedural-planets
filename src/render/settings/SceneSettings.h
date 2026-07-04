@@ -13,6 +13,9 @@ struct LightingSettings
     float specularStrength = 0.0f;
     float specularPower = 32.0f;
 
+    // Celestial lighting: soft terminator band half-width (0 = hard edge)
+    float terminatorSoftness = 0.08f;
+
     // Distance in planet radii where detail noise begins fading
     float detailFadeStart = 2.0f;
 

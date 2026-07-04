@@ -15,6 +15,26 @@ float calcDiffuse(vec3 normal, vec3 lightDir)
     return max(dot(normal, lightDir), 0.0);
 }
 
+// Soft day/night factor across the terminator. 1 = full day, 0 = full night, with a graded band
+// around N·L = 0 instead of a hard clamp. Use the SPHERE normal (not the terrain normal) so the
+// terminator follows the planet's curve, not local slope. `softness` is the half-width of the band.
+float dayFactor(vec3 sphereNormal, vec3 lightDir, float softness)
+{
+    float ndl = dot(sphereNormal, lightDir);
+    return smoothstep(-softness, softness, ndl);
+}
+
+// Warm the sunlight and redden it through the low-sun dusk band. Returns the effective sun color to
+// multiply into the diffuse term: near-white at high sun, shifting toward warm/red as the sun nears
+// the horizon (day factor drops toward 0), which is what sells the terminator on the surface.
+vec3 duskSunColor(vec3 sunColor, float day)
+{
+    // dusk peaks in the twilight band (day ~0.5) and vanishes at full day/night
+    float dusk = 1.0 - abs(day * 2.0 - 1.0);
+    vec3 duskTint = vec3(1.0, 0.55, 0.30);
+    return mix(sunColor, sunColor * duskTint, dusk * 0.7);
+}
+
 // Blinn-Phong specular term
 float calcSpecular(vec3 normal, vec3 lightDir, vec3 viewDir, float power, float strength)
 {

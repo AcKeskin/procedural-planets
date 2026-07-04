@@ -20,6 +20,8 @@ in vec4 vShadingData; // climate: x=temp, y=moisture, z=detail, w=small
 out vec4 FragColor;
 
 uniform vec3  uLightDir;
+uniform vec3  uSunColor;          // warms the key light; reddens through the dusk band
+uniform float uTerminatorSoftness; // half-width of the soft day/night band (0 = hard edge)
 uniform vec3  uCameraPos;
 uniform float uSeaLevel;
 uniform vec2  uHeightMinMax;
@@ -225,8 +227,14 @@ void main()
     float matte = max(rockW, snowW);
     float roughness = clamp(mat.roughness, mix(0.85, 0.4, matte), 1.0);
     float ao = calcSphericalAO(N, sphereNormal, uAOStrength);
-    vec3 lit = cookTorrance(mat.albedo, 0.0, roughness,
-                            N, viewDir, lightDir, vec3(uSunIntensity));
+
+    // Celestial lighting: warm/dusk-reddened key light. Cook-Torrance's own max(N·L,0) already
+    // falls the direct light off across the terminator, so we DON'T re-multiply by a day factor
+    // (that double-darkened low-sun-angle daylit regions). The `day` value is used only for the
+    // dusk color shift and for gating night lights — not for attenuating the diffuse.
+    float day = dayFactor(sphereNormal, lightDir, uTerminatorSoftness);
+    vec3 sunRadiance = duskSunColor(uSunColor, day) * uSunIntensity;
+    vec3 lit = cookTorrance(mat.albedo, 0.0, roughness, N, viewDir, lightDir, sunRadiance);
     vec3 ambient = mat.albedo * uAmbientLight * ao;
     vec3 color = lit + ambient;
 
