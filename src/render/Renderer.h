@@ -70,6 +70,12 @@ public:
     // Capture/cinematic reads the composited scene from here.
     Framebuffer& SceneFramebuffer() { return _sceneFbo; }
 
+    // The size the scene is actually drawn + presented at. A capture must read pixels at
+    // THIS size (not the window size, which can change between a draw and the readback in
+    // live mode), or glReadPixels reads a region the backbuffer was never filled to.
+    int FramebufferWidth() const { return _fbWidth; }
+    int FramebufferHeight() const { return _fbHeight; }
+
     GenerationScheduler& Scheduler() { return _scheduler; }
     lod::PlanetQuadTree& QuadTree() { return _quadTree; }
 

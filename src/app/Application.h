@@ -30,6 +30,11 @@
 namespace planets::app
 {
 
+namespace instrument
+{
+class ScriptRunner;
+}
+
 namespace AppDefaults
 {
 inline constexpr float SeaLevel = 0.995f;
@@ -77,6 +82,16 @@ public:
     // (new random world) every request.holdFrames frames, across request.planets worlds.
     bool RunGenerationShowcase(const CaptureRequest& request);
 
+    // Command-driven instrument: boot, then execute a JSON command timeline (camera, live
+    // params, frame bursts) deterministically at a fixed dt. The drivable instrument mode.
+    bool RunScript(const CaptureRequest& request);
+
+    // Live instrument: boot a visible window and a localhost command server, then run an
+    // interactive loop that applies commands as they arrive (one JSON command per line) and
+    // renders continuously. Captures-on-demand reply with the written PNG path. Runs until
+    // the window closes.
+    bool RunLive(const CaptureRequest& request);
+
     // Apply CLI overrides before window/scene creation (size, vsync, seed, camera).
     void ApplyCaptureOverrides(const CaptureRequest& request);
 
@@ -89,6 +104,10 @@ private:
     void ShuffleTerrain();
     void StartCinematic();
     void StopCinematic();
+
+    // Resize the renderer's framebuffer to the current window size if they differ (cheap
+    // no-op when unchanged). Must run before any render that may be captured in live mode.
+    void SyncFramebufferToWindow();
 
     // Render frames until the LOD scheduler has no pending/in-flight work, so a capture
     // never shoots a half-generated patch. minFrames forces a settle floor; maxFrames caps
@@ -104,6 +123,9 @@ private:
 
     // Load a BodyConfig from data/bodies/<name>.json and switch to it
     void SwitchBody(planetgen::BodyConfig config);
+
+    // Load a BodyConfig from a path (file-scoped helper made reachable for the runner).
+    planetgen::BodyConfig LoadBodyConfigPublic(const std::string& path);
 
     // Build QuadTreeConfig from current LodConfig
     render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
@@ -166,6 +188,11 @@ private:
     // Headless capture overrides (applied in Initialize when .enabled). Default = interactive.
     CaptureRequest _capture;
     bool _headlessCaptureRequested = false;
+
+    // The instrument runner is an extension of the headless modes; it mutates the private
+    // settings members + drives Render/Drain/Regenerate directly rather than widening the
+    // public surface for every tunable.
+    friend class instrument::ScriptRunner;
 };
 
 } // namespace planets::app
