@@ -13,7 +13,6 @@ uniform vec3 uDeepColor;
 uniform vec3 uShallowColor;
 uniform float uFresnelPower;
 uniform float uDepthMultiplier;
-uniform float uAlphaMultiplier;
 uniform float uSmoothness;
 uniform float uWaveStrength;
 uniform float uWaveScale;

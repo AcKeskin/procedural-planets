@@ -227,7 +227,6 @@ void OceanRenderer::Render(const glm::mat4& view,
     _oceanShader.SetVec3("uShallowColor", settings.shallowColor);
     _oceanShader.SetFloat("uFresnelPower", settings.fresnelPower);
     _oceanShader.SetFloat("uDepthMultiplier", settings.depthMultiplier);
-    _oceanShader.SetFloat("uAlphaMultiplier", settings.alphaMultiplier);
     _oceanShader.SetFloat("uSmoothness", settings.smoothness);
     _oceanShader.SetFloat("uWaveStrength", settings.waveStrength);
     _oceanShader.SetFloat("uWaveScale", settings.waveScale);

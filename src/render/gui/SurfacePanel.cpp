@@ -136,9 +136,6 @@ void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& sea
         ImGui::SliderFloat("Depth Multiplier", &settings.depthMultiplier, 1.0f, 30.0f);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Controls shallow-to-deep color transition");
-        ImGui::SliderFloat("Alpha Multiplier", &settings.alphaMultiplier, 10.0f, 100.0f);
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Controls transparency based on depth");
 
         ImGui::Separator();
         ImGui::Text("Reflection");
