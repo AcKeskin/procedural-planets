@@ -157,7 +157,12 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
         _planetShader.SetFloat("uSpecularStrength", ctx.scene->lighting.specularStrength);
         _planetShader.SetFloat("uSpecularPower", ctx.scene->lighting.specularPower);
         _planetShader.SetFloat("uDetailFadeStart", ctx.scene->lighting.detailFadeStart);
-        _planetShader.SetFloat("uHazeStrength", ctx.scene->lighting.hazeStrength);
+
+        // One distance fade only: when the atmosphere pass is on it owns aerial perspective, so the
+        // surface haze defers (strength 0) rather than doubling up with the post-process in-scatter.
+        // The surface haze stays available as the sole fade when the atmosphere is disabled.
+        const bool atmosphereOwnsHaze = ctx.atmosphere && ctx.atmosphere->enabled;
+        _planetShader.SetFloat("uHazeStrength", atmosphereOwnsHaze ? 0.0f : ctx.scene->lighting.hazeStrength);
         _planetShader.SetVec3("uHazeColor", ctx.scene->lighting.hazeColor);
     }
 
@@ -194,6 +199,8 @@ void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
                                    invProjection,
                                    ctx.cameraPos,
                                    ctx.scene->lightDir,
+                                   ctx.scene->sunColor,
+                                   ctx.scene->lighting.terminatorSoftness,
                                    glm::vec3(0.0f),
                                    ctx.planetRadius,
                                    oceanRadius,

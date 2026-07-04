@@ -9,6 +9,10 @@ const float FRESNEL_RIM_INTENSITY = 0.3;
 const float AO_MIN_FACTOR = 0.3;
 const float HAZE_DISTANCE_RANGE = 4.0;
 
+// Warm twilight tint shared by the surface sun (duskSunColor) and the atmosphere sky dusk, so the
+// two redden to the same color at the terminator.
+const vec3 DUSK_TINT = vec3(1.0, 0.55, 0.30);
+
 // Blinn-Phong diffuse term
 float calcDiffuse(vec3 normal, vec3 lightDir)
 {
@@ -31,8 +35,7 @@ vec3 duskSunColor(vec3 sunColor, float day)
 {
     // dusk peaks in the twilight band (day ~0.5) and vanishes at full day/night
     float dusk = 1.0 - abs(day * 2.0 - 1.0);
-    vec3 duskTint = vec3(1.0, 0.55, 0.30);
-    return mix(sunColor, sunColor * duskTint, dusk * 0.7);
+    return mix(sunColor, sunColor * DUSK_TINT, dusk * 0.7);
 }
 
 // Blinn-Phong specular term

@@ -1,5 +1,9 @@
 #version 450 core
 
+// lighting.glsl → dayFactor + DUSK_TINT: the sky dusk band reuses the exact curve and warm tint the
+// surface shader applies, so the terminator's sky reddening meets the ground twilight band with no split.
+#include "lighting.glsl"
+
 in vec2 vUv;
 
 out vec4 outColor;
@@ -16,6 +20,8 @@ uniform mat4 uInvProjection;
 uniform vec3 uCameraPos;
 
 uniform vec3 uLightDir;
+uniform vec3 uSunColor;           // the sun-of-record's color; tints in-scatter and its dusk band
+uniform float uTerminatorSoftness; // matches the surface terminator so sky/ground dusk align
 
 uniform vec3 uPlanetCenter;
 uniform float uPlanetRadius;
@@ -119,14 +125,31 @@ vec3 calculateLight(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 originalC
     }
 
     inScatteredLight *= uScatteringCoefficients * uIntensity * stepSize;
+
+    // Warm the sky through the twilight band. Rayleigh in-scatter is intrinsically blue, so a
+    // multiplicative warm tint only desaturates it — instead shift the in-scatter's HUE toward a
+    // warm dusk color in the band, preserving its brightness. The band is keyed on the sun's
+    // elevation over the local horizon at the ray's atmosphere entry, using the SAME day curve the
+    // surface shader uses (lighting.glsl dayFactor), so sky dusk meets ground dusk at the terminator
+    // with no seam. DUSK_TINT is the warm tint shared with the surface's duskSunColor.
+    vec3 localUp = normalize(rayOrigin - uPlanetCenter);
+    float skyDay = dayFactor(localUp, uLightDir, uTerminatorSoftness);
+    float dusk = 1.0 - abs(skyDay * 2.0 - 1.0);
+    float inScatterLuma = dot(inScatteredLight, vec3(0.299, 0.587, 0.114));
+    inScatteredLight = mix(inScatteredLight, inScatterLuma * DUSK_TINT * 2.0, dusk * 0.6);
+    inScatteredLight *= uSunColor;
+
     inScatteredLight += blueNoise * 0.01;
 
     // Scalar attenuation avoids per-wavelength color shift (rainbow fringe)
     float avgCoeff = dot(uScatteringCoefficients, vec3(0.333));
     float weightedOpticalDepth = viewRayOpticalDepth.x * avgCoeff;
 
+    // Surface out-scatter: how much the atmosphere dims the surface behind it. Kept gentle so the
+    // continents/ocean read through from orbit instead of being washed to a flat teal veil — the
+    // long view path across the disc interior otherwise erases the surface entirely.
     const float brightnessAdaptionStrength = 0.15;
-    const float reflectedLightOutScatterStrength = 3.0;
+    const float reflectedLightOutScatterStrength = 1.0;
     float brightnessAdaption = dot(inScatteredLight, vec3(1.0)) * brightnessAdaptionStrength;
     float brightnessSum = weightedOpticalDepth * uIntensity * reflectedLightOutScatterStrength + brightnessAdaption;
     float reflectedLightStrength = exp(-brightnessSum);
