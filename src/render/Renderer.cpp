@@ -74,6 +74,7 @@ bool Renderer::SetActiveBody(
 
     _quadTree.Initialize(quadTreeConfig, _scheduler, seed);
     _oceanRenderer.Initialize(quadTreeConfig.planetRadius, seaLevel, OceanSubdivisions, body, seed);
+    _cloudRenderer.Initialize(quadTreeConfig.planetRadius);
     _atmosphereRenderer.Initialize();
     return true;
 }
@@ -111,6 +112,21 @@ void Renderer::DrawScene(const RenderContext& ctx)
                               ctx.scene->lighting.ambientLight,
                               ctx.time,
                               *ctx.ocean);
+    }
+
+    // Clouds draw into the scene (over the surface, before the atmosphere post-process) so the
+    // limb + aerial perspective scatter over the cloud tops.
+    if (ctx.clouds && ctx.scene)
+    {
+        _cloudRenderer.Render(ctx.view,
+                              ctx.projection,
+                              ctx.cameraPos,
+                              ctx.scene->lightDir,
+                              ctx.scene->sunColor,
+                              ctx.scene->lighting.sunIntensity,
+                              ctx.scene->lighting.ambientLight,
+                              ctx.time,
+                              *ctx.clouds);
     }
 
     _sceneFbo.Unbind();
@@ -161,6 +177,16 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
         _planetShader.SetVec3("uSunColor", ctx.scene->sunColor);
         _planetShader.SetFloat("uTerminatorSoftness", ctx.scene->lighting.terminatorSoftness);
         _planetShader.SetFloat("uNightLightStrength", ctx.scene->lighting.nightLightStrength);
+
+        // Cloud shadow params — match the cloud shell's field so the shadow tracks the clouds; zero
+        // strength when clouds are disabled so the surface is unaffected.
+        const bool cloudsOn = ctx.clouds && ctx.clouds->enabled;
+        _planetShader.SetFloat("uCloudScale", ctx.clouds ? ctx.clouds->scale : 1.0f);
+        _planetShader.SetFloat("uCloudCoverage", ctx.clouds ? ctx.clouds->coverage : 0.0f);
+        _planetShader.SetFloat("uCloudSpeed", ctx.clouds ? ctx.clouds->speed : 0.0f);
+        _planetShader.SetFloat("uCloudTime", ctx.time);
+        _planetShader.SetFloat("uCloudAltitude", ctx.clouds ? ctx.clouds->altitude : 0.0f);
+        _planetShader.SetFloat("uCloudShadowStrength", cloudsOn ? ctx.clouds->shadowStrength : 0.0f);
         _planetShader.SetFloat("uSunIntensity", ctx.scene->lighting.sunIntensity);
         _planetShader.SetFloat("uAmbientLight", ctx.scene->lighting.ambientLight);
         _planetShader.SetFloat("uSpecularStrength", ctx.scene->lighting.specularStrength);

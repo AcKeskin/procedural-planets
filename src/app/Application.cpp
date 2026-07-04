@@ -613,6 +613,7 @@ void Application::Render()
     ctx.scene = &_sceneSettings;
     ctx.ocean = &_oceanSettings;
     ctx.atmosphere = &_atmosphereSettings;
+    ctx.clouds = &_cloudSettings;
     ctx.body = _activeBody.get();
     ctx.planetRadius = _lodConfig.planetRadius;
     ctx.seaLevel = _seaLevel;

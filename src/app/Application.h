@@ -15,6 +15,7 @@
 #include "settings/TerrainSettings.h"
 #include "settings/OceanSettings.h"
 #include "settings/AtmosphereSettings.h"
+#include "settings/CloudSettings.h"
 #include "settings/CinematicSettings.h"
 #include "BiomePalette.h"
 #include "BodyRuntime.h"
@@ -150,6 +151,7 @@ private:
     render::TerrainStats _terrainStats;
     render::effects::OceanSettings _oceanSettings;
     render::effects::AtmosphereSettings _atmosphereSettings;
+    render::effects::CloudSettings _cloudSettings;
     float _seaLevel;
 
     // Camera

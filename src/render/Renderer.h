@@ -10,6 +10,8 @@
 #include "lod/PlanetQuadTree.h"
 #include "effects/OceanRenderer.h"
 #include "effects/AtmosphereRenderer.h"
+#include "effects/CloudRenderer.h"
+#include "settings/CloudSettings.h"
 #include "settings/SceneSettings.h"
 #include "settings/OceanSettings.h"
 #include "settings/AtmosphereSettings.h"
@@ -33,6 +35,7 @@ struct RenderContext
     const SceneSettings* scene = nullptr;
     const effects::OceanSettings* ocean = nullptr;
     const effects::AtmosphereSettings* atmosphere = nullptr;
+    const effects::CloudSettings* clouds = nullptr;
 
     const BodyRuntime* body = nullptr; // null when no body loaded; carries shading/AO via Config()
     float planetRadius = 1.0f;
@@ -96,6 +99,7 @@ private:
     lod::PlanetQuadTree _quadTree;
     effects::OceanRenderer _oceanRenderer;
     effects::AtmosphereRenderer _atmosphereRenderer;
+    effects::CloudRenderer _cloudRenderer;
 
     BiomePalette _palette;
     GpuBuffer<BiomeEntry> _paletteBuffer;

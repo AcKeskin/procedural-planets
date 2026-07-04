@@ -8,8 +8,10 @@
 // (uShore*, uFlat*, ...) are simply not declared; SetRenderUniforms' extra sets no-op.
 
 // lighting.glsl → calcFresnel, applyHaze, calcSphericalAO, calcDistanceRadii
+// clouds.glsl → cloudCoverage: soft shadow that matches the cloud shell
 #include "math.glsl"
 #include "lighting.glsl"
+#include "clouds.glsl"
 #include "pbr.glsl"
 
 in vec3 vNormal;
@@ -23,6 +25,15 @@ uniform vec3  uLightDir;
 uniform vec3  uSunColor;          // warms the key light; reddens through the dusk band
 uniform float uTerminatorSoftness; // half-width of the soft day/night band (0 = hard edge)
 uniform float uNightLightStrength; // emissive city lights on the night side (0 = off)
+
+// Cloud shadow: sample the shared coverage field along the sun so shadows track the visible clouds.
+uniform float uCloudScale;
+uniform float uCloudCoverage;
+uniform float uCloudSpeed;
+uniform float uCloudTime;
+uniform float uCloudShadowStrength;
+uniform float uCloudAltitude;
+
 uniform vec3  uCameraPos;
 uniform float uSeaLevel;
 uniform vec2  uHeightMinMax;
@@ -235,6 +246,14 @@ void main()
     // dusk color shift and for gating night lights — not for attenuating the diffuse.
     float day = dayFactor(sphereNormal, lightDir, uTerminatorSoftness);
     vec3 sunRadiance = duskSunColor(uSunColor, day) * uSunIntensity;
+
+    // Soft cloud shadow: sample the shared coverage field where this fragment's sun ray crosses the
+    // cloud shell (surface direction pushed toward the sun), and dim the direct light. Only on the
+    // lit side (× day), gated by uCloudShadowStrength (0 when clouds are off).
+    vec3 shadowDir = normalize(sphereNormal + lightDir * uCloudAltitude * 6.0);
+    float cloudShadow = cloudCoverage(shadowDir, uCloudScale, uCloudCoverage, uCloudSpeed, uCloudTime);
+    sunRadiance *= 1.0 - cloudShadow * uCloudShadowStrength * day;
+
     vec3 lit = cookTorrance(mat.albedo, 0.0, roughness, N, viewDir, lightDir, sunRadiance);
     vec3 ambient = mat.albedo * uAmbientLight * ao;
     vec3 color = lit + ambient;
