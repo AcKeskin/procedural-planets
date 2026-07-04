@@ -36,42 +36,27 @@ float noise(vec3 p)
         f.z);
 }
 
-// Generate star brightness at a given direction
+// One star layer: a stable star per grid cell in direction-space (no swim under camera translate),
+// with a smooth radial dot (no hard threshold → no twinkle-alias under rotation). `cut` is the
+// sparsity (higher = fewer stars), `weight` the layer brightness.
+float starLayer(vec3 dir, float scale, float cut, float weight)
+{
+    vec3 coord = dir * scale;
+    vec3 cell = floor(coord);
+    float rnd = hash(cell);
+    if (rnd < cut)
+        return 0.0;
+    float presence = (rnd - cut) / (1.0 - cut); // 0..1 how bright this cell's star is
+    float dist = length(fract(coord) - 0.5);
+    float dot_ = smoothstep(0.5, 0.0, dist);
+    return dot_ * dot_ * presence * weight;
+}
+
 float starField(vec3 dir)
 {
-    // Use multiple scales for varied star sizes
-    float stars = 0.0;
-
-    // Small dim stars (many)
-    vec3 starCoord1 = dir * 500.0;
-    float star1 = hash(floor(starCoord1));
-    float dist1 = length(fract(starCoord1) - 0.5);
-    if (star1 > 0.995)
-    {
-        float brightness = smoothstep(0.5, 0.0, dist1) * (star1 - 0.995) * 200.0;
-        stars += brightness * 0.3;
-    }
-
-    // Medium stars (fewer)
-    vec3 starCoord2 = dir * 200.0;
-    float star2 = hash(floor(starCoord2));
-    float dist2 = length(fract(starCoord2) - 0.5);
-    if (star2 > 0.992)
-    {
-        float brightness = smoothstep(0.5, 0.0, dist2) * (star2 - 0.992) * 125.0;
-        stars += brightness * 0.6;
-    }
-
-    // Bright stars (rare)
-    vec3 starCoord3 = dir * 80.0;
-    float star3 = hash(floor(starCoord3));
-    float dist3 = length(fract(starCoord3) - 0.5);
-    if (star3 > 0.997)
-    {
-        float brightness = smoothstep(0.5, 0.0, dist3) * (star3 - 0.997) * 333.0;
-        stars += brightness;
-    }
-
+    float stars = starLayer(dir, 500.0, 0.995, 0.3)   // small dim, many
+                + starLayer(dir, 200.0, 0.992, 0.6)   // medium
+                + starLayer(dir, 80.0, 0.997, 1.0);   // bright, rare
     return stars * uStarDensity;
 }
 
@@ -111,20 +96,22 @@ void main()
     float starBrightness = starField(viewDir);
     vec3 stars = starColor(viewDir) * starBrightness;
 
-    // Sun
-    float sunAngle = acos(clamp(dot(viewDir, uLightDir), -1.0, 1.0));
+    // Sun. uLightDir points FROM the sun, so the disc sits in the -uLightDir direction (matching
+    // the lit side of the planet).
+    vec3 sunDir = -normalize(uLightDir);
+    float sunAngle = acos(clamp(dot(viewDir, sunDir), -1.0, 1.0));
 
-    // Sun disc
+    // Bright disc core.
     float sunDisc = smoothstep(uSunSize, uSunSize * 0.8, sunAngle);
 
-    // Sun corona (glow around the sun)
-    float coronaSize = uSunSize * 4.0;
-    float corona = smoothstep(coronaSize, uSunSize, sunAngle);
-    corona = pow(corona, 2.0);
+    // Layered glare: a tight bright inner bloom + a wide soft halo, both falling off radially from
+    // the disc. Gives the sun a photographic glare instead of a flat disc.
+    float inner = smoothstep(uSunSize * 6.0, uSunSize, sunAngle);
+    inner = pow(inner, 2.5);
+    float halo = smoothstep(uSunSize * 24.0, uSunSize, sunAngle);
+    halo = pow(halo, 3.0);
 
-    // Sun color with bloom
-    vec3 sunContrib = uSunColor * sunDisc;
-    sunContrib += uSunColor * corona * 0.3;
+    vec3 sunContrib = uSunColor * (sunDisc * 3.0 + inner * 0.9 + halo * 0.25);
 
     // Combine everything
     vec3 finalColor = spaceColor + stars + sunContrib;
