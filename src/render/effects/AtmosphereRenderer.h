@@ -30,7 +30,6 @@ public:
                 const glm::vec3& cameraPos,
                 const glm::vec3& lightDir,
                 const glm::vec3& sunColor,
-                float terminatorSoftness,
                 const glm::vec3& planetCenter,
                 float planetRadius,
                 float oceanRadius,

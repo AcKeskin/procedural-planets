@@ -157,7 +157,6 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
                                 const glm::vec3& cameraPos,
                                 const glm::vec3& lightDir,
                                 const glm::vec3& sunColor,
-                                float terminatorSoftness,
                                 const glm::vec3& planetCenter,
                                 float planetRadius,
                                 float oceanRadius,
@@ -180,7 +179,6 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
     _atmosphereShader.SetVec3("uCameraPos", cameraPos);
     _atmosphereShader.SetVec3("uLightDir", glm::normalize(lightDir));
     _atmosphereShader.SetVec3("uSunColor", sunColor);
-    _atmosphereShader.SetFloat("uTerminatorSoftness", terminatorSoftness);
 
     _atmosphereShader.SetVec3("uPlanetCenter", planetCenter);
     _atmosphereShader.SetFloat("uPlanetRadius", planetRadius);
