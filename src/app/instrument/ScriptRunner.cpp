@@ -145,8 +145,7 @@ void ScriptRunner::ApplyCameraAbsolute(const CameraCommand& c)
         cam.SetPosition(c.eye);
         const float yawR = glm::radians(c.yaw);
         const float pitchR = glm::radians(c.pitch);
-        const glm::vec3 dir{std::cos(yawR) * std::cos(pitchR), std::sin(pitchR),
-                            std::sin(yawR) * std::cos(pitchR)};
+        const glm::vec3 dir{std::cos(yawR) * std::cos(pitchR), std::sin(pitchR), std::sin(yawR) * std::cos(pitchR)};
         cam.LookAt(c.eye + dir);
         break;
     }

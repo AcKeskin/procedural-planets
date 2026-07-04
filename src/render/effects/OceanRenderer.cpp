@@ -169,8 +169,7 @@ void OceanRenderer::BakeBathymetry(MeshData& mesh, PgBody body, float seaLevel, 
     PgResult r = pg_generate_heights(body, dirs.data(), count, seed);
     if (!r)
     {
-        std::cerr << "[OceanRenderer] pg_generate_heights failed; depth color falls back to flat"
-                  << std::endl;
+        std::cerr << "[OceanRenderer] pg_generate_heights failed; depth color falls back to flat" << std::endl;
         return;
     }
 

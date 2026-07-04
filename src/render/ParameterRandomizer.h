@@ -77,8 +77,8 @@ inline void RandomizeBodyParameters(planetgen::BodyConfig& cfg,
     // (a few big continents vs many small ones vs a clustered supercontinent) rather than the same
     // continental character every time.
     sh.continentCount = ri(3, 9);
-    sh.continentSizeVariance = rf(0.15f, 0.7f);      // low = even sizes, high = a mix of big + small
-    sh.continentClustering = rf(0.0f, 0.85f);        // 0 = dispersed, high = supercontinent
+    sh.continentSizeVariance = rf(0.15f, 0.7f); // low = even sizes, high = a mix of big + small
+    sh.continentClustering = rf(0.0f, 0.85f);   // 0 = dispersed, high = supercontinent
 
     sh.oceanDepthMultiplier = rf(2.0f, 7.0f);
     sh.oceanFloorDepth = rf(0.8f, 2.0f);

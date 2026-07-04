@@ -39,7 +39,7 @@ struct ParamTargets
 // Result of applying a dotted-key parameter.
 struct ApplyResult
 {
-    bool applied = false;   // key resolved and value coerced
+    bool applied = false;    // key resolved and value coerced
     bool needsRegen = false; // the touched param requires a LOD/terrain regenerate
 };
 

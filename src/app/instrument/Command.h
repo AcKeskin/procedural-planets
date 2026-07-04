@@ -101,15 +101,21 @@ struct CaptureCommand
 struct BurstCommand
 {
     int frames = 1;
-    int every = 1;          // capture every Nth frame
-    std::string pattern;    // printf pattern with one %0Nd
+    int every = 1;       // capture every Nth frame
+    std::string pattern; // printf pattern with one %0Nd
 };
 
 // Tagged union of every command payload. payload holds exactly the variant for `type`.
 struct Command
 {
     CommandType type = CommandType::Wait;
-    std::variant<SetSeedCommand, SetBodyCommand, SetParamCommand, CameraCommand, WaitCommand, CaptureCommand, BurstCommand>
+    std::variant<SetSeedCommand,
+                 SetBodyCommand,
+                 SetParamCommand,
+                 CameraCommand,
+                 WaitCommand,
+                 CaptureCommand,
+                 BurstCommand>
         payload;
 };
 

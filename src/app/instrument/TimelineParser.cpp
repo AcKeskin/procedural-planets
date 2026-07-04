@@ -31,21 +31,39 @@ bool ReadVec3(const json& j, glm::vec3& out)
 // A scalar param value from JSON: bool, integer, float, or a 3-array → vec3.
 bool ReadParamValue(const json& j, ParamValue& out)
 {
-    if (j.is_boolean()) { out = j.get<bool>(); return true; }
-    if (j.is_number_integer() || j.is_number_unsigned()) { out = j.get<int>(); return true; }
-    if (j.is_number_float()) { out = j.get<float>(); return true; }
+    if (j.is_boolean())
+    {
+        out = j.get<bool>();
+        return true;
+    }
+    if (j.is_number_integer() || j.is_number_unsigned())
+    {
+        out = j.get<int>();
+        return true;
+    }
+    if (j.is_number_float())
+    {
+        out = j.get<float>();
+        return true;
+    }
     if (j.is_array())
     {
         glm::vec3 v;
-        if (ReadVec3(j, v)) { out = v; return true; }
+        if (ReadVec3(j, v))
+        {
+            out = v;
+            return true;
+        }
     }
     return false;
 }
 
 PathEase ParseEase(const std::string& s)
 {
-    if (s == "linear") return PathEase::Linear;
-    if (s == "smoothstep") return PathEase::Smoothstep;
+    if (s == "linear")
+        return PathEase::Linear;
+    if (s == "smoothstep")
+        return PathEase::Smoothstep;
     return PathEase::CatmullRom; // default + "catmull-rom"
 }
 
@@ -56,8 +74,10 @@ bool ParseWaypoint(const json& j, Waypoint& wp)
     {
         wp.orbit = false;
         glm::vec3 e{0.0f}, tg{0.0f};
-        if (j.contains("eye") && !ReadVec3(j["eye"], e)) return false;
-        if (j.contains("target") && !ReadVec3(j["target"], tg)) return false;
+        if (j.contains("eye") && !ReadVec3(j["eye"], e))
+            return false;
+        if (j.contains("target") && !ReadVec3(j["target"], tg))
+            return false;
         wp.eye = e;
         wp.target = tg;
         return true;
@@ -80,20 +100,24 @@ bool ParseCamera(const json& j, Command& out)
     if (mode == "lookat" || mode == "lookAt")
     {
         c.mode = CameraMode::LookAt;
-        if (j.contains("eye")) ReadVec3(j["eye"], c.eye);
-        if (j.contains("target")) ReadVec3(j["target"], c.target);
+        if (j.contains("eye"))
+            ReadVec3(j["eye"], c.eye);
+        if (j.contains("target"))
+            ReadVec3(j["target"], c.target);
     }
     else if (mode == "freefly")
     {
         c.mode = CameraMode::FreeFly;
-        if (j.contains("eye")) ReadVec3(j["eye"], c.eye);
+        if (j.contains("eye"))
+            ReadVec3(j["eye"], c.eye);
         c.yaw = j.value("yaw", -90.0f);
         c.pitch = j.value("pitch", 0.0f);
     }
     else if (mode == "orbit")
     {
         c.mode = CameraMode::Orbit;
-        if (j.contains("target")) ReadVec3(j["target"], c.target);
+        if (j.contains("target"))
+            ReadVec3(j["target"], c.target);
         c.distance = j.value("distance", 0.0f);
         c.distanceRadii = j.value("distanceRadii", 0.0f);
         c.yaw = j.value("yaw", -90.0f);
@@ -256,8 +280,16 @@ std::optional<Timeline> ParseTimeline(const std::string& jsonText, std::string& 
     if (doc.contains("setup") && doc["setup"].is_object())
     {
         const auto& s = doc["setup"];
-        if (s.contains("seed")) { tl.seed = s["seed"].get<uint32_t>(); tl.hasSeed = true; }
-        if (s.contains("body")) { tl.body = s["body"].get<std::string>(); tl.hasBody = true; }
+        if (s.contains("seed"))
+        {
+            tl.seed = s["seed"].get<uint32_t>();
+            tl.hasSeed = true;
+        }
+        if (s.contains("body"))
+        {
+            tl.body = s["body"].get<std::string>();
+            tl.hasBody = true;
+        }
         tl.width = s.value("width", 0);
         tl.height = s.value("height", 0);
         tl.fps = s.value("fps", 30.0f);
@@ -278,8 +310,7 @@ std::optional<Timeline> ParseTimeline(const std::string& jsonText, std::string& 
         // setParams: expand to a SetParam per key/value pair, preserving order isn't
         // guaranteed across the object but order within a group doesn't matter (each is
         // independent), and the dirty-batching makes the regen cost identical.
-        if (cj.is_object() && cj.value("cmd", "") == "setParams" && cj.contains("values") &&
-            cj["values"].is_object())
+        if (cj.is_object() && cj.value("cmd", "") == "setParams" && cj.contains("values") && cj["values"].is_object())
         {
             for (const auto& [k, vj] : cj["values"].items())
             {

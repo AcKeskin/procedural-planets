@@ -25,8 +25,7 @@ float Ease(PathEase e, float t)
 }
 
 // Catmull-Rom needs a point before and after the segment; clamp at the ends.
-template <typename T>
-T CatmullSegment(const std::vector<T>& pts, int i, float u)
+template <typename T> T CatmullSegment(const std::vector<T>& pts, int i, float u)
 {
     const int n = static_cast<int>(pts.size());
     const T& p0 = pts[(std::max)(i - 1, 0)];
@@ -49,8 +48,8 @@ void CameraPath::Build(const CameraCommand& cmd, float radius)
     for (Waypoint& w : _waypoints)
         if (w.orbit && w.distanceRadii > 0.0f)
             w.distance = radius * w.distanceRadii;
-    std::stable_sort(_waypoints.begin(), _waypoints.end(),
-                     [](const Waypoint& a, const Waypoint& b) { return a.t < b.t; });
+    std::stable_sort(
+        _waypoints.begin(), _waypoints.end(), [](const Waypoint& a, const Waypoint& b) { return a.t < b.t; });
     _ease = cmd.ease;
     _loop = cmd.loop;
     _orbit = _waypoints.front().orbit;

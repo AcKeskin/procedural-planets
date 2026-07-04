@@ -470,8 +470,7 @@ bool Application::RunLive(const CaptureRequest& request)
     // fixed dt used by path/wait/burst commands; the wall-clock loop itself is free-running.
     instrument::ScriptRunner runner(*this, request.cinematicFps);
 
-    std::cout << "[Live] ready — send JSON commands (one per line) to drive the planet."
-              << std::endl;
+    std::cout << "[Live] ready — send JSON commands (one per line) to drive the planet." << std::endl;
 
     while (!_window.ShouldClose() && !source.IsClosed())
     {

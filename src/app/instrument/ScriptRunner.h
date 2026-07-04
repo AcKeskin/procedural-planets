@@ -28,7 +28,10 @@ public:
 class TimelineSource : public ICommandSource
 {
 public:
-    explicit TimelineSource(std::vector<Command> commands) : _commands(std::move(commands)) {}
+    explicit TimelineSource(std::vector<Command> commands)
+        : _commands(std::move(commands))
+    {
+    }
     bool Next(Command& out) override;
 
 private:
@@ -54,10 +57,10 @@ public:
 
 private:
     void ApplyCameraAbsolute(const CameraCommand& c);
-    float CurrentRadius() const;        // active body radius (for distanceRadii); 10 if no body
-    void ReapplyCamera();               // re-seat last camera intent (after a body switch resets it)
-    void PumpFrames(int n);             // advance path + shader time, render, no capture
-    void EnsureFresh();                 // regen + drain if dirty
+    float CurrentRadius() const; // active body radius (for distanceRadii); 10 if no body
+    void ReapplyCamera();        // re-seat last camera intent (after a body switch resets it)
+    void PumpFrames(int n);      // advance path + shader time, render, no capture
+    void EnsureFresh();          // regen + drain if dirty
     bool CaptureTo(const std::string& path);
 
     Application& _app;

@@ -14,30 +14,66 @@ namespace
 
 bool AsFloat(const ParamValue& v, float& out)
 {
-    if (auto* f = std::get_if<float>(&v)) { out = *f; return true; }
-    if (auto* i = std::get_if<int>(&v)) { out = static_cast<float>(*i); return true; }
-    if (auto* b = std::get_if<bool>(&v)) { out = *b ? 1.0f : 0.0f; return true; }
+    if (auto* f = std::get_if<float>(&v))
+    {
+        out = *f;
+        return true;
+    }
+    if (auto* i = std::get_if<int>(&v))
+    {
+        out = static_cast<float>(*i);
+        return true;
+    }
+    if (auto* b = std::get_if<bool>(&v))
+    {
+        out = *b ? 1.0f : 0.0f;
+        return true;
+    }
     return false;
 }
 
 bool AsInt(const ParamValue& v, int& out)
 {
-    if (auto* i = std::get_if<int>(&v)) { out = *i; return true; }
-    if (auto* f = std::get_if<float>(&v)) { out = static_cast<int>(*f); return true; }
+    if (auto* i = std::get_if<int>(&v))
+    {
+        out = *i;
+        return true;
+    }
+    if (auto* f = std::get_if<float>(&v))
+    {
+        out = static_cast<int>(*f);
+        return true;
+    }
     return false;
 }
 
 bool AsBool(const ParamValue& v, bool& out)
 {
-    if (auto* b = std::get_if<bool>(&v)) { out = *b; return true; }
-    if (auto* i = std::get_if<int>(&v)) { out = (*i != 0); return true; }
-    if (auto* f = std::get_if<float>(&v)) { out = (*f != 0.0f); return true; }
+    if (auto* b = std::get_if<bool>(&v))
+    {
+        out = *b;
+        return true;
+    }
+    if (auto* i = std::get_if<int>(&v))
+    {
+        out = (*i != 0);
+        return true;
+    }
+    if (auto* f = std::get_if<float>(&v))
+    {
+        out = (*f != 0.0f);
+        return true;
+    }
     return false;
 }
 
 bool AsVec3(const ParamValue& v, glm::vec3& out)
 {
-    if (auto* vv = std::get_if<glm::vec3>(&v)) { out = *vv; return true; }
+    if (auto* vv = std::get_if<glm::vec3>(&v))
+    {
+        out = *vv;
+        return true;
+    }
     return false;
 }
 
@@ -53,67 +89,87 @@ struct Entry
 
 // Field-setter factories keep the table terse: F_FLOAT(scene->lighting.sunIntensity) etc.
 // Each captures a member pointer chain via a lambda over targets.
-#define SET_FLOAT(EXPR)                                                                                                 \
-    [](const ParamTargets& t, const ParamValue& v) -> bool {                                                           \
-        float f;                                                                                                        \
-        if (!AsFloat(v, f)) return false;                                                                               \
-        EXPR = f;                                                                                                       \
-        return true;                                                                                                    \
+#define SET_FLOAT(EXPR)                                                                                                \
+    [](const ParamTargets& t, const ParamValue& v) -> bool                                                             \
+    {                                                                                                                  \
+        float f;                                                                                                       \
+        if (!AsFloat(v, f))                                                                                            \
+            return false;                                                                                              \
+        EXPR = f;                                                                                                      \
+        return true;                                                                                                   \
     }
-#define SET_INT(EXPR)                                                                                                   \
-    [](const ParamTargets& t, const ParamValue& v) -> bool {                                                           \
-        int i;                                                                                                          \
-        if (!AsInt(v, i)) return false;                                                                                 \
-        EXPR = i;                                                                                                       \
-        return true;                                                                                                    \
+#define SET_INT(EXPR)                                                                                                  \
+    [](const ParamTargets& t, const ParamValue& v) -> bool                                                             \
+    {                                                                                                                  \
+        int i;                                                                                                         \
+        if (!AsInt(v, i))                                                                                              \
+            return false;                                                                                              \
+        EXPR = i;                                                                                                      \
+        return true;                                                                                                   \
     }
-#define SET_BOOL(EXPR)                                                                                                  \
-    [](const ParamTargets& t, const ParamValue& v) -> bool {                                                           \
-        bool b;                                                                                                         \
-        if (!AsBool(v, b)) return false;                                                                               \
-        EXPR = b;                                                                                                       \
-        return true;                                                                                                    \
+#define SET_BOOL(EXPR)                                                                                                 \
+    [](const ParamTargets& t, const ParamValue& v) -> bool                                                             \
+    {                                                                                                                  \
+        bool b;                                                                                                        \
+        if (!AsBool(v, b))                                                                                             \
+            return false;                                                                                              \
+        EXPR = b;                                                                                                      \
+        return true;                                                                                                   \
     }
-#define SET_VEC3(EXPR)                                                                                                  \
-    [](const ParamTargets& t, const ParamValue& v) -> bool {                                                           \
-        glm::vec3 vv;                                                                                                   \
-        if (!AsVec3(v, vv)) return false;                                                                               \
-        EXPR = vv;                                                                                                      \
-        return true;                                                                                                    \
+#define SET_VEC3(EXPR)                                                                                                 \
+    [](const ParamTargets& t, const ParamValue& v) -> bool                                                             \
+    {                                                                                                                  \
+        glm::vec3 vv;                                                                                                  \
+        if (!AsVec3(v, vv))                                                                                            \
+            return false;                                                                                              \
+        EXPR = vv;                                                                                                     \
+        return true;                                                                                                   \
     }
 
 // Guard a body.* setter: reject when no body is loaded.
-#define BODY_FLOAT(EXPR)                                                                                                \
-    [](const ParamTargets& t, const ParamValue& v) -> bool {                                                           \
-        if (!t.body) return false;                                                                                      \
-        float f;                                                                                                        \
-        if (!AsFloat(v, f)) return false;                                                                               \
-        EXPR = f;                                                                                                       \
-        return true;                                                                                                    \
+#define BODY_FLOAT(EXPR)                                                                                               \
+    [](const ParamTargets& t, const ParamValue& v) -> bool                                                             \
+    {                                                                                                                  \
+        if (!t.body)                                                                                                   \
+            return false;                                                                                              \
+        float f;                                                                                                       \
+        if (!AsFloat(v, f))                                                                                            \
+            return false;                                                                                              \
+        EXPR = f;                                                                                                      \
+        return true;                                                                                                   \
     }
-#define BODY_INT(EXPR)                                                                                                  \
-    [](const ParamTargets& t, const ParamValue& v) -> bool {                                                           \
-        if (!t.body) return false;                                                                                      \
-        int i;                                                                                                          \
-        if (!AsInt(v, i)) return false;                                                                                 \
-        EXPR = i;                                                                                                       \
-        return true;                                                                                                    \
+#define BODY_INT(EXPR)                                                                                                 \
+    [](const ParamTargets& t, const ParamValue& v) -> bool                                                             \
+    {                                                                                                                  \
+        if (!t.body)                                                                                                   \
+            return false;                                                                                              \
+        int i;                                                                                                         \
+        if (!AsInt(v, i))                                                                                              \
+            return false;                                                                                              \
+        EXPR = i;                                                                                                      \
+        return true;                                                                                                   \
     }
-#define BODY_BOOL(EXPR)                                                                                                 \
-    [](const ParamTargets& t, const ParamValue& v) -> bool {                                                           \
-        if (!t.body) return false;                                                                                      \
-        bool b;                                                                                                         \
-        if (!AsBool(v, b)) return false;                                                                               \
-        EXPR = b;                                                                                                       \
-        return true;                                                                                                    \
+#define BODY_BOOL(EXPR)                                                                                                \
+    [](const ParamTargets& t, const ParamValue& v) -> bool                                                             \
+    {                                                                                                                  \
+        if (!t.body)                                                                                                   \
+            return false;                                                                                              \
+        bool b;                                                                                                        \
+        if (!AsBool(v, b))                                                                                             \
+            return false;                                                                                              \
+        EXPR = b;                                                                                                      \
+        return true;                                                                                                   \
     }
-#define BODY_VEC3(EXPR)                                                                                                 \
-    [](const ParamTargets& t, const ParamValue& v) -> bool {                                                           \
-        if (!t.body) return false;                                                                                      \
-        glm::vec3 vv;                                                                                                   \
-        if (!AsVec3(v, vv)) return false;                                                                               \
-        EXPR = vv;                                                                                                      \
-        return true;                                                                                                    \
+#define BODY_VEC3(EXPR)                                                                                                \
+    [](const ParamTargets& t, const ParamValue& v) -> bool                                                             \
+    {                                                                                                                  \
+        if (!t.body)                                                                                                   \
+            return false;                                                                                              \
+        glm::vec3 vv;                                                                                                  \
+        if (!AsVec3(v, vv))                                                                                            \
+            return false;                                                                                              \
+        EXPR = vv;                                                                                                     \
+        return true;                                                                                                   \
     }
 
 const std::unordered_map<std::string, Entry>& Table()
@@ -171,13 +227,18 @@ const std::unordered_map<std::string, Entry>& Table()
         {"clouds.shadowStrength", {false, SET_FLOAT(t.clouds->shadowStrength)}},
 
         // ---- sea level (real-time) ----
-        {"seaLevel", {false, [](const ParamTargets& t, const ParamValue& v) -> bool {
-                          if (!t.seaLevel) return false;
-                          float f;
-                          if (!AsFloat(v, f)) return false;
-                          *t.seaLevel = f;
-                          return true;
-                      }}},
+        {"seaLevel",
+         {false,
+          [](const ParamTargets& t, const ParamValue& v) -> bool
+          {
+              if (!t.seaLevel)
+                  return false;
+              float f;
+              if (!AsFloat(v, f))
+                  return false;
+              *t.seaLevel = f;
+              return true;
+          }}},
 
         // ---- LOD (needs regen) ----
         {"lod.enabled", {true, SET_BOOL(t.lod->enabled)}},

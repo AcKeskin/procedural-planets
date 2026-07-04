@@ -53,7 +53,10 @@ private:
 class LiveServer
 {
 public:
-    explicit LiveServer(LiveCommandSource& source) : _source(source) {}
+    explicit LiveServer(LiveCommandSource& source)
+        : _source(source)
+    {
+    }
     ~LiveServer();
 
     bool Start(unsigned short port);
