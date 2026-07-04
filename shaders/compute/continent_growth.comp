@@ -211,10 +211,12 @@ void main()
         }
     }
 
-    // Continentalness: smooth falloff from craton core.
-    // halfAngle ≈ half the angular radius of a continent (π / numCores * sizeMultiplier).
-    float halfAngle = (PI / float(numCores)) * (1.0 + sizeVariance * 0.5);
-    halfAngle = clamp(halfAngle, 0.1, 1.2);
+    // Continentalness: smooth falloff from craton core. The angular radius scales as
+    // 1/sqrt(numCores) (not 1/numCores) so total land area stays roughly constant as cores are
+    // added — more cores means more, smaller continents, not a shrinking land fraction. The 2.2
+    // factor targets an Earth-like ~30% land coverage against the height-stage land threshold.
+    float halfAngle = (2.2 / sqrt(float(numCores))) * (1.0 + sizeVariance * 0.5);
+    halfAngle = clamp(halfAngle, 0.1, 1.4);
 
     float t = clamp(minAngularDist / halfAngle, 0.0, 1.0);
     float continentalness = 1.0 - smoothstep(0.0, 1.0, t);

@@ -7,6 +7,14 @@ int main(int argc, char** argv)
 
     planets::app::Application app;
 
+    // Live instrument: visible window + localhost command server, drive it interactively.
+    if (request.live)
+        return app.RunLive(request) ? 0 : -1;
+
+    // Command-driven instrument: execute a JSON timeline (camera, live params, bursts), exit.
+    if (request.script)
+        return app.RunScript(request) ? 0 : -1;
+
     // Headless generation showcase: orbit while regenerating planets, write a sequence, exit.
     if (request.showcase)
         return app.RunGenerationShowcase(request) ? 0 : -1;

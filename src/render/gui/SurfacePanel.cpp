@@ -136,14 +136,10 @@ void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& sea
         ImGui::SliderFloat("Depth Multiplier", &settings.depthMultiplier, 1.0f, 30.0f);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Controls shallow-to-deep color transition");
-        ImGui::SliderFloat("Alpha Multiplier", &settings.alphaMultiplier, 10.0f, 100.0f);
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Controls transparency based on depth");
 
         ImGui::Separator();
         ImGui::Text("Reflection");
         ImGui::SliderFloat("Fresnel Power", &settings.fresnelPower, 1.5f, 3.5f);
-        ImGui::SliderFloat("Smoothness", &settings.smoothness, 0.5f, 0.99f, "%.2f");
 
         ImGui::Separator();
         ImGui::Text("Waves");

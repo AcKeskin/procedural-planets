@@ -72,6 +72,14 @@ inline void RandomizeBodyParameters(planetgen::BodyConfig& cfg,
     sh.maskNoise.persistence = rf(0.35f, 0.55f);
     sh.maskNoise.lacunarity = rf(1.4f, 2.0f);
 
+    // Continent-growth cores drive the WHOLE-PLANET layout — the most visible difference between
+    // worlds. Randomizing them is what makes randomize actually produce different-looking planets
+    // (a few big continents vs many small ones vs a clustered supercontinent) rather than the same
+    // continental character every time.
+    sh.continentCount = ri(3, 9);
+    sh.continentSizeVariance = rf(0.15f, 0.7f);      // low = even sizes, high = a mix of big + small
+    sh.continentClustering = rf(0.0f, 0.85f);        // 0 = dispersed, high = supercontinent
+
     sh.oceanDepthMultiplier = rf(2.0f, 7.0f);
     sh.oceanFloorDepth = rf(0.8f, 2.0f);
     sh.oceanFloorSmoothing = rf(0.3f, 1.2f);

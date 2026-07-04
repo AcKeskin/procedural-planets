@@ -10,6 +10,8 @@
 #include "lod/PlanetQuadTree.h"
 #include "effects/OceanRenderer.h"
 #include "effects/AtmosphereRenderer.h"
+#include "effects/CloudRenderer.h"
+#include "settings/CloudSettings.h"
 #include "settings/SceneSettings.h"
 #include "settings/OceanSettings.h"
 #include "settings/AtmosphereSettings.h"
@@ -33,6 +35,7 @@ struct RenderContext
     const SceneSettings* scene = nullptr;
     const effects::OceanSettings* ocean = nullptr;
     const effects::AtmosphereSettings* atmosphere = nullptr;
+    const effects::CloudSettings* clouds = nullptr;
 
     const BodyRuntime* body = nullptr; // null when no body loaded; carries shading/AO via Config()
     float planetRadius = 1.0f;
@@ -70,6 +73,12 @@ public:
     // Capture/cinematic reads the composited scene from here.
     Framebuffer& SceneFramebuffer() { return _sceneFbo; }
 
+    // The size the scene is actually drawn + presented at. A capture must read pixels at
+    // THIS size (not the window size, which can change between a draw and the readback in
+    // live mode), or glReadPixels reads a region the backbuffer was never filled to.
+    int FramebufferWidth() const { return _fbWidth; }
+    int FramebufferHeight() const { return _fbHeight; }
+
     GenerationScheduler& Scheduler() { return _scheduler; }
     lod::PlanetQuadTree& QuadTree() { return _quadTree; }
 
@@ -90,6 +99,7 @@ private:
     lod::PlanetQuadTree _quadTree;
     effects::OceanRenderer _oceanRenderer;
     effects::AtmosphereRenderer _atmosphereRenderer;
+    effects::CloudRenderer _cloudRenderer;
 
     BiomePalette _palette;
     GpuBuffer<BiomeEntry> _paletteBuffer;

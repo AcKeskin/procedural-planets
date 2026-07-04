@@ -4,6 +4,11 @@ add_executable(procedural-planets
     Application.cpp
     CaptureRequest.cpp
     Input.cpp
+    instrument/ParamRegistry.cpp
+    instrument/TimelineParser.cpp
+    instrument/CameraPath.cpp
+    instrument/ScriptRunner.cpp
+    instrument/LiveServer.cpp
 )
 
 target_include_directories(procedural-planets PRIVATE
@@ -13,6 +18,7 @@ target_include_directories(procedural-planets PRIVATE
 target_link_libraries(procedural-planets PRIVATE
     core
     render
+    nlohmann_json::nlohmann_json
 )
 
 # Copy shaders to output directory

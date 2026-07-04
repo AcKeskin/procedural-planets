@@ -5,6 +5,8 @@
 #include <cmath>
 #include <array>
 #include <map>
+#include <vector>
+#include <algorithm>
 #include <iostream>
 
 namespace planets::render::effects
@@ -38,7 +40,7 @@ OceanRenderer::~OceanRenderer()
     Shutdown();
 }
 
-bool OceanRenderer::Initialize(float planetRadius, float seaLevel, int subdivisions)
+bool OceanRenderer::Initialize(float planetRadius, float seaLevel, int subdivisions, PgBody body, uint32_t seed)
 {
     if (!_oceanShader.LoadFromFiles("shaders/ocean.vert", "shaders/ocean.frag"))
     {
@@ -47,7 +49,7 @@ bool OceanRenderer::Initialize(float planetRadius, float seaLevel, int subdivisi
     }
 
     float oceanRadius = planetRadius * seaLevel;
-    GenerateOceanSphere(oceanRadius, subdivisions);
+    GenerateOceanSphere(oceanRadius, subdivisions, body, seaLevel, seed);
 
     _initialized = true;
     std::cout << "[OceanRenderer] Initialized with radius " << oceanRadius << std::endl;
@@ -59,7 +61,7 @@ void OceanRenderer::Shutdown()
     _initialized = false;
 }
 
-void OceanRenderer::GenerateOceanSphere(float radius, int subdivisions)
+void OceanRenderer::GenerateOceanSphere(float radius, int subdivisions, PgBody body, float seaLevel, uint32_t seed)
 {
     MeshData meshData;
 
@@ -140,16 +142,64 @@ void OceanRenderer::GenerateOceanSphere(float radius, int subdivisions)
         meshData.indices.push_back(face[2]);
     }
 
+    BakeBathymetry(meshData, body, seaLevel, seed);
+
     _oceanMesh.Upload(meshData);
 
     std::cout << "[OceanRenderer] Generated ocean sphere: " << meshData.vertices.size() << " vertices, "
               << meshData.indices.size() / 3 << " triangles" << std::endl;
 }
 
+void OceanRenderer::BakeBathymetry(MeshData& mesh, PgBody body, float seaLevel, uint32_t seed)
+{
+    const uint32_t count = static_cast<uint32_t>(mesh.vertices.size());
+    if (!body || count == 0)
+        return;
+
+    // pg_generate_heights wants unit-sphere directions (heights are a radial multiplier ~1.0).
+    std::vector<float> dirs(count * 3);
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        glm::vec3 d = glm::normalize(mesh.vertices[i].position);
+        dirs[i * 3 + 0] = d.x;
+        dirs[i * 3 + 1] = d.y;
+        dirs[i * 3 + 2] = d.z;
+    }
+
+    PgResult r = pg_generate_heights(body, dirs.data(), count, seed);
+    if (!r)
+    {
+        std::cerr << "[OceanRenderer] pg_generate_heights failed; depth color falls back to flat"
+                  << std::endl;
+        return;
+    }
+
+    const float* heights = pg_result_get_heights(r);
+    if (heights)
+    {
+        // depth = how far the terrain sits below sea level (0 at the coastline). Normalize by the
+        // deepest point so depth01 spans coast→abyss regardless of the body's absolute height scale.
+        float maxDepth = 1e-4f;
+        std::vector<float> depth(count);
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            depth[i] = std::max(0.0f, seaLevel - heights[i]);
+            maxDepth = std::max(maxDepth, depth[i]);
+        }
+        for (uint32_t i = 0; i < count; ++i)
+            mesh.vertices[i].uv.x = depth[i] / maxDepth; // depth01 → shader reads aUv.x
+    }
+
+    pg_result_destroy(r);
+}
+
 void OceanRenderer::Render(const glm::mat4& view,
                            const glm::mat4& projection,
                            const glm::vec3& cameraPos,
                            const glm::vec3& lightDir,
+                           const glm::vec3& sunColor,
+                           float sunIntensity,
+                           float ambientLight,
                            float elapsedTime,
                            const OceanSettings& settings)
 {
@@ -170,12 +220,13 @@ void OceanRenderer::Render(const glm::mat4& view,
     _oceanShader.SetMat4("uProjection", projection);
     _oceanShader.SetVec3("uCameraPos", cameraPos);
     _oceanShader.SetVec3("uLightDir", lightDir);
+    _oceanShader.SetVec3("uSunColor", sunColor);
+    _oceanShader.SetFloat("uSunIntensity", sunIntensity);
+    _oceanShader.SetFloat("uAmbientLight", ambientLight);
     _oceanShader.SetVec3("uDeepColor", settings.deepColor);
     _oceanShader.SetVec3("uShallowColor", settings.shallowColor);
     _oceanShader.SetFloat("uFresnelPower", settings.fresnelPower);
     _oceanShader.SetFloat("uDepthMultiplier", settings.depthMultiplier);
-    _oceanShader.SetFloat("uAlphaMultiplier", settings.alphaMultiplier);
-    _oceanShader.SetFloat("uSmoothness", settings.smoothness);
     _oceanShader.SetFloat("uWaveStrength", settings.waveStrength);
     _oceanShader.SetFloat("uWaveScale", settings.waveScale);
     _oceanShader.SetFloat("uWaveSpeed", settings.waveSpeed);

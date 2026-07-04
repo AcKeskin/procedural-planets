@@ -10,12 +10,14 @@ uniform mat4 uProjection;
 
 out vec3 fragWorldPos;
 out vec3 fragNormal;
+out float fragDepth01; // baked bathymetry: 0 at the coastline, 1 over the deepest floor
 
 void main()
 {
     vec4 worldPos = uModel * vec4(aPosition, 1.0);
     fragWorldPos = worldPos.xyz;
     fragNormal = mat3(transpose(inverse(uModel))) * aNormal;
+    fragDepth01 = aUv.x;
 
     gl_Position = uProjection * uView * worldPos;
 }

@@ -45,6 +45,18 @@ struct CaptureRequest
     float startYaw = -90.0f;    // orbit start angle (matches CameraDefaults::Yaw)
     float startPitch = 0.0f;
 
+    // --- Command-driven instrument (--script <path.json>) ---
+    // Boot, then execute a JSON command timeline (camera, live params, frame bursts) at a
+    // fixed dt. Implies enabled (capture machinery is reused for the frame output).
+    bool script = false;
+    std::string scriptPath;
+
+    // --- Live instrument (--live [port]) ---
+    // Boot a visible window + a localhost TCP command server; apply JSON commands (one per
+    // line) as they arrive, render continuously. capture replies with the written PNG path.
+    bool live = false;
+    unsigned short livePort = 8787;
+
     // --- Generation showcase (--showcase) ---
     // Orbits continuously while regenerating the planet (new random world) every
     // holdFrames frames, to show off generation variety + speed. Shares the cinematic

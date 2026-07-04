@@ -14,7 +14,7 @@ struct AtmosphereSettings
 
     // Rayleigh scattering
     glm::vec3 wavelengths = glm::vec3(700.0f, 530.0f, 460.0f);
-    float scatteringStrength = 12.0f;
+    float scatteringStrength = 8.0f;
     float densityFalloff = 4.5f;
 
     // Mie scattering (contributes to extinction, not in-scattering color)

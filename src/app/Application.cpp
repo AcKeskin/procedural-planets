@@ -1,11 +1,15 @@
 #include "Application.h"
 #include "GpuConstants.h"
+#include "instrument/ScriptRunner.h"
+#include "instrument/TimelineParser.h"
+#include "instrument/LiveServer.h"
 #include <model/BodyConfigJson.h>
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <imgui.h>
 #include <iostream>
+#include <fstream>
 #include <chrono>
 #include <cstdio>
 #include <random>
@@ -138,19 +142,24 @@ void Application::Run()
 
         ProcessInput(_deltaTime);
 
-        // Handle window resize
-        int currentWidth = _window.GetWidth();
-        int currentHeight = _window.GetHeight();
-        if (currentWidth != _previousWidth || currentHeight != _previousHeight)
-        {
-            _renderer.ResizeFramebuffer(currentWidth, currentHeight);
-            _previousWidth = currentWidth;
-            _previousHeight = currentHeight;
-        }
+        SyncFramebufferToWindow();
 
         Render();
         _window.SwapBuffers();
     }
+}
+
+void Application::SyncFramebufferToWindow()
+{
+    const int w = _window.GetWidth();
+    const int h = _window.GetHeight();
+    if (w == _previousWidth && h == _previousHeight)
+        return;
+    if (w <= 0 || h <= 0)
+        return; // minimized; skip until restored
+    _renderer.ResizeFramebuffer(w, h);
+    _previousWidth = w;
+    _previousHeight = h;
 }
 
 void Application::ApplyCaptureOverrides(const CaptureRequest& request)
@@ -374,6 +383,127 @@ bool Application::RunGenerationShowcase(const CaptureRequest& request)
     return written == total;
 }
 
+planetgen::BodyConfig Application::LoadBodyConfigPublic(const std::string& path)
+{
+    return LoadBodyConfig(path);
+}
+
+bool Application::RunScript(const CaptureRequest& request)
+{
+    ApplyCaptureOverrides(request);
+
+    std::ifstream in(_capture.scriptPath);
+    if (!in)
+    {
+        std::cerr << "[Script] could not open '" << _capture.scriptPath << "'" << std::endl;
+        return false;
+    }
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+
+    std::string err;
+    auto timeline = instrument::ParseTimeline(text, err);
+    if (!timeline)
+    {
+        std::cerr << "[Script] parse failed: " << err << std::endl;
+        return false;
+    }
+
+    // setup block overrides the CLI/defaults before the window is built.
+    if (timeline->hasSeed)
+        _capture.seed = timeline->seed;
+    if (timeline->hasBody)
+        _capture.body = timeline->body;
+    if (timeline->width > 0)
+        _capture.width = timeline->width;
+    if (timeline->height > 0)
+        _capture.height = timeline->height;
+
+    if (!Initialize())
+    {
+        std::cerr << "[Script] initialization failed." << std::endl;
+        return false;
+    }
+
+    if (timeline->hasBody && _capture.body != "earth")
+        SwitchBody(LoadBodyConfig("data/bodies/" + _capture.body + ".json"));
+
+    // Initial settle so the first command runs against a fully-generated planet.
+    if (!DrainGeneration(_capture.frames, AppDefaults::CaptureDrainMaxFrames))
+        std::cerr << "[Script] generation did not drain within " << AppDefaults::CaptureDrainMaxFrames
+                  << " frames; starting anyway." << std::endl;
+
+    instrument::ScriptRunner runner(*this, timeline->fps);
+    instrument::TimelineSource source(std::move(timeline->commands));
+    runner.Run(source);
+
+    std::cout << "[Script] timeline complete." << std::endl;
+    Shutdown();
+    return true;
+}
+
+bool Application::RunLive(const CaptureRequest& request)
+{
+    // Visible interactive window: keep capture-mode framing off so the user sees a normal
+    // free-fly view; capture-on-demand still works via the _headlessCaptureRequested flag.
+    _capture = request;
+    _capture.enabled = false;
+
+    if (!Initialize())
+    {
+        std::cerr << "[Live] initialization failed." << std::endl;
+        return false;
+    }
+
+    if (!DrainGeneration(request.frames, AppDefaults::CaptureDrainMaxFrames))
+        std::cerr << "[Live] generation did not drain; starting anyway." << std::endl;
+
+    instrument::LiveCommandSource source;
+    instrument::LiveServer server(source);
+    if (!server.Start(request.livePort))
+    {
+        std::cerr << "[Live] could not start command server on port " << request.livePort << std::endl;
+        Shutdown();
+        return false;
+    }
+
+    // The runner mutates Application state on this (the render) thread only. fps sets the
+    // fixed dt used by path/wait/burst commands; the wall-clock loop itself is free-running.
+    instrument::ScriptRunner runner(*this, request.cinematicFps);
+
+    std::cout << "[Live] ready — send JSON commands (one per line) to drive the planet."
+              << std::endl;
+
+    while (!_window.ShouldClose() && !source.IsClosed())
+    {
+        _window.PollEvents();
+        _input.Update();
+        ProcessInput(static_cast<float>(glfwGetTime()) - _lastTime);
+        _lastTime = static_cast<float>(glfwGetTime());
+
+        // Sync the framebuffer to the window size BEFORE dispatching commands: a capture/
+        // burst command renders + reads pixels inside Dispatch, so the scene FBO + viewport
+        // must already match the current window or the readback is garbled/wrong-aspect.
+        SyncFramebufferToWindow();
+
+        // Apply every command queued since the last frame, replying to each.
+        instrument::LiveItem item;
+        while (source.NextItem(item))
+        {
+            const std::string resp = runner.Dispatch(item.cmd);
+            if (item.done)
+                item.done->set_value(resp);
+        }
+
+        Render();
+        _window.SwapBuffers();
+    }
+
+    server.Stop();
+    std::cout << "[Live] session ended." << std::endl;
+    Shutdown();
+    return true;
+}
+
 void Application::Shutdown()
 {
     _guiManager.Shutdown();
@@ -483,22 +613,28 @@ void Application::Render()
     ctx.scene = &_sceneSettings;
     ctx.ocean = &_oceanSettings;
     ctx.atmosphere = &_atmosphereSettings;
+    ctx.clouds = &_cloudSettings;
     ctx.body = _activeBody.get();
     ctx.planetRadius = _lodConfig.planetRadius;
     ctx.seaLevel = _seaLevel;
 
     _renderer.DrawScene(ctx);
 
+    // Read pixels at the size the renderer actually drew + presented, not the window size
+    // (which can differ if a resize landed between this draw and the readback in live mode).
+    const int capW = _renderer.FramebufferWidth();
+    const int capH = _renderer.FramebufferHeight();
+
     if (_screenshotRequested)
     {
-        _captureManager.CaptureScreenshot(_window.GetWidth(), _window.GetHeight());
+        _captureManager.CaptureScreenshot(capW, capH);
         _screenshotRequested = false;
     }
 
     // Headless capture point: scene composited, before the GUI overlay.
     if (_headlessCaptureRequested)
     {
-        _captureManager.CaptureScreenshotToFile(_capture.outputPath, _window.GetWidth(), _window.GetHeight());
+        _captureManager.CaptureScreenshotToFile(_capture.outputPath, capW, capH);
         _headlessCaptureRequested = false;
     }
 

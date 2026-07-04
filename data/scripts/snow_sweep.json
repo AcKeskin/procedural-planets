@@ -1,0 +1,21 @@
+{
+  "setup": { "seed": 1337, "body": "earth", "width": 1280, "height": 720, "fps": 30 },
+  "timeline": [
+    { "cmd": "camera", "mode": "orbit", "target": [0, 0, 0], "distance": 24, "yaw": -90, "pitch": 20 },
+
+    { "cmd": "setParam", "key": "body.shading.snowLine", "value": 0.95 },
+    { "cmd": "capture", "path": "out/snow_095.png" },
+
+    { "cmd": "setParam", "key": "body.shading.snowLine", "value": 0.80 },
+    { "cmd": "capture", "path": "out/snow_080.png" },
+
+    { "cmd": "setParam", "key": "body.shading.snowLine", "value": 0.65 },
+    { "cmd": "capture", "path": "out/snow_065.png" },
+
+    { "cmd": "setParams", "values": {
+        "ocean.waveStrength": 0.4,
+        "scene.lighting.sunIntensity": 1.6
+    } },
+    { "cmd": "capture", "path": "out/ocean_hi.png" }
+  ]
+}

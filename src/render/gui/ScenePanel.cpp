@@ -74,6 +74,17 @@ void ScenePanel::DrawLightingContent(LightingSettings& settings)
         ImGui::SetTooltip("Base illumination in shadows");
 
     ImGui::Separator();
+    ImGui::Text("Terminator");
+
+    ImGui::SliderFloat("Terminator Softness", &settings.terminatorSoftness, 0.0f, 0.3f, "%.3f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Width of the soft day/night twilight band (0 = hard edge)");
+
+    ImGui::SliderFloat("Night Lights", &settings.nightLightStrength, 0.0f, 2.0f, "%.2f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Emissive city lights on the habitable night side (0 = off)");
+
+    ImGui::Separator();
     ImGui::Text("Specular");
 
     ImGui::SliderFloat("Specular Strength", &settings.specularStrength, 0.0f, 0.5f, "%.2f");

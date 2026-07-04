@@ -84,6 +84,31 @@ CaptureRequest CaptureRequest::Parse(int argc, char** argv)
                 req.enabled = true;
             }
         }
+        else if (std::strcmp(arg, "--script") == 0)
+        {
+            const char* v = NextValue(argc, argv, i, "--script");
+            if (v)
+            {
+                req.scriptPath = v;
+                req.script = true;
+                req.enabled = true; // reuse the capture machinery for frame output
+            }
+        }
+        else if (std::strcmp(arg, "--live") == 0)
+        {
+            req.live = true;
+            // Optional port follows; if the next token isn't a number, leave the default.
+            if (i + 1 < argc && argv[i + 1][0] != '-')
+            {
+                char* end = nullptr;
+                const unsigned long p = std::strtoul(argv[i + 1], &end, 10);
+                if (end && *end == '\0' && p > 0 && p < 65536)
+                {
+                    req.livePort = static_cast<unsigned short>(p);
+                    ++i;
+                }
+            }
+        }
         else if (std::strcmp(arg, "--seed") == 0)
         {
             const char* v = NextValue(argc, argv, i, "--seed");

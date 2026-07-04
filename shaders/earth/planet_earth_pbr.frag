@@ -8,8 +8,10 @@
 // (uShore*, uFlat*, ...) are simply not declared; SetRenderUniforms' extra sets no-op.
 
 // lighting.glsl → calcFresnel, applyHaze, calcSphericalAO, calcDistanceRadii
+// clouds.glsl → cloudCoverage: soft shadow that matches the cloud shell
 #include "math.glsl"
 #include "lighting.glsl"
+#include "clouds.glsl"
 #include "pbr.glsl"
 
 in vec3 vNormal;
@@ -20,6 +22,18 @@ in vec4 vShadingData; // climate: x=temp, y=moisture, z=detail, w=small
 out vec4 FragColor;
 
 uniform vec3  uLightDir;
+uniform vec3  uSunColor;          // warms the key light; reddens through the dusk band
+uniform float uTerminatorSoftness; // half-width of the soft day/night band (0 = hard edge)
+uniform float uNightLightStrength; // emissive city lights on the night side (0 = off)
+
+// Cloud shadow: sample the shared coverage field along the sun so shadows track the visible clouds.
+uniform float uCloudScale;
+uniform float uCloudCoverage;
+uniform float uCloudSpeed;
+uniform float uCloudTime;
+uniform float uCloudShadowStrength;
+uniform float uCloudAltitude;
+
 uniform vec3  uCameraPos;
 uniform float uSeaLevel;
 uniform vec2  uHeightMinMax;
@@ -225,8 +239,22 @@ void main()
     float matte = max(rockW, snowW);
     float roughness = clamp(mat.roughness, mix(0.85, 0.4, matte), 1.0);
     float ao = calcSphericalAO(N, sphereNormal, uAOStrength);
-    vec3 lit = cookTorrance(mat.albedo, 0.0, roughness,
-                            N, viewDir, lightDir, vec3(uSunIntensity));
+
+    // Celestial lighting: warm/dusk-reddened key light. Cook-Torrance's own max(N·L,0) already
+    // falls the direct light off across the terminator, so we DON'T re-multiply by a day factor
+    // (that double-darkened low-sun-angle daylit regions). The `day` value is used only for the
+    // dusk color shift and for gating night lights — not for attenuating the diffuse.
+    float day = dayFactor(sphereNormal, lightDir, uTerminatorSoftness);
+    vec3 sunRadiance = duskSunColor(uSunColor, day) * uSunIntensity;
+
+    // Soft cloud shadow: sample the shared coverage field where this fragment's sun ray crosses the
+    // cloud shell (surface direction pushed toward the sun), and dim the direct light. Only on the
+    // lit side (× day), gated by uCloudShadowStrength (0 when clouds are off).
+    vec3 shadowDir = normalize(sphereNormal + lightDir * uCloudAltitude * 6.0);
+    float cloudShadow = cloudCoverage(shadowDir, uCloudScale, uCloudCoverage, uCloudSpeed, uCloudTime);
+    sunRadiance *= 1.0 - cloudShadow * uCloudShadowStrength * day;
+
+    vec3 lit = cookTorrance(mat.albedo, 0.0, roughness, N, viewDir, lightDir, sunRadiance);
     vec3 ambient = mat.albedo * uAmbientLight * ao;
     vec3 color = lit + ambient;
 
@@ -234,6 +262,16 @@ void main()
                          uPlanetScale, uFresnelStrengthNear, uFresnelStrengthFar, uFresnelPow);
     color = applyHaze(color, uHazeColor, N, lightDir,
                       camDist, uPlanetScale, uHazeStrength, uAmbientLight, uSunIntensity);
+
+    // Night-side city lights on habitable land: temperate, moist-enough, low-elevation ground
+    // (where settlements sit), never snow/desert/mountain. Land-only here by construction (ocean
+    // returned early). Warm sodium-lamp color, hard-gated to the night side inside nightLights().
+    float habitability = uNightLightStrength
+                       * smoothstep(0.35, 0.6, temperature) * (1.0 - smoothstep(0.75, 0.95, temperature))
+                       * smoothstep(0.2, 0.5, moisture)
+                       * (1.0 - smoothstep(0.3, 0.6, h))   // low elevation
+                       * (1.0 - snowW);
+    color += nightLights(normalize(vWorldPos), day, habitability, vec3(1.0, 0.8, 0.45));
 
     // Reinhard roll-off so highlights don't clip, then a mild gamma lift to keep midtones from
     // going muddy. No specular boost (the earlier *1.6 was lifting grazing specular into sheen).

@@ -156,6 +156,7 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
                                 const glm::mat4& invProjection,
                                 const glm::vec3& cameraPos,
                                 const glm::vec3& lightDir,
+                                const glm::vec3& sunColor,
                                 const glm::vec3& planetCenter,
                                 float planetRadius,
                                 float oceanRadius,
@@ -177,6 +178,7 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
     _atmosphereShader.SetMat4("uInvProjection", invProjection);
     _atmosphereShader.SetVec3("uCameraPos", cameraPos);
     _atmosphereShader.SetVec3("uLightDir", glm::normalize(lightDir));
+    _atmosphereShader.SetVec3("uSunColor", sunColor);
 
     _atmosphereShader.SetVec3("uPlanetCenter", planetCenter);
     _atmosphereShader.SetFloat("uPlanetRadius", planetRadius);
@@ -186,7 +188,10 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
     _atmosphereShader.SetFloat("uNearPlane", nearPlane);
     _atmosphereShader.SetFloat("uFarPlane", farPlane);
 
-    // Rayleigh coefficients: inverse 4th power of wavelength, normalized by planet radius
+    // Optical depth accumulates in world units (∝ planetRadius), so every extinction coefficient is
+    // normalized by planetRadius to keep coeff·opticalDepth — and thus the atmosphere's look —
+    // invariant across [5000,50000]. Rayleigh AND Mie must both divide by radius; leaving Mie raw
+    // made its extinction grow with radius and collapse the atmosphere to opaque at large scale.
     float scatterX = std::pow(RayleighReferenceWavelength / settings.wavelengths.x, RayleighPower);
     float scatterY = std::pow(RayleighReferenceWavelength / settings.wavelengths.y, RayleighPower);
     float scatterZ = std::pow(RayleighReferenceWavelength / settings.wavelengths.z, RayleighPower);
@@ -197,7 +202,7 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
     _atmosphereShader.SetInt("uNumOpticalDepthPoints", settings.numOpticalDepthPoints);
     _atmosphereShader.SetFloat("uDensityFalloff", settings.densityFalloff);
     _atmosphereShader.SetFloat("uIntensity", settings.intensity);
-    _atmosphereShader.SetFloat("uMieCoefficient", settings.mieCoefficient);
+    _atmosphereShader.SetFloat("uMieCoefficient", settings.mieCoefficient / planetRadius);
     _atmosphereShader.SetFloat("uMieDensityFalloff", settings.mieDensityFalloff);
 
     _atmosphereShader.SetFloat("uDitherStrength", settings.ditherStrength);

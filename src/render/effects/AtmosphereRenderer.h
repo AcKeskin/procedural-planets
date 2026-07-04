@@ -29,6 +29,7 @@ public:
                 const glm::mat4& invProjection,
                 const glm::vec3& cameraPos,
                 const glm::vec3& lightDir,
+                const glm::vec3& sunColor,
                 const glm::vec3& planetCenter,
                 float planetRadius,
                 float oceanRadius,

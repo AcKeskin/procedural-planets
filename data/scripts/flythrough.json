@@ -1,0 +1,16 @@
+{
+  "setup": { "seed": 7, "body": "earth", "width": 1280, "height": 720, "fps": 30 },
+  "timeline": [
+    { "cmd": "setParam", "key": "lod.splitThreshold", "value": 9.0 },
+
+    { "cmd": "camera", "mode": "path", "ease": "catmull-rom", "loop": false,
+      "waypoints": [
+        { "t": 0.0, "eye": [0, 6, 32], "target": [0, 0, 0] },
+        { "t": 1.5, "eye": [0, 12, 18], "target": [0, 0, 0] },
+        { "t": 3.0, "eye": [18, 7, 11], "target": [2, 0, 0] }
+      ]
+    },
+
+    { "cmd": "burst", "frames": 90, "every": 6, "pattern": "out/fly_%03d.png" }
+  ]
+}

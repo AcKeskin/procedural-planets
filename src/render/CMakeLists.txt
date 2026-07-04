@@ -25,6 +25,7 @@ add_library(render STATIC
     lod/SharedPatchTopology.cpp
     effects/OceanRenderer.cpp
     effects/AtmosphereRenderer.cpp
+    effects/CloudRenderer.cpp
     cinematic/CinematicController.cpp
     cinematic/CaptureManager.cpp
     # Model and backend sources compiled directly (DLL boundary: symbols not exported via PG_API)
