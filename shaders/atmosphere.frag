@@ -147,9 +147,12 @@ vec3 getViewRay(vec2 uv)
     return normalize(worldDir);
 }
 
+// Reversed-Z: the depth buffer stores near->1, far->0 (see Camera::GetProjectionMatrix).
+// Linear eye depth from a reversed [0,1] buffer value is near*far / (near + d*(far-near)) —
+// the standard formula with the reversed sample d' = 1-d folded in.
 float linearizeDepth(float depth)
 {
-    return uNearPlane * uFarPlane / (uFarPlane - depth * (uFarPlane - uNearPlane));
+    return uNearPlane * uFarPlane / (uNearPlane + depth * (uFarPlane - uNearPlane));
 }
 
 void main()

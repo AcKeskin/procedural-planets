@@ -16,6 +16,12 @@ Renderer::~Renderer()
 bool Renderer::Initialize(int width, int height)
 {
     glEnable(GL_DEPTH_TEST);
+    // Reversed-Z depth: clip space is [0,1] and the far plane maps to 0, so the
+    // depth test keeps the *greater* value and depth clears to 0. Set once; the
+    // reversed projection lives in Camera::GetProjectionMatrix.
+    glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+    glDepthFunc(GL_GREATER);
+    glClearDepth(0.0);
     _fbWidth = width;
     _fbHeight = height;
 
@@ -80,9 +86,14 @@ void Renderer::DrawScene(const RenderContext& ctx)
 
     _sceneFbo.Bind();
     // ImGui leaves depth-test disabled; the planet must write depth so the
-    // atmosphere pass can tell surface from sky. Re-enable it each frame.
+    // atmosphere pass can tell surface from sky. Re-enable it each frame — and
+    // re-assert the reversed-Z func/clear here too, since anything that touches
+    // depth state (ImGui, a resize) can reset them to the GL_LESS default and
+    // silently invert reversed-Z.
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_GREATER);
     glDepthMask(GL_TRUE);
+    glClearDepth(0.0);
     glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

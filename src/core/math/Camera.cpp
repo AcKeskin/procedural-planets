@@ -115,7 +115,13 @@ glm::mat4 Camera::GetViewMatrix() const
 
 glm::mat4 Camera::GetProjectionMatrix(float aspectRatio) const
 {
-    return glm::perspective(glm::radians(_fov), aspectRatio, _nearPlane, _farPlane);
+    // Reversed-Z: map far->0, near->1 so float depth spreads uniformly across the
+    // range (kills far-plane z-fighting at large radius). Two required pieces:
+    //   1. a [0,1] clip-depth projection (perspectiveZO, not the default [-1,1]) — the
+    //      renderer sets glClipControl(..., GL_ZERO_TO_ONE) to match;
+    //   2. swap near/far so the mapping is inverted.
+    // Paired with GL_GREATER depth test + clear-depth 0.0 in the renderer.
+    return glm::perspectiveZO(glm::radians(_fov), aspectRatio, _farPlane, _nearPlane);
 }
 
 void Camera::UpdateVectors()
