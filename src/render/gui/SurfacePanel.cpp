@@ -112,13 +112,15 @@ void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& sea
     {
         ImGui::Separator();
         ImGui::SliderFloat("Sea Level", &seaLevel, 0.9f, 1.1f, "%.3f");
-
-        ImGui::Text("Colors");
-        ImGui::ColorEdit3("Deep Color", &settings.deepColor.x);
-        ImGui::ColorEdit3("Shallow Color", &settings.shallowColor.x);
+        ImGui::SetItemTooltip("Water surface radius (1 = planet radius). Terrain shading, the ocean and the "
+                              "atmosphere all use this one value");
 
         ImGui::Separator();
         ImGui::Text("Water");
+        ImGui::ColorEdit3("Shallow Color", &settings.shallowColor.x);
+        ImGui::SetItemTooltip("Water colour over the shallows");
+        ImGui::ColorEdit3("Deep Color", &settings.deepColor.x);
+        ImGui::SetItemTooltip("Water colour over deep ocean");
         ImGui::SliderFloat("Clarity", &settings.clarity, 0.02f, 1.0f, "%.2f");
         ImGui::SetItemTooltip("How deep you can see into the water before it turns opaque");
 
@@ -129,6 +131,7 @@ void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& sea
         ImGui::SliderFloat("Wave Scale", &settings.waveScale, 0.25f, 4.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
         ImGui::SetItemTooltip("Wave frequency relative to planet size: higher = smaller waves");
         ImGui::SliderFloat("Wave Speed", &settings.waveSpeed, 0.1f, 2.0f, "%.1f");
+        ImGui::SetItemTooltip("How fast the waves move");
     }
 }
 
