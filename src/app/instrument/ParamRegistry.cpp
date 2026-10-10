@@ -270,6 +270,7 @@ const std::unordered_map<std::string, Entry>& Table()
 
         // ---- body.shape.* (needs regen) ----
         {"body.shape.heightScale", {true, BODY_FLOAT(t.body->shape.heightScale)}},
+        {"body.shape.normalEpsilon", {true, BODY_FLOAT(t.body->shape.normalEpsilon)}},
         {"body.shape.oceanDepthMultiplier", {true, BODY_FLOAT(t.body->shape.oceanDepthMultiplier)}},
         {"body.shape.mountainBlend", {true, BODY_FLOAT(t.body->shape.mountainBlend)}},
         {"body.shape.continentBaseLevel", {true, BODY_FLOAT(t.body->shape.continentBaseLevel)}},
