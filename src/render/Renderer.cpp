@@ -221,6 +221,10 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
         if (ctx.clouds)
             _clouds.SetLayerUniforms(_planetShader, *ctx.clouds, CloudLayer(ctx));
         _planetShader.SetFloat("uCloudShadowStrength", cloudsOn ? ctx.clouds->shadowStrength : 0.0f);
+        const SurfaceSettings surface = ctx.surface ? *ctx.surface : SurfaceSettings{};
+        _planetShader.SetVec3("uRockTint", surface.rockTint);
+        _planetShader.SetVec3("uSandTint", surface.sandTint);
+        _planetShader.SetVec3("uSnowTint", surface.snowTint);
         _planetShader.SetFloat("uSunIntensity", ctx.scene->lighting.sunIntensity);
         _planetShader.SetFloat("uAmbientLight", ctx.scene->lighting.ambientLight);
         _planetShader.SetFloat("uSpecularStrength", ctx.scene->lighting.specularStrength);

@@ -4,8 +4,10 @@
 #include "../settings/CloudSettings.h"
 #include "../settings/OceanSettings.h"
 #include "../settings/SceneSettings.h"
+#include "../settings/SurfaceSettings.h"
 #include <nlohmann/json_fwd.hpp>
 #include <string>
+#include <vector>
 
 namespace planets::render::types
 {
@@ -20,6 +22,10 @@ struct BodyLook
     effects::OceanSettings ocean;
     glm::vec3 sunColor = SceneSettings{}.sunColor;
     LightingSettings lighting; // only ambient, night lights and haze come from the block
+    SurfaceSettings surface;
+    // Biome colours in Whittaker order (tropical wet/mid/dry, temperate x3, boreal x3, tundra,
+    // ice). Empty: the body's registry palette.
+    std::vector<glm::vec3> palette;
 };
 
 // Parses the `render` block of a body JSON (missing or not an object: all defaults).
@@ -34,6 +40,7 @@ void ApplyBodyLook(const BodyLook& look,
                    effects::AtmosphereSettings& atmosphere,
                    effects::CloudSettings& clouds,
                    effects::OceanSettings& ocean,
-                   SceneSettings& scene);
+                   SceneSettings& scene,
+                   SurfaceSettings& surface);
 
 } // namespace planets::render::types

@@ -31,6 +31,11 @@ uniform float uNightLightStrength; // emissive city lights on the night side (0 
 // Cloud shadow: sample the shared coverage field along the sun so shadows track the visible clouds.
 uniform float uCloudShadowStrength;
 
+// Planet type material tints (1 = Earth).
+uniform vec3 uRockTint;
+uniform vec3 uSandTint;
+uniform vec3 uSnowTint;
+
 uniform vec3  uCameraPos;
 uniform float uSeaLevel;
 uniform vec2  uHeightMinMax;
@@ -131,15 +136,15 @@ struct Material { vec3 albedo; float roughness; };
 Material rockMaterial(vec3 wp, float footprint, float v)
 {
     // grey granite with iron/ochre streaks
-    vec3 base = mix(vec3(0.30, 0.29, 0.27), vec3(0.42, 0.40, 0.37), v);
+    vec3 base = mix(vec3(0.30, 0.29, 0.27), vec3(0.42, 0.40, 0.37), v) * uRockTint;
     float ochre = smoothstep(0.55, 0.8, fbmFootprint(wp, 0.6, 4, footprint, 0.5).x);
-    base = mix(base, vec3(0.34, 0.26, 0.18), ochre * 0.5);
+    base = mix(base, vec3(0.34, 0.26, 0.18) * uRockTint, ochre * 0.5);
     return Material(base, mix(0.95, 0.7, v));
 }
 
 Material sandMaterial(float v)
 {
-    vec3 base = mix(vec3(0.62, 0.52, 0.36), vec3(0.74, 0.66, 0.46), v);
+    vec3 base = mix(vec3(0.62, 0.52, 0.36), vec3(0.74, 0.66, 0.46), v) * uSandTint;
     return Material(base, 0.9);
 }
 
@@ -151,7 +156,7 @@ Material flatGroundMaterial(vec3 biomeColor, float v)
 
 Material snowMaterial(float v)
 {
-    return Material(mix(vec3(0.86, 0.88, 0.93), vec3(0.97, 0.98, 1.0), v), 0.4);
+    return Material(mix(vec3(0.86, 0.88, 0.93), vec3(0.97, 0.98, 1.0), v) * uSnowTint, 0.4);
 }
 
 void main()

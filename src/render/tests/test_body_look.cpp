@@ -37,6 +37,16 @@ TEST_CASE("body_look: fields in the block override, the rest keep defaults", "[b
     CHECK_THAT(look.lighting.ambientLight, WithinAbs(0.1, 1e-6));
 }
 
+TEST_CASE("body_look: palette and material tints", "[body_look]")
+{
+    const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({
+        "render": {"palette": [[1, 0, 1], [0, 1, 1], [9]], "materials": {"rockTint": [0.2, 0.2, 0.2]}}})"));
+    REQUIRE(look.palette.size() == 2); // the malformed entry is skipped
+    CHECK(look.palette[0] == glm::vec3(1.0f, 0.0f, 1.0f));
+    CHECK(look.surface.rockTint == glm::vec3(0.2f));
+    CHECK(look.surface.sandTint == glm::vec3(1.0f));
+}
+
 TEST_CASE("body_look: wrong types are ignored", "[body_look]")
 {
     const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({
@@ -53,9 +63,10 @@ TEST_CASE("body_look: apply keeps the light direction and exposure", "[body_look
     effects::CloudSettings clouds;
     effects::OceanSettings ocean;
     SceneSettings scene;
+    SurfaceSettings surface;
     scene.lightDir = glm::vec3(0.0f, -1.0f, 0.0f);
     scene.exposure = 2.0f;
-    types::ApplyBodyLook(look, atmosphere, clouds, ocean, scene);
+    types::ApplyBodyLook(look, atmosphere, clouds, ocean, scene, surface);
     CHECK(scene.sunColor == glm::vec3(1.0f, 0.2f, 0.2f));
     CHECK(scene.lightDir == glm::vec3(0.0f, -1.0f, 0.0f));
     CHECK(scene.exposure == 2.0f);

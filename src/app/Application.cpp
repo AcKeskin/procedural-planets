@@ -607,6 +607,7 @@ void Application::Render()
     ctx.time = _lastTime;
     ctx.scene = &_sceneSettings;
     ctx.ocean = &_oceanSettings;
+    ctx.surface = &_surfaceSettings;
     ctx.atmosphere = &_atmosphereSettings;
     ctx.clouds = &_cloudSettings;
     ctx.body = _activeBody.get();
@@ -722,7 +723,10 @@ void Application::SwitchBody(planetgen::BodyConfig config, const render::types::
     _lodConfig.planetRadius = _activeBody->GetRadius();
     _seaLevel = _activeBody->GetSeaLevel();
     // Each planet type brings its own sky, clouds, ocean and star; a switch replaces them.
-    render::types::ApplyBodyLook(look, _atmosphereSettings, _cloudSettings, _oceanSettings, _sceneSettings);
+    render::types::ApplyBodyLook(look, _atmosphereSettings, _cloudSettings, _oceanSettings, _sceneSettings,
+                                 _surfaceSettings);
+    if (!look.palette.empty())
+        _activeBody->OverridePalette(look.palette);
     _atmosphereSettings.enabled = _activeBody->HasAtmosphere() && look.atmosphere.enabled;
     if (_capture.enabled)
         ApplyCaptureExposure();

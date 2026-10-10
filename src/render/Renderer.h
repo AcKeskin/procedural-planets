@@ -18,6 +18,7 @@
 #include "settings/SceneSettings.h"
 #include "settings/OceanSettings.h"
 #include "settings/AtmosphereSettings.h"
+#include "settings/SurfaceSettings.h"
 #include <planetgen/planetgen.h>
 #include <glm/glm.hpp>
 
@@ -39,6 +40,7 @@ struct RenderContext
     const effects::OceanSettings* ocean = nullptr;
     const effects::AtmosphereSettings* atmosphere = nullptr;
     const effects::CloudSettings* clouds = nullptr;
+    const SurfaceSettings* surface = nullptr;
 
     const BodyRuntime* body = nullptr; // null when no body loaded; carries shading/AO via Config()
     float planetRadius = 1.0f;

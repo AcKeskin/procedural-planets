@@ -47,26 +47,145 @@
     "paletteRef": {
         "paletteId": "volcanic"
     },
+    "render": {
+        "materials": {
+            "rockTint": [
+                0.45,
+                0.38,
+                0.36
+            ],
+            "sandTint": [
+                0.35,
+                0.25,
+                0.22
+            ],
+            "snowTint": [
+                0.6,
+                0.58,
+                0.57
+            ]
+        },
+        "palette": [
+            [
+                0.2,
+                0.08,
+                0.05
+            ],
+            [
+                0.24,
+                0.1,
+                0.06
+            ],
+            [
+                0.3,
+                0.13,
+                0.07
+            ],
+            [
+                0.16,
+                0.09,
+                0.07
+            ],
+            [
+                0.19,
+                0.11,
+                0.08
+            ],
+            [
+                0.26,
+                0.15,
+                0.09
+            ],
+            [
+                0.12,
+                0.08,
+                0.07
+            ],
+            [
+                0.15,
+                0.1,
+                0.08
+            ],
+            [
+                0.2,
+                0.13,
+                0.09
+            ],
+            [
+                0.22,
+                0.2,
+                0.19
+            ],
+            [
+                0.55,
+                0.53,
+                0.52
+            ]
+        ],
+        "star": {
+            "color": [
+                1.0,
+                0.85,
+                0.7
+            ]
+        }
+    },
     "shaderPaths": {
         "erosion": "shaders/compute/erosion_earth.comp",
-        "fragment": "shaders/generic/planet_generic.frag",
+        "fragment": "shaders/earth/planet_earth_pbr.frag",
         "height": "shaders/compute/height_earth.comp",
-        "shading": "shaders/compute/shading_generic.comp",
-        "vertex": "shaders/generic/planet_generic.vert"
+        "shading": "shaders/compute/shading_earth.comp",
+        "vertex": "shaders/earth/planet_earth.vert"
     },
     "shading": {
         "aoStrength": 0.35,
         "biomesEnabled": false,
         "coastalDepthRange": 0.04,
-        "colorFlatHighA": [0.20, 0.40, 0.18],
-        "colorFlatHighB": [0.10, 0.28, 0.12],
-        "colorFlatLowA": [0.45, 0.55, 0.30],
-        "colorFlatLowB": [0.15, 0.40, 0.15],
-        "colorShoreHigh": [0.62, 0.55, 0.40],
-        "colorShoreLow": [0.78, 0.72, 0.50],
-        "colorSnow": [0.95, 0.95, 0.98],
-        "colorSteepHigh": [0.30, 0.28, 0.26],
-        "colorSteepLow": [0.40, 0.38, 0.35],
+        "colorFlatHighA": [
+            0.2,
+            0.4,
+            0.18
+        ],
+        "colorFlatHighB": [
+            0.1,
+            0.28,
+            0.12
+        ],
+        "colorFlatLowA": [
+            0.45,
+            0.55,
+            0.3
+        ],
+        "colorFlatLowB": [
+            0.15,
+            0.4,
+            0.15
+        ],
+        "colorShoreHigh": [
+            0.62,
+            0.55,
+            0.4
+        ],
+        "colorShoreLow": [
+            0.78,
+            0.72,
+            0.5
+        ],
+        "colorSnow": [
+            0.95,
+            0.95,
+            0.98
+        ],
+        "colorSteepHigh": [
+            0.3,
+            0.28,
+            0.26
+        ],
+        "colorSteepLow": [
+            0.4,
+            0.38,
+            0.35
+        ],
         "continentalityStrength": 0.3,
         "detailNoiseScale": 4.0,
         "flatColBlend": 1.5,
@@ -86,7 +205,7 @@
         "steepnessThreshold": 0.3,
         "temperatureExponent": 0.6,
         "temperatureLapseRate": 2.0,
-        "useClimateModel": false,
+        "useClimateModel": true,
         "warpStrength": 0.5
     },
     "shape": {

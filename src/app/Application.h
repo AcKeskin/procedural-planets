@@ -158,6 +158,7 @@ private:
     render::effects::OceanSettings _oceanSettings;
     render::effects::AtmosphereSettings _atmosphereSettings;
     render::effects::CloudSettings _cloudSettings;
+    render::SurfaceSettings _surfaceSettings;
     float _seaLevel;
 
     // Camera

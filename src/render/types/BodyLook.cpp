@@ -86,6 +86,20 @@ BodyLook ParseBodyLook(const json& body)
     Read(l, "hazeColor", look.lighting.hazeColor);
     Read(l, "hazeStrength", look.lighting.hazeStrength);
 
+    const json& m = Block(render, "materials");
+    Read(m, "rockTint", look.surface.rockTint);
+    Read(m, "sandTint", look.surface.sandTint);
+    Read(m, "snowTint", look.surface.snowTint);
+
+    if (render.contains("palette") && render["palette"].is_array())
+    {
+        for (const auto& entry : render["palette"])
+        {
+            if (entry.is_array() && entry.size() == 3)
+                look.palette.emplace_back(entry[0].get<float>(), entry[1].get<float>(), entry[2].get<float>());
+        }
+    }
+
     return look;
 }
 
@@ -105,8 +119,10 @@ void ApplyBodyLook(const BodyLook& look,
                    effects::AtmosphereSettings& atmosphere,
                    effects::CloudSettings& clouds,
                    effects::OceanSettings& ocean,
-                   SceneSettings& scene)
+                   SceneSettings& scene,
+                   SurfaceSettings& surface)
 {
+    surface = look.surface;
     atmosphere = look.atmosphere;
     clouds = look.clouds;
     ocean = look.ocean;
