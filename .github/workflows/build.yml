@@ -42,11 +42,16 @@ jobs:
         shell: pwsh
         run: |
           $exe = "build/bin/Release/procedural-planets.exe"
+          $dll = "build/bin/Release/planetgen.dll"
           $shaders = "build/bin/Release/shaders"
           $data = "build/bin/Release/data"
 
           if (!(Test-Path $exe)) {
             Write-Error "Executable not found at $exe"
+            exit 1
+          }
+          if (!(Test-Path $dll)) {
+            Write-Error "Library not found at $dll"
             exit 1
           }
           if (!(Test-Path $shaders)) {
@@ -63,7 +68,7 @@ jobs:
           $dataCount = (Get-ChildItem $data -Recurse -File).Count
           Write-Host "Build verified: $exe ($size), $count shader files, $dataCount data files"
 
-      # Stage a clean release package (exe + shaders + textures).
+      # Stage a clean release package (exe + planetgen.dll + shaders + data).
       - name: Stage release package
         shell: pwsh
         run: |
@@ -71,6 +76,8 @@ jobs:
           New-Item -ItemType Directory -Path $dir -Force | Out-Null
 
           Copy-Item "build/bin/Release/procedural-planets.exe" $dir
+          # The exe links libplanetgen as a DLL; without it the exe does not start.
+          Copy-Item "build/bin/Release/planetgen.dll" $dir
           Copy-Item "build/bin/Release/shaders" "$dir/shaders" -Recurse
 
           # data/ (palettes, body configs) is a runtime requirement — the app
@@ -80,11 +87,6 @@ jobs:
           # Remove non-runtime files from shaders
           Get-ChildItem "$dir/shaders" -Filter "CLAUDE.md" -Recurse |
             Remove-Item -Force
-
-          # Include textures if present in source tree
-          if (Test-Path "textures") {
-            Copy-Item "textures" "$dir/textures" -Recurse
-          }
 
       - name: Create zip archive
         shell: pwsh
@@ -109,11 +111,12 @@ jobs:
           body: |
             ### Contents
             - `procedural-planets.exe` — Windows x64 Release build
+            - `planetgen.dll` — the terrain generation library (required at runtime)
             - `shaders/` — GLSL shader files (required at runtime)
-            - `textures/` — Runtime texture assets (if available)
+            - `data/` — body configs, palettes and sample scripts (required at runtime)
 
             ### Requirements
-            - Windows 10+ with OpenGL 4.x capable GPU
+            - Windows 10+ with an OpenGL 4.5 capable GPU
           generate_release_notes: true
           files: release-package/procedural-planets-windows-x64.zip
           draft: false
