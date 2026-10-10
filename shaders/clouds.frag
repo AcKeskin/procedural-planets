@@ -36,7 +36,12 @@ void main()
     vec3 lightDir = -normalize(uLightDir);
     float day = dayFactor(fragDir, lightDir, 0.12);
     float lambert = clamp(dot(fragDir, lightDir) * 0.5 + 0.5, 0.0, 1.0); // wrapped: soft, always lit on day side
-    vec3 dayColor = uColor * uSunColor * (0.6 + 0.9 * lambert) * uSunIntensity;
+    // Peaks a little above 1 in the HDR target: the brightest cloud burns to white in the tonemap,
+    // the rest keeps its shading instead of a flat over-exposed patch.
+    // Only part of the sun's tint: with the old 8-bit clip, sunlit cloud always read white, and the
+    // warm default sun otherwise turns every cloud cream.
+    vec3 cloudSun = mix(vec3(1.0), uSunColor / max(max(uSunColor.r, uSunColor.g), max(uSunColor.b, 1e-4)), 0.3);
+    vec3 dayColor = uColor * cloudSun * (0.48 + 0.72 * lambert) * uSunIntensity;
     vec3 nightColor = uColor * uAmbientLight * 0.6;
     vec3 color = mix(nightColor, dayColor, day);
 
