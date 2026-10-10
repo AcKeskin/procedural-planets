@@ -56,9 +56,9 @@ bool QuadTreeNode::ShouldMerge(const glm::vec3& cameraPos, float splitThreshold,
     return distance > splitThreshold * _arcLength * hysteresis;
 }
 
-void QuadTreeNode::Split()
+void QuadTreeNode::Split(int maxDepth)
 {
-    if (!CanSplit())
+    if (!CanSplit(maxDepth))
         return;
 
     // Compute edge midpoints and normalize to unit sphere

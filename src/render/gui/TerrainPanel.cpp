@@ -39,7 +39,6 @@ bool TerrainPanel::DrawTerrainBlocks(BodyRuntime& body, uint32_t& seed, bool& ra
     auto& sh = body.Config().shape;
     auto& tec = body.Config().tectonics;
     auto& ofl = body.Config().oceanFloor;
-    auto& hd = body.Config().heightDetail;
     auto& mw = body.Config().macroWorld;
 
     // Regenerate only when a slider's edit is committed (mouse released), not on
@@ -56,7 +55,7 @@ bool TerrainPanel::DrawTerrainBlocks(BodyRuntime& body, uint32_t& seed, bool& ra
     if (ImGui::InputInt("Seed", &seedInt))
         seed = static_cast<uint32_t>(seedInt);
     edited();
-    ImGui::SliderFloat("Height Scale", &sh.heightScale, 0.02f, 0.20f, "%.3f");
+    ImGui::SliderFloat("Height Scale", &sh.heightScale, 0.005f, 0.20f, "%.3f");
     edited();
     ImGui::SliderFloat("Global Frequency", &sh.globalFrequency, 0.6f, 2.0f, "%.2f");
     ImGui::SetItemTooltip("Scales every terrain noise frequency: higher = smaller features");
@@ -187,29 +186,6 @@ bool TerrainPanel::DrawTerrainBlocks(BodyRuntime& body, uint32_t& seed, bool& ra
     ImGui::SliderFloat("Mask Lacunarity", &sh.maskNoise.lacunarity, 1.4f, 2.2f);
     edited();
 
-    ImGui::Spacing();
-    ImGui::Text("Height-Dependent Detail");
-    ImGui::Separator();
-    ImGui::SliderFloat("Detail Low Threshold", &hd.detailLowThreshold, -0.5f, 0.1f);
-    edited();
-    ImGui::SliderFloat("Detail High Threshold", &hd.detailHighThreshold, 0.0f, 0.8f);
-    edited();
-    ImGui::SliderFloat("Strength Low", &hd.perturbStrengthLow, 0.0f, 0.003f, "%.4f");
-    edited();
-    ImGui::SliderFloat("Strength High", &hd.perturbStrengthHigh, 0.001f, 0.01f, "%.4f");
-    edited();
-    ImGui::SliderInt("Octaves Low", &hd.detailOctavesLow, 1, 4);
-    edited();
-    ImGui::SliderInt("Octaves High", &hd.detailOctavesHigh, 2, 8);
-    edited();
-    ImGui::SliderFloat("Detail Persistence", &hd.detailPersistence, 0.2f, 0.7f);
-    edited();
-    ImGui::SliderFloat("Detail Lacunarity", &hd.detailLacunarity, 1.5f, 3.5f);
-    edited();
-    ImGui::SliderFloat("Perturb Scale", &hd.perturbScale, 10.0f, 30.0f);
-    ImGui::SetItemTooltip("Frequency of the small height wobble added on top of the terrain");
-    edited();
-
     // Once-per-body bake (plates, erosion, rivers, moisture). Any change here re-bakes.
     ImGui::Spacing();
     ImGui::Text("Macro World");
@@ -283,7 +259,8 @@ bool TerrainPanel::DrawLodContent(LodConfig& lod, const TerrainStats& stats)
     ImGui::Text("Quadtree");
     ImGui::SliderInt("Mesh Resolution", &lod.meshResolution, 8, 64);
     edited();
-    ImGui::SliderInt("Max Depth", &lod.maxDepth, 2, 10);
+    ImGui::SliderInt("Max Depth", &lod.maxDepth, 2, 12);
+    ImGui::SetItemTooltip("Deepest LOD level: higher = finer mesh up close, more patches");
     edited();
     ImGui::SliderFloat("Split Threshold", &lod.splitThreshold, 0.5f, 12.0f);
     ImGui::SetItemTooltip("Higher = patches split sooner, so denser terrain up close");

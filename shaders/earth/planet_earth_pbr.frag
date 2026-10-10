@@ -1,7 +1,7 @@
 #version 450 core
 
 // Realistic (PBR) planet surface — PROTOTYPE.
-// Cook-Torrance lighting + procedural TRIPLANAR materials (rock / sand / grass / snow),
+// Cook-Torrance lighting + procedural materials (rock / sand / grass / snow),
 // no texture assets: albedo + roughness + detail-normal are generated in-shader from noise.
 // Reuses the same vertex inputs and uniforms as planet_earth.frag, so it drops in by
 // pointing earth.json shaderPaths.fragment here — no C++ change. Unused legacy uniforms
@@ -13,11 +13,13 @@
 #include "lighting.glsl"
 #include "clouds.glsl"
 #include "pbr.glsl"
+#include "ground_material.glsl"
+#include "biome_palette.glsl"
 
 in vec3 vNormal;
 in vec3 vWorldPos;
 in float vHeight;
-in vec4 vShadingData; // climate: x=temp, y=moisture, z=detail, w=small
+in vec4 vShadingData; // climate: x=temp, y=moisture (macro moisture when the macro world is on), z=detail, w=small
 
 out vec4 FragColor;
 
@@ -47,7 +49,6 @@ uniform float uPlanetScale;
 uniform float uFresnelStrengthNear;
 uniform float uFresnelStrengthFar;
 uniform float uFresnelPow;
-uniform float uDetailFadeStart;
 uniform float uHazeStrength;
 uniform vec3  uHazeColor;
 uniform float uAOStrength;
@@ -64,31 +65,64 @@ float hash13(vec3 p)
     return fract((p.x + p.y) * p.z);
 }
 
-float valueNoise(vec3 p)
+// Value noise and its analytic gradient: .x = value in [0,1], .yzw = d/dp. One evaluation gives
+// both the albedo grain and the bump, where a finite difference needs six.
+vec4 valueNoiseD(vec3 p)
 {
     vec3 i = floor(p);
     vec3 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    float n000 = hash13(i + vec3(0,0,0));
-    float n100 = hash13(i + vec3(1,0,0));
-    float n010 = hash13(i + vec3(0,1,0));
-    float n110 = hash13(i + vec3(1,1,0));
-    float n001 = hash13(i + vec3(0,0,1));
-    float n101 = hash13(i + vec3(1,0,1));
-    float n011 = hash13(i + vec3(0,1,1));
-    float n111 = hash13(i + vec3(1,1,1));
-    return mix(mix(mix(n000, n100, f.x), mix(n010, n110, f.x), f.y),
-               mix(mix(n001, n101, f.x), mix(n011, n111, f.x), f.y), f.z);
+    vec3 u = f * f * (3.0 - 2.0 * f);
+    vec3 du = 6.0 * f * (1.0 - f);
+
+    float a = hash13(i + vec3(0,0,0));
+    float b = hash13(i + vec3(1,0,0));
+    float c = hash13(i + vec3(0,1,0));
+    float d = hash13(i + vec3(1,1,0));
+    float e = hash13(i + vec3(0,0,1));
+    float f1 = hash13(i + vec3(1,0,1));
+    float g = hash13(i + vec3(0,1,1));
+    float h = hash13(i + vec3(1,1,1));
+
+    float k0 = a, k1 = b - a, k2 = c - a, k3 = e - a;
+    float k4 = a - b - c + d, k5 = a - c - e + g, k6 = a - b - e + f1;
+    float k7 = -a + b + c - d + e - f1 - g + h;
+
+    float value = k0 + k1 * u.x + k2 * u.y + k3 * u.z + k4 * u.x * u.y + k5 * u.y * u.z
+                + k6 * u.z * u.x + k7 * u.x * u.y * u.z;
+    vec3 grad = du * vec3(k1 + k4 * u.y + k6 * u.z + k7 * u.y * u.z,
+                          k2 + k5 * u.z + k4 * u.x + k7 * u.z * u.x,
+                          k3 + k6 * u.x + k5 * u.y + k7 * u.x * u.y);
+    return vec4(value, grad);
 }
 
-float fbm3(vec3 p, int octaves)
+// Weight of a noise octave of this frequency at this pixel footprint (both in matPos units). An
+// octave fades out between 6.7 and 2.9 pixels per cycle: finer than that it only shimmers.
+float octaveWeight(float frequency, float footprint)
 {
-    float sum = 0.0, amp = 0.5, freq = 1.0;
-    for (int i = 0; i < octaves; ++i)
+    return 1.0 - smoothstep(0.15, 0.35, frequency * footprint);
+}
+
+// fbm that adds octaves as the footprint shrinks, so close views gain grain and far views never
+// alias. A dropped octave contributes its mean (0.5), so brightness does not drift with distance.
+// Returns .x = value, .yzw = gradient.
+vec4 fbmFootprint(vec3 p, float baseFrequency, int maxOctaves, float footprint, float gain)
+{
+    vec4 sum = vec4(0.0);
+    float amp = 0.5;
+    float frequency = baseFrequency;
+    for (int i = 0; i < maxOctaves; ++i)
     {
-        sum += amp * valueNoise(p * freq);
-        freq *= 2.02;
-        amp *= 0.5;
+        float w = octaveWeight(frequency, footprint);
+        if (w <= 0.0)
+        {
+            sum.x += amp * 0.5 * (1.0 - pow(gain, float(maxOctaves - i))) / (1.0 - gain);
+            break;
+        }
+        vec4 n = valueNoiseD(p * frequency);
+        sum.x += amp * mix(0.5, n.x, w);
+        sum.yzw += amp * w * frequency * n.yzw;
+        frequency *= 2.02;
+        amp *= gain;
     }
     return sum;
 }
@@ -96,48 +130,28 @@ float fbm3(vec3 p, int octaves)
 // Planet radius the material and detail-normal noise frequencies were tuned at.
 const float kMaterialReferenceRadius = 10.0;
 
-// ---- triplanar sampling ----
-// Blend weights from the geometric normal, sharpened so seams stay narrow.
-vec3 triplanarWeights(vec3 n)
-{
-    vec3 w = pow(abs(n), vec3(4.0));
-    return w / max(w.x + w.y + w.z, 1e-4);
-}
-
-// Scalar triplanar fbm of world position — isotropic surface grain with no UV stretch.
-float triplanarFbm(vec3 wp, float scale, int octaves, vec3 w)
-{
-    float x = fbm3(wp.yzx * scale, octaves);
-    float y = fbm3(wp.zxy * scale, octaves);
-    float z = fbm3(wp.xyz * scale, octaves);
-    return x * w.x + y * w.y + z * w.z;
-}
-
 // Material = (albedo, roughness). Procedural micro-variation baked into albedo.
 struct Material { vec3 albedo; float roughness; };
 
-Material rockMaterial(vec3 wp, vec3 w, float v)
+Material rockMaterial(vec3 wp, float footprint, float v)
 {
     // grey granite with iron/ochre streaks
     vec3 base = mix(vec3(0.30, 0.29, 0.27), vec3(0.42, 0.40, 0.37), v);
-    float ochre = smoothstep(0.55, 0.8, triplanarFbm(wp, 0.6, 4, w));
+    float ochre = smoothstep(0.55, 0.8, fbmFootprint(wp, 0.6, 4, footprint, 0.5).x);
     base = mix(base, vec3(0.34, 0.26, 0.18), ochre * 0.5);
     return Material(base, mix(0.95, 0.7, v));
 }
 
-Material sandMaterial(vec3 wp, vec3 w, float v)
+Material sandMaterial(float v)
 {
     vec3 base = mix(vec3(0.62, 0.52, 0.36), vec3(0.74, 0.66, 0.46), v);
     return Material(base, 0.9);
 }
 
-Material grassMaterial(vec3 wp, vec3 w, float v, float moisture)
+// Flat ground: the palette biome colour with patchy lightness.
+Material flatGroundMaterial(vec3 biomeColor, float v)
 {
-    vec3 dry = vec3(0.34, 0.36, 0.18);
-    vec3 wet = vec3(0.12, 0.30, 0.10);
-    vec3 base = mix(dry, wet, clamp(moisture, 0.0, 1.0));
-    base *= mix(0.8, 1.15, v); // patchy lightness
-    return Material(base, 0.85);
+    return Material(biomeColor * mix(0.8, 1.15, v), 0.85);
 }
 
 Material snowMaterial(float v)
@@ -154,8 +168,6 @@ void main()
     vec3 lightDir = -normalize(uLightDir);          // toward the sun
     vec3 viewDir  = normalize(uCameraPos - vWorldPos);
     float camDist = length(uCameraPos - vWorldPos);
-    float distRadii = calcDistanceRadii(vWorldPos, uCameraPos, uPlanetScale);
-    float detailFade = 1.0 - smoothstep(uDetailFadeStart, uDetailFadeStart * 2.0, distRadii);
 
     // ---- ocean: simple PBR water, fresnel-tinted ----
     if (vHeight < uSeaLevel)
@@ -173,13 +185,9 @@ void main()
         return;
     }
 
-    vec3 w = triplanarWeights(geoN);
-
     // Surface descriptors
     float steepness = 1.0 - clamp(dot(geoN, sphereNormal), 0.0, 1.0);
     float h = clamp((vHeight - uSeaLevel) / (uHeightMinMax.y - uSeaLevel), 0.0, 1.0);
-    float temperature = vShadingData.x;
-    float moisture    = vShadingData.y;
 
     // Material noise runs on the position scaled to the radius it was tuned at, so the grain
     // keeps its size relative to the planet at any radius. In raw world units a radius-5000
@@ -187,22 +195,34 @@ void main()
     // cost the noise input its precision. At the reference radius the scale is exactly 1.
     vec3 matPos = vWorldPos * (kMaterialReferenceRadius / uPlanetScale);
 
-    // Procedural material variation fields (triplanar, world-space → seam-free, no stretch)
-    float vFine   = triplanarFbm(matPos, 3.0, 4, w);   // fine grain
-    float vMedium = triplanarFbm(matPos, 0.9, 4, w);   // patch-scale variation
+    // matPos units per pixel: decides which noise octaves this pixel can show.
+    float footprint = max(length(dFdx(matPos)), length(dFdy(matPos)));
 
-    Material rock  = rockMaterial(matPos, w, vFine);
-    Material sand  = sandMaterial(matPos, w, vFine);
-    Material grass = grassMaterial(matPos, w, vMedium, moisture);
+    // Material variation fields (3D noise of position: seam-free and unstretched by construction).
+    // The fine grain gains octaves down to a few pixels as the camera closes in.
+    vec4 fine = fbmFootprint(matPos, 3.0, 12, footprint, 0.5);
+    float vFine   = fine.x;
+    float vMedium = fbmFootprint(matPos, 0.9, 4, footprint, 0.5).x; // patch-scale variation
+
+    // Climate: smooth fields, safe to interpolate per vertex. Per-pixel noise plus the vertex
+    // detail channels (.z warped, .w small-scale) roughen biome borders so they never trace the
+    // mesh triangles.
+    float temperature = clamp(vShadingData.x + (vShadingData.w - 0.5) * 0.06, 0.0, 1.0);
+    float moisture    = clamp(vShadingData.y + (vMedium - 0.5) * 0.18 + (vShadingData.z - 0.5) * 0.12, 0.0, 1.0);
+
+    Biome biome = whittakerBiome(temperature, moisture);
+
+    Material rock  = rockMaterial(matPos, footprint, vFine);
+    Material sand  = sandMaterial(vFine);
     Material snow  = snowMaterial(vFine);
 
     // --- blend materials by slope / height / climate ---
-    // flats: sand on dry-warm-low, grass otherwise
+    // Flats: the biome colour; beaches (dry, warm, low) blend to sand.
     float aridity = (1.0 - moisture) * smoothstep(0.35, 0.7, temperature);
     float sandW = smoothstep(0.35, 0.65, aridity) * (1.0 - smoothstep(0.12, 0.25, h));
-    Material flatMat;
-    flatMat.albedo    = mix(grass.albedo, sand.albedo, sandW);
-    flatMat.roughness = mix(grass.roughness, sand.roughness, sandW);
+    Material flatMat = flatGroundMaterial(biome.color, vMedium);
+    flatMat.albedo    = mix(flatMat.albedo, sand.albedo, sandW);
+    flatMat.roughness = mix(flatMat.roughness, sand.roughness, sandW);
 
     // rock takes over on slope (with noisy threshold so the line isn't clean)
     float rockThresh = 0.35 + (vMedium - 0.5) * 0.25;
@@ -220,26 +240,52 @@ void main()
     mat.albedo    = mix(mat.albedo, snow.albedo, snowW);
     mat.roughness = mix(mat.roughness, snow.roughness, snowW);
 
-    // --- procedural DETAIL NORMAL: perturb the geometric normal with a high-frequency noise
-    // gradient so flat ground catches light as fine grain. CENTRAL difference (sample both sides
-    // per axis) — a forward difference is asymmetric at noise extrema and spikes the normal into
-    // specular RINGS (same forward-vs-central lesson as the vertex normals). Clamp the gradient so
-    // an extremum can't throw the normal toward the light. Faded out at orbital distance. ---
-    // eps is a SMALL fraction of a noise cell (cell size = 1/bumpScale in matPos units). Sampling a
-    // full cell apart (the earlier bug) washed the gradient out; a tenth-cell step resolves it.
-    float bumpScale = 45.0;
-    float e = 0.1 / bumpScale;
-    float nXp = triplanarFbm(matPos + vec3(e, 0, 0), bumpScale, 3, w);
-    float nXm = triplanarFbm(matPos - vec3(e, 0, 0), bumpScale, 3, w);
-    float nYp = triplanarFbm(matPos + vec3(0, e, 0), bumpScale, 3, w);
-    float nYm = triplanarFbm(matPos - vec3(0, e, 0), bumpScale, 3, w);
-    float nZp = triplanarFbm(matPos + vec3(0, 0, e), bumpScale, 3, w);
-    float nZm = triplanarFbm(matPos - vec3(0, 0, e), bumpScale, 3, w);
-    vec3 grad = vec3(nXp - nXm, nYp - nYm, nZp - nZm) / (2.0 * e);
-    grad -= geoN * dot(grad, geoN);                  // keep perturbation tangential
-    grad = clamp(grad, vec3(-8.0), vec3(8.0));        // cap extremum spikes (ring source) but allow grain
-    float bumpStrength = mix(0.0, 0.025, detailFade) * (1.0 - snowW * 0.6);
-    vec3 N = normalize(geoN - grad * bumpStrength);
+    // Fine grain on every material (grass took none before), weaker on snow.
+    mat.albedo *= mix(1.0, mix(0.72, 1.28, vFine), 1.0 - snowW * 0.7);
+
+    // Texture detail: the same blend as above, spread over the five texture layers (dry flats get
+    // the soil layer). Only layers with real weight are sampled.
+    float flatW = (1.0 - rockW) * (1.0 - snowW);
+    float desert = smoothstep(0.45, 0.75, aridity);
+    sandW = max(sandW, desert);
+    float soilShare = max(smoothstep(0.6, 0.85, 1.0 - moisture) * 0.6, biome.polar * 0.7);
+    float layerW[5];
+    layerW[GROUND_ROCK]  = rockW * (1.0 - snowW);
+    layerW[GROUND_SNOW]  = snowW;
+    layerW[GROUND_SAND]  = flatW * sandW;
+    layerW[GROUND_SOIL]  = flatW * (1.0 - sandW) * soilShare;
+    layerW[GROUND_GRASS] = flatW * (1.0 - sandW) * (1.0 - soilShare);
+
+    vec3 tw = groundTriplanarWeights(geoN);
+    vec3 texAlbedo = vec3(0.0);
+    vec3 texNormal = vec3(0.0);
+    float texTotal = 0.0;
+    for (int layer = 0; layer < 5; ++layer)
+    {
+        if (layerW[layer] < 0.03)
+            continue;
+        GroundSample g = groundLayer(matPos, tw, layer, footprint);
+        texAlbedo += g.albedo * layerW[layer];
+        texNormal += g.normal * layerW[layer];
+        texTotal += layerW[layer];
+    }
+    if (texTotal > 0.0)
+    {
+        mat.albedo *= texAlbedo / texTotal;
+        texNormal /= texTotal;
+    }
+
+    // --- DETAIL NORMAL from the analytic gradient of the bump fbm. Octaves join as the footprint
+    // shrinks, so the grain sharpens toward the ground and never aliases from far away. ---
+    const float kBumpFrequency = 45.0;
+    const float kBumpTilt = 0.012; // normal tilt per unit of gradient
+    // Normals light non-linearly, so they shimmer sooner than colour: bump octaves fade at twice
+    // the footprint, and each finer octave is a little shallower (gain 0.4).
+    vec3 grad = fbmFootprint(matPos, kBumpFrequency, 8, footprint * 2.0, 0.4).yzw;
+    grad -= geoN * dot(grad, geoN); // keep the perturbation tangential
+    float bumpStrength = kBumpTilt * (1.0 - snowW * 0.6);
+    const float kTextureBump = 0.6; // tilt from the material normal maps
+    vec3 N = normalize(geoN - grad * bumpStrength + (texNormal - geoN * dot(texNormal, geoN)) * kTextureBump);
 
     // --- Cook-Torrance shading ---
     // Ground (grass/soil/sand) is near-matte: real surfaces have almost no specular lobe, and a
@@ -282,10 +328,9 @@ void main()
                        * (1.0 - snowW);
     color += nightLights(normalize(vWorldPos), day, habitability, vec3(1.0, 0.8, 0.45));
 
-    // Reinhard roll-off so highlights don't clip, then a mild gamma lift to keep midtones from
-    // going muddy. No specular boost (the earlier *1.6 was lifting grazing specular into sheen).
-    color = color / (color + vec3(0.8));
-    color = pow(color, vec3(0.9));
+    // Mild gamma lift so shadows and midtones don't go muddy; no roll-off, the scene is HDR and
+    // tonemap.glsl rolls highlights off once, at the end.
+    color = pow(max(color, vec3(0.0)), vec3(0.9));
 
     FragColor = vec4(color, 1.0);
 }

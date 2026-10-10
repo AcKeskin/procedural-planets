@@ -30,7 +30,7 @@ uniform float uHazeStrength;
 uniform vec3 uHazeColor;
 
 // Biome palette SSBO — body type defines entry count and meaning
-#define BIOME_PALETTE_BINDING 3
+#define BIOME_PALETTE_BINDING 4
 
 layout(std430, binding = BIOME_PALETTE_BINDING) readonly buffer BiomePaletteBuffer
 {

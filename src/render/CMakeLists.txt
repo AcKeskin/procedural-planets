@@ -29,6 +29,7 @@ add_library(render STATIC
     effects/AtmosphereRenderer.cpp
     effects/CloudRenderer.cpp
     effects/BloomPass.cpp
+    effects/GroundTextures.cpp
     cinematic/CinematicController.cpp
     cinematic/CaptureManager.cpp
     # Model and backend sources compiled directly (DLL boundary: symbols not exported via PG_API)
@@ -36,6 +37,7 @@ add_library(render STATIC
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfigProjection.cpp
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfigJson.cpp
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/PaletteRegistry.cpp
+    ${CMAKE_SOURCE_DIR}/libplanetgen/src/materials/GroundMaterials.cpp
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/backend/ParamMappers.cpp
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp

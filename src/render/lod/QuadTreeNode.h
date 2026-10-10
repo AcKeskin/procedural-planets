@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include <glm/glm.hpp>
 #include <array>
 #include <memory>
@@ -15,7 +17,9 @@ class SpherePatch;
 class QuadTreeNode
 {
 public:
-    static constexpr int MaxDepth = 8;
+    // Hard cap on the LOD depth setting: depth 12 vertex spacing (~2e-6 R) is still well above
+    // float precision at radius 5000.
+    static constexpr int MaxDepthCap = 12;
 
     // Construct node from three triangle vertices on unit sphere
     QuadTreeNode(const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2, int depth, QuadTreeNode* parent);
@@ -30,7 +34,7 @@ public:
 
     // State queries
     bool IsLeaf() const { return _children[0] == nullptr; }
-    bool CanSplit() const { return IsLeaf() && _depth < MaxDepth; }
+    bool CanSplit(int maxDepth) const { return IsLeaf() && _depth < std::min(maxDepth, MaxDepthCap); }
 
     // Decide whether to split based on camera distance
     bool ShouldSplit(const glm::vec3& cameraPos, float splitThreshold) const;
@@ -39,7 +43,7 @@ public:
     bool ShouldMerge(const glm::vec3& cameraPos, float splitThreshold, float hysteresis) const;
 
     // Tree mutation
-    void Split();
+    void Split(int maxDepth);
     void Merge();
 
     // Patch ownership (leaf nodes only)

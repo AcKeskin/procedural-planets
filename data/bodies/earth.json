@@ -99,7 +99,7 @@
             "strength": 2.0
         },
         "globalFrequency": 1.0,
-        "heightScale": 0.06,
+        "heightScale": 0.03,
         "maskNoise": {
             "lacunarity": 1.66,
             "octaves": 3,
@@ -118,7 +118,7 @@
         },
         "mountainPower": 2.18,
         "mountainSmoothing": 1.0,
-        "normalEpsilon": 0.003,
+        "normalEpsilon": 0.0008,
         "oceanDepthMultiplier": 5.0,
         "oceanFloorDepth": 1.36,
         "oceanFloorSmoothing": 0.5

@@ -204,12 +204,12 @@ void PlanetQuadTree::TraverseAndUpdate(QuadTreeNode& node, const glm::vec3& came
 
     if (node.IsLeaf())
     {
-        bool shouldSplit = distance < splitDistance && node.CanSplit() && _activeLeafCount < _config.maxActivePatches;
+        bool shouldSplit = distance < splitDistance && node.CanSplit(_config.maxDepth) && _activeLeafCount < _config.maxActivePatches;
 
         if (shouldSplit && !IsPending(&node))
         {
             // Split creates children but preserves parent patch as fallback
-            node.Split();
+            node.Split(_config.maxDepth);
 
             // Enqueue async generation for all children
             for (int i = 0; i < 4; ++i)

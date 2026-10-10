@@ -380,7 +380,6 @@ float evaluateHeight(vec3 dir)
     float contScale = continentScale * globalFrequency;
     float mtnScale = mountainScale * globalFrequency;
     float mskScale = maskScale * globalFrequency;
-    float ptbScale = perturbScale * globalFrequency;
 
     float continentShape;
     float mountainMask;
@@ -645,6 +644,17 @@ float evaluateHeight(vec3 dir)
                               0.5, 2.3, 1.0, seed + 74u);
     float detailGain = mix(0.5, 1.0, rangeMask); // rockier in ranges, gentler on plains
     float fineDetail = surfaceDetail * surfaceDetailStrength * detailGain;
+
+    // Fine ground relief, the same at every LOD depth: heights must stay a pure function of
+    // direction, or patches of different depth disagree on their shared edge. Deep patches
+    // resolve it as real shape, coarse ones average it out. Persistence 0.4 makes each finer
+    // octave a little less steep, so octaves a coarse mesh undersamples add little normal noise.
+    // earth.json's normalEpsilon (0.0008) resolves the first octaves only: a step small enough
+    // for all of them combed undersampled noise into streaks on mid-distance patches.
+    const float fineReliefScale    = 700.0;
+    const float fineReliefStrength = 0.003;
+    fineDetail += fbm(dir, vec3(7272.0), 4, fineReliefScale * globalFrequency, 0.4, 2.2, 1.0, seed + 75u)
+                * fineReliefStrength * detailGain;
 
     float landRelief = (plains + hills + rangeRelief * rangeStrength * rangeMask + fineDetail) * landMask;
 

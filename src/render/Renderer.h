@@ -13,6 +13,7 @@
 #include "effects/AtmosphereRenderer.h"
 #include "effects/CloudRenderer.h"
 #include "effects/BloomPass.h"
+#include "effects/GroundTextures.h"
 #include "settings/CloudSettings.h"
 #include "settings/SceneSettings.h"
 #include "settings/OceanSettings.h"
@@ -116,6 +117,7 @@ private:
     effects::AtmosphereRenderer _atmosphereRenderer;
     effects::CloudRenderer _cloudRenderer;
     effects::BloomPass _bloom;
+    effects::GroundTextures _groundTextures;
 
     BiomePalette _palette;
     GpuBuffer<BiomeEntry> _paletteBuffer;
