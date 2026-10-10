@@ -43,10 +43,10 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
         ImGui::Separator();
         ImGui::Text("Mie Scattering");
         ImGui::SetItemTooltip("Scattering by dust and droplets: haze and the glow around the sun");
-        ImGui::SliderFloat("Mie Coefficient", &settings.mieCoefficient, 0.0f, 0.03f, "%.4f");
+        ImGui::SliderFloat("Mie Coefficient", &settings.mieCoefficient, 0.0f, 2.0f, "%.2f");
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Haze extinction amount");
-        ImGui::SliderFloat("Mie Density Falloff", &settings.mieDensityFalloff, 1.0f, 10.0f);
+            ImGui::SetTooltip("Amount of haze: dims the far surface and brightens the glow around the sun");
+        ImGui::SliderFloat("Mie Density Falloff", &settings.mieDensityFalloff, 1.0f, 20.0f);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("How quickly Mie density decreases with altitude");
 
@@ -79,13 +79,7 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
         ImGui::Separator();
         if (ImGui::Button("Earth Preset"))
         {
-            settings.wavelengths = glm::vec3(700.0f, 530.0f, 460.0f);
-            settings.scatteringStrength = 20.0f;
-            settings.densityFalloff = 4.5f;
-            settings.atmosphereScale = 0.25f;
-            settings.mieCoefficient = 0.005f;
-            settings.mieDensityFalloff = 4.0f;
-            settings.intensity = 1.0f;
+            settings = effects::AtmosphereSettings{}; // the defaults are the Earth look
             settings.ditherStrength = 0.8f;
             settings.ditherScale = 4.0f;
         }
@@ -96,7 +90,7 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
             settings.scatteringStrength = 8.0f;
             settings.densityFalloff = 3.0f;
             settings.atmosphereScale = 0.08f;
-            settings.mieCoefficient = 0.015f;
+            settings.mieCoefficient = 1.2f;
             settings.mieDensityFalloff = 2.5f;
             settings.intensity = 1.2f;
             settings.ditherStrength = 0.8f;

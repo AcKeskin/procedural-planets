@@ -51,9 +51,9 @@ void ScenePanel::DrawSpaceContent(SceneSettings& settings)
     ImGui::Separator();
     ImGui::Text("Sun Appearance");
 
-    ImGui::SliderFloat("Sun Size", &settings.sunSize, 0.01f, 0.1f, "%.3f rad");
+    ImGui::SliderFloat("Sun Size", &settings.sunSize, 0.002f, 0.05f, "%.4f rad", ImGuiSliderFlags_Logarithmic);
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Angular size in radians");
+        ImGui::SetTooltip("Angular radius of the sun disc. The real sun is 0.0047 rad");
 
     ImGui::ColorEdit3("Sun Color", &settings.sunColor.x);
 
@@ -61,6 +61,16 @@ void ScenePanel::DrawSpaceContent(SceneSettings& settings)
     ImGui::Text("Stars");
 
     ImGui::SliderFloat("Star Density", &settings.starDensity, 0.0f, 3.0f);
+
+    ImGui::Separator();
+    ImGui::Text("Camera");
+
+    ImGui::SliderFloat("Exposure", &settings.exposure, 0.25f, 4.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Brightness of the whole image before highlights roll off to white");
+    ImGui::SliderFloat("Bloom", &settings.bloomStrength, 0.0f, 3.0f, "%.2f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Glow around very bright light: the sun and sun glints on water");
 }
 
 void ScenePanel::DrawLightingContent(LightingSettings& settings, bool atmosphereOwnsHaze)
