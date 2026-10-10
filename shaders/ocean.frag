@@ -2,7 +2,9 @@
 
 in vec3 fragWorldPos;
 in vec3 fragNormal;
-in float fragDepth01; // real bathymetry: 0 at coast, 1 over the deepest floor
+in float fragDepth;   // water depth in planet-radius units, from the drawn terrain heights
+
+uniform float uHeightScale; // body shape.heightScale: radius units per terrain unit
 
 uniform vec3 uCameraPos;
 uniform vec3 uLightDir;
@@ -47,8 +49,15 @@ vec3 calcWaveNormal(vec3 worldPos, vec3 sphereNormal)
     return normalize(mix(sphereNormal, sphereNormal + perturbation, uWaveStrength));
 }
 
+// Terrain units of depth that read as the deepest colour (the ocean floor sits around 1-1.5).
+const float kDeepDepthUnits = 1.5;
+
 void main()
 {
+    if (fragDepth <= 0.0)
+        discard; // land: the terrain draws here
+    float fragDepth01 = clamp(fragDepth / (uHeightScale * kDeepDepthUnits), 0.0, 1.0);
+
     vec3 viewDir = normalize(uCameraPos - fragWorldPos);
     vec3 sphereNormal = normalize(fragNormal);
     vec3 waveNormal = calcWaveNormal(fragWorldPos, sphereNormal);

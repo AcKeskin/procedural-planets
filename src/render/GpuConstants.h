@@ -21,8 +21,5 @@ inline constexpr float FresnelPower = 3.0f;
 // 16/frame so detail resolves quickly when the camera approaches (and headless captures,
 // which render a fixed warm-up window, settle to full subdivision before the shot).
 inline constexpr int SchedulerPatchesPerFrame = 16;
-// 6 (vs 5) quadruples ocean vertices so the shallow coastal shelf has enough vertices to render a
-// visible depth band + shoreline foam from the baked bathymetry — subdiv 5 left only ~33 shelf verts.
-inline constexpr int OceanSubdivisions = 6;
 
 } // namespace planets::render

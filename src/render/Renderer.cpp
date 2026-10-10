@@ -58,7 +58,7 @@ void Renderer::ResizeFramebuffer(int width, int height)
 }
 
 bool Renderer::SetActiveBody(
-    PgBody body, const BodyRuntime& runtime, const lod::QuadTreeConfig& quadTreeConfig, float seaLevel, uint32_t seed)
+    PgBody body, const BodyRuntime& runtime, const lod::QuadTreeConfig& quadTreeConfig, uint32_t seed)
 {
     if (!_planetShader.LoadFromFiles(runtime.GetVertexShaderPath(), runtime.GetFragmentShaderPath()))
     {
@@ -73,7 +73,7 @@ bool Renderer::SetActiveBody(
     _scheduler.Initialize(body, seed);
 
     _quadTree.Initialize(quadTreeConfig, _scheduler, seed);
-    _oceanRenderer.Initialize(quadTreeConfig.planetRadius, seaLevel, OceanSubdivisions, body, seed);
+    _oceanRenderer.Initialize();
     _cloudRenderer.Initialize(quadTreeConfig.planetRadius);
     _atmosphereRenderer.Initialize();
     return true;
@@ -106,15 +106,18 @@ void Renderer::DrawScene(const RenderContext& ctx)
     _oceanTimer.Begin();
     if (ctx.body && ctx.seaLevel > 0.0f && ctx.ocean && ctx.scene)
     {
-        _oceanRenderer.Render(ctx.view,
-                              ctx.projection,
-                              ctx.cameraPos,
-                              ctx.scene->lightDir,
-                              ctx.scene->sunColor,
-                              ctx.scene->lighting.sunIntensity,
-                              ctx.scene->lighting.ambientLight,
-                              ctx.time,
-                              *ctx.ocean);
+        effects::OceanFrame frame;
+        frame.view = ctx.view;
+        frame.projection = ctx.projection;
+        frame.cameraPos = ctx.cameraPos;
+        frame.lightDir = ctx.scene->lightDir;
+        frame.sunColor = ctx.scene->sunColor;
+        frame.sunIntensity = ctx.scene->lighting.sunIntensity;
+        frame.ambientLight = ctx.scene->lighting.ambientLight;
+        frame.time = ctx.time;
+        frame.seaLevel = ctx.seaLevel;
+        frame.heightScale = ctx.body->GetHeightScale();
+        _oceanRenderer.Render(frame, *ctx.ocean, _quadTree);
     }
     _oceanTimer.End();
 

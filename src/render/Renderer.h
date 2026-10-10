@@ -76,7 +76,6 @@ public:
     bool SetActiveBody(PgBody body,
                        const BodyRuntime& runtime,
                        const lod::QuadTreeConfig& quadTreeConfig,
-                       float seaLevel,
                        uint32_t seed);
 
     // Composite one frame into the scene framebuffer then to the default target.

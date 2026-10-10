@@ -789,7 +789,7 @@ void Application::RegenerateLodSystem()
             _libBody = std::move(rebuilt);
     }
 
-    _renderer.SetActiveBody(_libBody.Handle(), *_activeBody, BuildQuadTreeConfig(), _seaLevel, _genConfig.seed);
+    _renderer.SetActiveBody(_libBody.Handle(), *_activeBody, BuildQuadTreeConfig(), _genConfig.seed);
 
     float farPlane =
         (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
