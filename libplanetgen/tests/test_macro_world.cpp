@@ -705,3 +705,75 @@ TEST_CASE("macro_world climate: coastal land is wetter than continental interior
     }
     pg_context_destroy(ctx);
 }
+
+namespace
+{
+// Unit vectors on a lat/lon grid. Edge vertices are computed from the same
+// (lat, lon) inputs in both patches, so shared-edge directions are bit-equal.
+std::vector<float> LatLonPatch(double lat0, double lon0, double span, int steps)
+{
+    std::vector<float> v;
+    for (int a = 0; a <= steps; ++a)
+        for (int b = 0; b <= steps; ++b)
+        {
+            const double lat = (lat0 + span * a / steps) * 0.0174532925199;
+            const double lon = (lon0 + span * b / steps) * 0.0174532925199;
+            v.push_back(float(std::cos(lat) * std::cos(lon)));
+            v.push_back(float(std::sin(lat)));
+            v.push_back(float(std::cos(lat) * std::sin(lon)));
+        }
+    return v;
+}
+} // namespace
+
+TEST_CASE("macro_world patches: adjacent patches match on their shared edge with the layer on", "[gpu][macro_world][patch]")
+{
+    const int Steps = 16;
+    const uint32_t N = (Steps + 1) * (Steps + 1);
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+    auto& gpu = *ctx->backend;
+    {
+        const auto cfg = MacroEarth(128);
+        planetgen::GpuTextureHandle maskTex = 0, macroTex = 0;
+        uint64_t maskKey = 0, macroKey = 0;
+        planetgen::GenerationPipeline pipeline(gpu, ctx->registry, ctx->palettes);
+
+        // Patch A spans lon [20, 30], patch B lon [30, 40]: A's last column is B's first.
+        auto run = [&](const std::vector<float>& verts)
+        {
+            const auto h = gpu.CreateBuffer(N * sizeof(float));
+            const auto nb = gpu.CreateBuffer(N * 3 * sizeof(float));
+            const auto sh = gpu.CreateBuffer(N * 4 * sizeof(float));
+            REQUIRE(pipeline.GeneratePatch(cfg, verts.data(), N, 42u, h, nb, sh,
+                                           { &maskTex, &maskKey }, { &macroTex, &macroKey }));
+            std::vector<float> out(N * 8);
+            gpu.DownloadBuffer(h, out.data(), N * sizeof(float));
+            gpu.DownloadBuffer(nb, out.data() + N, N * 3 * sizeof(float));
+            gpu.DownloadBuffer(sh, out.data() + N * 4, N * 4 * sizeof(float));
+            for (auto b : { h, nb, sh })
+                gpu.DestroyBuffer(b);
+            return out;
+        };
+        const auto a = run(LatLonPatch(-5.0, 20.0, 10.0, Steps));
+        REQUIRE(macroTex != 0);
+        const auto b = run(LatLonPatch(-5.0, 30.0, 10.0, Steps));
+
+        int mismatches = 0;
+        for (int row = 0; row <= Steps; ++row)
+        {
+            const uint32_t va = row * (Steps + 1) + Steps; // A: last column
+            const uint32_t vb = row * (Steps + 1);         // B: first column
+            mismatches += a[va] != b[vb];
+            for (int k = 0; k < 3; ++k)
+                mismatches += a[N + va * 3 + k] != b[N + vb * 3 + k];
+            for (int k = 0; k < 4; ++k)
+                mismatches += a[N * 4 + va * 4 + k] != b[N * 4 + vb * 4 + k];
+        }
+        CHECK(mismatches == 0);
+
+        gpu.DestroyTexture(maskTex);
+        gpu.DestroyTexture(macroTex);
+    }
+    pg_context_destroy(ctx);
+}

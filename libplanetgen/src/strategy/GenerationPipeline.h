@@ -16,6 +16,7 @@
 #include "ErosionStrategy.h"
 #include "PaletteProvider.h"
 #include "ContinentMaskPass.h"
+#include "MacroWorldPass.h"
 #include "../model/BodyConfig.h"
 #include "../model/PaletteRegistry.h"
 
@@ -56,13 +57,23 @@ public:
         uint64_t*         key     = nullptr; // body's cache key (inout)
     };
 
+    // Optional macro world cache, owned by the body like the mask cache. When
+    // non-null and the config enables the layer, the pipeline bakes/reuses the
+    // field (it needs the mask) and binds it for height + shading.
+    struct MacroCache
+    {
+        GpuTextureHandle* texture = nullptr; // body's cached handle (inout)
+        uint64_t*         key     = nullptr; // body's cache key (inout)
+    };
+
     // Run the full pass sequence from a config. Enables erosion only when the
     // config's erosion block is on. `vertices` = packed float3 (x,y,z per vertex).
     PipelineResult Generate(const BodyConfig& config,
                             const float* vertices,
                             uint32_t vertexCount,
                             uint32_t seed,
-                            MaskCache mask = {});
+                            MaskCache mask = {},
+                            MacroCache macro = {});
 
     // Per-patch path: run height -> shading writing into the caller-owned output
     // buffers (GL handles), GPU-resident, with NO CPU readback. Erosion is skipped
@@ -77,7 +88,8 @@ public:
                        GpuBufferHandle outHeights,
                        GpuBufferHandle outNormals,
                        GpuBufferHandle outShading,
-                       MaskCache mask = {});
+                       MaskCache mask = {},
+                       MacroCache macro = {});
 
 private:
     IComputeBackend& _backend;

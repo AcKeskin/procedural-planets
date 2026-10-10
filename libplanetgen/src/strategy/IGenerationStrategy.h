@@ -48,6 +48,10 @@ struct StrategyContext
     // Continent-mask 3D texture (0 = none). When set, the height stage binds it to
     // the mask sampler unit and flags continentMaskAvailable in its params.
     GpuTextureHandle continentMask = 0;
+
+    // Macro world field, a cube-sphere 2D texture array (0 = layer off). When set,
+    // height and shading bind it to kMacroFieldSamplerUnit and sample it by direction.
+    GpuTextureHandle macroField = 0;
 };
 
 // Output handle bundle for the height stage (heights + packed-float3 normals).

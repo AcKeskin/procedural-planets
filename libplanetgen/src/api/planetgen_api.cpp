@@ -453,8 +453,9 @@ PgResult pg_generate_mesh(PgBody body, uint32_t rings, uint32_t segments, uint32
 
     planetgen::GenerationPipeline pipeline(*ctx->backend, ctx->registry, ctx->palettes);
     const planetgen::GenerationPipeline::MaskCache maskCache{ &body->maskTexture, &body->maskBuiltKey };
+    const planetgen::GenerationPipeline::MacroCache macroCache{ &body->macroTexture, &body->macroBuiltKey };
     planetgen::PipelineResult pr =
-        pipeline.Generate(body->config, mesh.positions.data(), vertexCount, seed, maskCache);
+        pipeline.Generate(body->config, mesh.positions.data(), vertexCount, seed, maskCache, macroCache);
 
     if (pr.count == 0)
     {
@@ -501,8 +502,10 @@ PgError pg_generate_patch(PgBody body, const float* vertices, uint32_t vertex_co
     {
         planetgen::GenerationPipeline pipeline(*ctx->backend, ctx->registry, ctx->palettes);
         const planetgen::GenerationPipeline::MaskCache maskCache{ &body->maskTexture, &body->maskBuiltKey };
+        const planetgen::GenerationPipeline::MacroCache macroCache{ &body->macroTexture, &body->macroBuiltKey };
         const bool ok = pipeline.GeneratePatch(body->config, vertices, vertex_count, seed,
-                                               height_buffer, normal_buffer, shading_buffer, maskCache);
+                                               height_buffer, normal_buffer, shading_buffer,
+                                               maskCache, macroCache);
         if (!ok)
         {
             ctx->SetError(PG_ERROR_NOT_INITIALIZED, "per-patch generation produced no dispatch");
