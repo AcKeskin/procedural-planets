@@ -6,9 +6,12 @@
 #include "model/BodyConfig.h"
 #include "model/BodyConfigJson.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -88,6 +91,89 @@ uint64_t HashGenerate(PgContext ctx, const planetgen::BodyConfig& cfg, uint32_t 
     return h;
 }
 
+// Test-only probe shaders are built from the on-disk include so they exercise
+// exactly the macro_grid.glsl the library embeds.
+std::string ReadShaderFile(const std::string& relPath)
+{
+    std::ifstream f(std::string(PLANETGEN_TEST_DATA_DIR) + "/" + relPath);
+    REQUIRE(f.is_open());
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+uint32_t CompileProbe(PgContext ctx, const std::string& key, const std::string& body)
+{
+    const std::string src = "#version 450\n" + ReadShaderFile("shaders/includes/macro_grid.glsl") + body;
+    REQUIRE(ctx->registry.RegisterProgram(key, src));
+    return ctx->registry.Resolve(key);
+}
+
+struct Vec3
+{
+    double x, y, z;
+};
+
+double Angle(const Vec3& a, const Vec3& b)
+{
+    const double d = a.x * b.x + a.y * b.y + a.z * b.z;
+    return std::acos(std::clamp(d, -1.0, 1.0));
+}
+
+Vec3 Normalize(Vec3 v)
+{
+    const double l = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    return { v.x / l, v.y / l, v.z / l };
+}
+
+// Writes each cell's direction (image, binding 0) and the linear ids of its
+// +x, -x, +y, -y neighbours (SSBO, binding 1). Linear id = (face * n + j) * n + i.
+const char* kNeighbourProbe = R"(
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(rgba32f, binding = 0) uniform image2DArray dirImg;
+layout(std430, binding = 1) writeonly buffer Neighbours { ivec4 nb[]; };
+int lin(ivec3 c, int n) { return (c.x * n + c.z) * n + c.y; }
+void main()
+{
+    int n = imageSize(dirImg).x;
+    ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
+    int f = int(gl_GlobalInvocationID.z);
+    imageStore(dirImg, ivec3(ij, f), vec4(mg_cellDir(f, ij, n), 0.0));
+    nb[lin(ivec3(f, ij), n)] = ivec4(lin(mg_neighbour(f, ij,  1,  0, n), n),
+                                     lin(mg_neighbour(f, ij, -1,  0, n), n),
+                                     lin(mg_neighbour(f, ij,  0,  1, n), n),
+                                     lin(mg_neighbour(f, ij,  0, -1, n), n));
+}
+)";
+
+// Fills the field with a smooth analytic function of the cell direction.
+const char* kFieldFill = R"(
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(rgba32f, binding = 0) uniform image2DArray fieldImg;
+void main()
+{
+    int n = imageSize(fieldImg).x;
+    ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
+    int f = int(gl_GlobalInvocationID.z);
+    vec3 d = mg_cellDir(f, ij, n);
+    imageStore(fieldImg, ivec3(ij, f), vec4(d.x + 0.5 * d.y * d.z, sin(3.0 * d.y), d.z, 1.0));
+}
+)";
+
+// Samples the field (sampler unit 5) at directions from an SSBO.
+const char* kSampleProbe = R"(
+layout(local_size_x = 64) in;
+layout(binding = 5) uniform sampler2DArray field;
+layout(std430, binding = 0) readonly buffer Dirs { vec4 dirs[]; };
+layout(std430, binding = 1) writeonly buffer Values { vec4 values[]; };
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= uint(dirs.length())) return;
+    values[id] = mg_sample(field, normalize(dirs[id].xyz));
+}
+)";
+
 } // namespace
 
 TEST_CASE("macro_world off: Earth output matches the pre-macro baseline", "[gpu][macro_world]")
@@ -107,5 +193,142 @@ TEST_CASE("macro_world off: Earth output matches the pre-macro baseline", "[gpu]
     std::printf("macro_world off-parity hash: 0x%016llx\n", static_cast<unsigned long long>(h));
     CHECK(h == kBaseline);
 
+    pg_context_destroy(ctx);
+}
+
+TEST_CASE("macro_world grid: cross-face neighbours are adjacent and reciprocal", "[gpu][macro_world]")
+{
+    const int n = 32;
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+    auto& gpu = *ctx->backend;
+
+    const uint32_t program = CompileProbe(ctx, "test_macro_grid_neighbours", kNeighbourProbe);
+    const auto dirTex = gpu.CreateTexture2DArray_RGBA32F(n, 6);
+    const size_t cells = static_cast<size_t>(6) * n * n;
+    const auto nbBuf = gpu.CreateBuffer(cells * 4 * sizeof(int32_t));
+
+    gpu.BindShader(program);
+    gpu.BindImage2DArray(dirTex, 0);
+    gpu.BindBuffer(nbBuf, 1);
+    gpu.Dispatch(n / 8, n / 8, 6);
+    gpu.ImageBarrier();
+    gpu.Barrier();
+
+    std::vector<float> dirs(cells * 4);
+    std::vector<int32_t> nb(cells * 4);
+    gpu.DownloadTexture(dirTex, dirs.data(), dirs.size() * sizeof(float));
+    gpu.DownloadBuffer(nbBuf, nb.data(), nb.size() * sizeof(int32_t));
+
+    auto dirOf = [&](size_t c) { return Vec3{ dirs[c * 4], dirs[c * 4 + 1], dirs[c * 4 + 2] }; };
+    const double cellAngle = (3.14159265358979 * 0.5) / n;
+
+    int crossings = 0;
+    for (int f = 0; f < 6; ++f)
+        for (int j = 0; j < n; ++j)
+            for (int i = 0; i < n; ++i)
+            {
+                const bool edgeI = (i == 0 || i == n - 1);
+                const bool edgeJ = (j == 0 || j == n - 1);
+                if (!(edgeI || edgeJ) || (edgeI && edgeJ))
+                    continue; // interior cells never cross; corner cells are the documented approximation
+
+                const size_t c = (static_cast<size_t>(f) * n + j) * n + i;
+                const bool outward[4] = { i == n - 1, i == 0, j == n - 1, j == 0 };
+                for (int k = 0; k < 4; ++k)
+                {
+                    if (!outward[k])
+                        continue;
+                    const size_t other = static_cast<size_t>(nb[c * 4 + k]);
+                    INFO("face " << f << " cell " << i << "," << j << " dir " << k << " -> " << other);
+                    REQUIRE(other < cells);
+                    CHECK(static_cast<int>(other / (n * n)) != f);
+                    CHECK(Angle(dirOf(c), dirOf(other)) < 1.5 * cellAngle);
+
+                    const int32_t* back = &nb[other * 4];
+                    const bool reciprocal = std::find(back, back + 4, static_cast<int32_t>(c)) != back + 4;
+                    CHECK(reciprocal);
+                    ++crossings;
+                }
+            }
+    CHECK(crossings == 6 * 4 * (n - 2));
+
+    gpu.DestroyBuffer(nbBuf);
+    gpu.DestroyTexture(dirTex);
+    pg_context_destroy(ctx);
+}
+
+TEST_CASE("macro_world grid: bilinear sampling is continuous across cube edges", "[gpu][macro_world]")
+{
+    const int n = 32;
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+    auto& gpu = *ctx->backend;
+
+    const uint32_t fill = CompileProbe(ctx, "test_macro_grid_fill", kFieldFill);
+    const uint32_t sample = CompileProbe(ctx, "test_macro_grid_sample", kSampleProbe);
+
+    const auto field = gpu.CreateTexture2DArray_RGBA32F(n, 6);
+    gpu.BindShader(fill);
+    gpu.BindImage2DArray(field, 0);
+    gpu.Dispatch(n / 8, n / 8, 6);
+    gpu.ImageBarrier();
+
+    // Pairs of points a hair either side of each of the 12 cube edges.
+    std::vector<float> dirs;
+    const double eps = 1e-4;
+    for (int a = 0; a < 3; ++a)
+        for (int b = a + 1; b < 3; ++b)
+        {
+            const int c = 3 - a - b;
+            for (int sa = -1; sa <= 1; sa += 2)
+                for (int sb = -1; sb <= 1; sb += 2)
+                    for (int k = 0; k <= 16; ++k)
+                    {
+                        const double along = -0.8 + 1.6 * k / 16.0;
+                        for (int side = -1; side <= 1; side += 2)
+                        {
+                            double p[3] = {};
+                            p[a] = sa * (1.0 + side * eps);
+                            p[b] = sb * (1.0 - side * eps);
+                            p[c] = along;
+                            const Vec3 d = Normalize({ p[0], p[1], p[2] });
+                            dirs.insert(dirs.end(), { float(d.x), float(d.y), float(d.z), 0.0f });
+                        }
+                    }
+        }
+    const size_t count = dirs.size() / 4;
+
+    const auto dirBuf = gpu.CreateBuffer(dirs.size() * sizeof(float));
+    gpu.UploadBuffer(dirBuf, dirs.data(), dirs.size() * sizeof(float));
+    const auto valBuf = gpu.CreateBuffer(count * 4 * sizeof(float));
+
+    gpu.BindShader(sample);
+    gpu.BindTexture2DArray(field, 5);
+    gpu.BindBuffer(dirBuf, 0);
+    gpu.BindBuffer(valBuf, 1);
+    gpu.Dispatch(static_cast<uint32_t>((count + 63) / 64));
+    gpu.Barrier();
+
+    std::vector<float> vals(count * 4);
+    gpu.DownloadBuffer(valBuf, vals.data(), vals.size() * sizeof(float));
+
+    double worstSeam = 0.0;
+    double worstAnalytic = 0.0;
+    for (size_t p = 0; p < count; p += 2)
+    {
+        for (int ch = 0; ch < 3; ++ch)
+            worstSeam = std::max(worstSeam, double(std::fabs(vals[p * 4 + ch] - vals[(p + 1) * 4 + ch])));
+
+        const Vec3 d{ dirs[p * 4], dirs[p * 4 + 1], dirs[p * 4 + 2] };
+        worstAnalytic = std::max(worstAnalytic, std::fabs(vals[p * 4] - (d.x + 0.5 * d.y * d.z)));
+    }
+    INFO("worst seam jump " << worstSeam << ", worst analytic error " << worstAnalytic);
+    CHECK(worstSeam < 1e-3);
+    CHECK(worstAnalytic < 0.02);
+
+    gpu.DestroyBuffer(dirBuf);
+    gpu.DestroyBuffer(valBuf);
+    gpu.DestroyTexture(field);
     pg_context_destroy(ctx);
 }

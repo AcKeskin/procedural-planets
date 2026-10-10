@@ -15,6 +15,7 @@ set(SHADER_SOURCES
     "${SHADER_SOURCE_DIR}/compute/erosion_earth.comp"
     "${SHADER_SOURCE_DIR}/compute/continent_growth.comp"
     "${SHADER_SOURCE_DIR}/includes/noise.glsl"
+    "${SHADER_SOURCE_DIR}/includes/macro_grid.glsl"
 )
 
 add_custom_command(
