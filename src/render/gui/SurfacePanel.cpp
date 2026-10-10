@@ -125,7 +125,9 @@ void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& sea
         ImGui::Separator();
         ImGui::Text("Waves");
         ImGui::SliderFloat("Wave Strength", &settings.waveStrength, 0.0f, 0.5f, "%.2f");
-        ImGui::SliderFloat("Wave Scale", &settings.waveScale, 5.0f, 50.0f);
+        ImGui::SetItemTooltip("Steepness of the waves: rougher water, wider sun glitter");
+        ImGui::SliderFloat("Wave Scale", &settings.waveScale, 0.25f, 4.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+        ImGui::SetItemTooltip("Wave frequency relative to planet size: higher = smaller waves");
         ImGui::SliderFloat("Wave Speed", &settings.waveSpeed, 0.1f, 2.0f, "%.1f");
     }
 }

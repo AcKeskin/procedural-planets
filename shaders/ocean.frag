@@ -46,32 +46,51 @@ WaterBody waterBody(float depthUnits)
 
 // ---- waves ----
 
-// Two sine layers at different frequencies for procedural wave normals
-vec3 calcWaveNormal(vec3 worldPos, vec3 sphereNormal)
+// Waves run on the direction scaled to this radius, so they keep their size relative to the
+// planet at any planet radius (the same rule as the ground's material noise).
+const float kWaveReferenceRadius = 10.0;
+const int kWaveCount = 8;
+const float kBaseWaveFrequency = 300.0; // radians per reference unit at wave scale 1
+
+// Fixed, well-spread 3D wave directions (plane waves through the sphere).
+const vec3 kWaveDirs[kWaveCount] = vec3[kWaveCount](
+    vec3( 0.83,  0.15,  0.54), vec3(-0.41,  0.79,  0.46), vec3( 0.12, -0.63,  0.77), vec3(-0.92, -0.25,  0.30),
+    vec3( 0.35,  0.90, -0.26), vec3(-0.18, -0.21, -0.96), vec3( 0.71, -0.56, -0.42), vec3(-0.55,  0.44, -0.71));
+
+struct WaveSurface
 {
-    vec3 up = abs(sphereNormal.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-    vec3 tangent1 = normalize(cross(sphereNormal, up));
-    vec3 tangent2 = cross(sphereNormal, tangent1);
+    vec3 normal;
+    float slopeVariance; // slope of waves too small for a pixel: widens the sun glitter
+};
 
-    float u = dot(worldPos, tangent1);
-    float v = dot(worldPos, tangent2);
+// Sum of plane waves over the sphere. Each wave's height gradient is projected onto the surface
+// to tilt the normal. A wave shorter than about two pixels cannot be drawn without shimmer; it
+// fades out of the normal and into slopeVariance, so distant water reads as rougher, not flat.
+WaveSurface waveSurface(vec3 dir)
+{
+    vec3 p = dir * kWaveReferenceRadius;
+    float footprint = length(fwidth(p)); // reference units per pixel
 
-    // Large slow waves
-    float wave1u = sin(u * uWaveScale * 0.1 + uTime * uWaveSpeed)
-                 * cos(v * uWaveScale * 0.13 + uTime * uWaveSpeed * 0.8);
-    float wave1v = cos(u * uWaveScale * 0.11 - uTime * uWaveSpeed * 0.9)
-                 * sin(v * uWaveScale * 0.1 + uTime * uWaveSpeed * 0.7);
+    vec3 gradient = vec3(0.0);
+    float lostVariance = 0.0;
+    float frequency = kBaseWaveFrequency * uWaveScale;
+    float slope = uWaveStrength;
+    for (int k = 0; k < kWaveCount; ++k)
+    {
+        vec3 d = normalize(kWaveDirs[k]);
+        float speed = uWaveSpeed * sqrt(frequency) * 0.5; // longer waves travel faster
+        float phase = dot(d, p) * frequency + uTime * speed + float(k) * 1.7;
+        float resolved = 1.0 - smoothstep(0.25, 0.5, frequency * footprint / 6.2832);
 
-    // Smaller faster waves
-    float wave2u = sin(u * uWaveScale * 0.3 - uTime * uWaveSpeed * 1.3)
-                 * cos(v * uWaveScale * 0.27 - uTime * uWaveSpeed * 0.6);
-    float wave2v = cos(u * uWaveScale * 0.28 + uTime * uWaveSpeed * 1.1)
-                 * sin(v * uWaveScale * 0.32 - uTime * uWaveSpeed * 0.9);
+        gradient += d * (slope * cos(phase) * resolved);
+        lostVariance += 0.5 * slope * slope * (1.0 - resolved);
 
-    vec3 perturbation = tangent1 * (wave1u * 0.6 + wave2u * 0.4)
-                      + tangent2 * (wave1v * 0.6 + wave2v * 0.4);
+        frequency *= 1.73;
+        slope *= 0.7;
+    }
 
-    return normalize(mix(sphereNormal, sphereNormal + perturbation, uWaveStrength));
+    gradient -= dir * dot(gradient, dir); // keep the tilt tangential
+    return WaveSurface(normalize(dir - gradient), lostVariance);
 }
 
 // ---- reflection ----
@@ -92,17 +111,22 @@ void main()
 
     vec3 viewDir = normalize(uCameraPos - fragWorldPos);
     vec3 sphereNormal = normalize(fragNormal);
-    vec3 waveNormal = calcWaveNormal(fragWorldPos, sphereNormal);
+    WaveSurface waves = waveSurface(sphereNormal);
+    vec3 waveNormal = waves.normal;
 
     // Diffuse + ambient on the sphere normal, matching the land's terminator.
     vec3 lightDir = -normalize(uLightDir); // uLightDir points from the sun; negate → toward it (matches land)
     float diffuse = max(dot(sphereNormal, lightDir), 0.0);
     vec3 color = body.color * (uAmbientLight + diffuse * uSunIntensity);
 
-    // Sun glitter: a broad soft patch plus a tight sparkle over the wave normal.
+    // Sun glitter: Blinn-Phong whose width comes from the slopes too small to draw. Up close the
+    // lobe is tight and the drawn waves scatter it into glints; from orbit it spreads into the
+    // broad glitter patch. Normalised so the patch dims as it widens.
     vec3 halfVec = normalize(viewDir + lightDir);
     float ndh = max(dot(waveNormal, halfVec), 0.0);
-    float glint = pow(ndh, 60.0) * 0.5 + pow(ndh, 900.0) * 0.5;
+    float roughness2 = 0.0005 + waves.slopeVariance;
+    float shininess = clamp(2.0 / roughness2 - 2.0, 16.0, 6000.0);
+    float glint = pow(ndh, shininess) * (shininess + 8.0) / (8.0 * 3.14159265) * 0.02;
 
     float F = fresnel(dot(viewDir, waveNormal));
     vec3 skyTint = vec3(0.15, 0.28, 0.42);
