@@ -93,6 +93,20 @@ WaveSurface waveSurface(vec3 dir)
     return WaveSurface(normalize(dir - gradient), lostVariance);
 }
 
+// ---- shoreline ----
+
+const float kFoamBandUnits = 0.02; // terrain units of depth the surf band covers
+
+// Surf on the shallowest water, broken up by the wave pattern so it is not a clean line.
+// Opacity already falls to 0 at depth 0 (waterBody), so the coast never shows a hard cut.
+float shoreFoam(float depthUnits, vec3 dir)
+{
+    float band = 1.0 - smoothstep(0.0, kFoamBandUnits, depthUnits);
+    vec3 p = dir * kWaveReferenceRadius * kBaseWaveFrequency * 0.05;
+    float breakup = 0.5 + 0.5 * sin(p.x + p.y * 1.3 + p.z * 0.7 + uTime * uWaveSpeed * 2.0);
+    return band * mix(0.4, 1.0, breakup);
+}
+
 // ---- reflection ----
 
 // Schlick fresnel for water (F0 = 0.02).
@@ -133,8 +147,11 @@ void main()
     color = mix(color, skyTint * (uAmbientLight + diffuse * uSunIntensity), F);
     color += uSunColor * glint * diffuse * 0.9;
 
-    // Reflection makes grazing water opaque even where it is shallow and clear.
-    float alpha = clamp(max(body.opacity, F), 0.0, 1.0);
+    float foam = shoreFoam(depthUnits, sphereNormal);
+    color = mix(color, vec3(0.85, 0.92, 0.95) * (uAmbientLight + diffuse * uSunIntensity), foam * 0.6);
+
+    // Reflection makes grazing water opaque even where it is shallow and clear; foam is opaque.
+    float alpha = clamp(max(max(body.opacity, F), foam * 0.6), 0.0, 1.0);
 
     outColor = vec4(color, alpha);
 }
