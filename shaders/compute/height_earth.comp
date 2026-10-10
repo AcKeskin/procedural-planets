@@ -380,7 +380,6 @@ float evaluateHeight(vec3 dir)
     float contScale = continentScale * globalFrequency;
     float mtnScale = mountainScale * globalFrequency;
     float mskScale = maskScale * globalFrequency;
-    float ptbScale = perturbScale * globalFrequency;
 
     float continentShape;
     float mountainMask;
