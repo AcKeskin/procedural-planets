@@ -1,10 +1,26 @@
 #include "Renderer.h"
 #include "GpuConstants.h"
 #include <GL/gl3w.h>
+#include <algorithm>
 #include <iostream>
 
 namespace planets::render
 {
+
+namespace
+{
+// Cloud shell altitude actually drawn: never below the terrain's height range, or peaks cut
+// hard-edged holes through the shell. Matches the range BodyRuntime normalizes heights with.
+float EffectiveCloudAltitude(const RenderContext& ctx)
+{
+    constexpr float HeightRangeMultiplier = 1.5f;
+    constexpr float ClearanceMargin = 0.005f; // fraction of the radius above the highest terrain
+    float altitude = ctx.clouds ? ctx.clouds->altitude : 0.0f;
+    if (ctx.body)
+        altitude = std::max(altitude, ctx.body->GetHeightScale() * HeightRangeMultiplier + ClearanceMargin);
+    return altitude;
+}
+} // namespace
 
 Renderer::Renderer() = default;
 
@@ -138,6 +154,8 @@ void Renderer::DrawScene(const RenderContext& ctx)
     const bool atmosphereOn = ctx.atmosphere && ctx.atmosphere->enabled;
     if (ctx.clouds && ctx.scene && atmosphereOn)
     {
+        effects::CloudSettings clouds = *ctx.clouds;
+        clouds.altitude = EffectiveCloudAltitude(ctx);
         _cloudRenderer.Render(ctx.view,
                               ctx.projection,
                               ctx.cameraPos,
@@ -146,7 +164,7 @@ void Renderer::DrawScene(const RenderContext& ctx)
                               ctx.scene->lighting.sunIntensity,
                               ctx.scene->lighting.ambientLight,
                               ctx.time,
-                              *ctx.clouds);
+                              clouds);
     }
 
     _bloom.Render(_sceneFbo.GetColorTexture(), _postProcessor);
@@ -207,7 +225,7 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
         _planetShader.SetFloat("uCloudCoverage", ctx.clouds ? ctx.clouds->coverage : 0.0f);
         _planetShader.SetFloat("uCloudSpeed", ctx.clouds ? ctx.clouds->speed : 0.0f);
         _planetShader.SetFloat("uCloudTime", ctx.time);
-        _planetShader.SetFloat("uCloudAltitude", ctx.clouds ? ctx.clouds->altitude : 0.0f);
+        _planetShader.SetFloat("uCloudAltitude", EffectiveCloudAltitude(ctx));
         _planetShader.SetFloat("uCloudShadowStrength", cloudsOn ? ctx.clouds->shadowStrength : 0.0f);
         _planetShader.SetFloat("uSunIntensity", ctx.scene->lighting.sunIntensity);
         _planetShader.SetFloat("uAmbientLight", ctx.scene->lighting.ambientLight);
