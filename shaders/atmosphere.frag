@@ -19,7 +19,7 @@ uniform mat4 uInvView;
 uniform mat4 uInvProjection;
 uniform vec3 uCameraPos;
 
-uniform vec3 uLightDir;
+uniform vec3 uLightDir;          // points FROM the sun, like every other shader
 uniform vec3 uSunColor;           // the sun-of-record's color; tints in-scatter and its dusk band
 
 uniform vec3 uPlanetCenter;
@@ -107,10 +107,11 @@ vec3 calculateLight(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 originalC
     vec3 inScatteredLight = vec3(0.0);
     vec2 viewRayOpticalDepth = vec2(0.0);
 
+    vec3 sunDir = -normalize(uLightDir); // toward the sun
     for (int i = 0; i < uNumInScatteringPoints; i++)
     {
-        float sunRayLength = raySphere(uPlanetCenter, uAtmosphereRadius, inScatterPoint, uLightDir).y;
-        vec2 sunRayOpticalDepth = opticalDepth(inScatterPoint, uLightDir, sunRayLength);
+        float sunRayLength = raySphere(uPlanetCenter, uAtmosphereRadius, inScatterPoint, sunDir).y;
+        vec2 sunRayOpticalDepth = opticalDepth(inScatterPoint, sunDir, sunRayLength);
 
         vec2 localDensity = densityAtPoint(inScatterPoint);
         viewRayOpticalDepth += localDensity * stepSize;
@@ -136,7 +137,7 @@ vec3 calculateLight(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 originalC
     // in-scatter magnitude, so the tint only touches lit atmosphere and never paints the night void.
     const float SKY_DUSK_WIDTH = 0.30;
     vec3 localUp = normalize(rayOrigin - uPlanetCenter);
-    float sunElevation = dot(localUp, uLightDir);
+    float sunElevation = dot(localUp, sunDir);
     float dusk = 1.0 - smoothstep(0.0, SKY_DUSK_WIDTH, abs(sunElevation));
     // Redirect the in-scatter's own brightness into the warm tint (not a fixed color), so the dusk
     // glows where the atmosphere is already lit and stays dark over the night void.
