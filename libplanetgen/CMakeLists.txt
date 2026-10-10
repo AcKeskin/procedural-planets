@@ -152,6 +152,7 @@ set(PLANETGEN_TEST_SOURCES
     tests/test_strategy_extension.cpp
     tests/test_public_api.cpp
     tests/test_macro_world.cpp
+    tests/test_ocean_depth.cpp
 )
 
 add_executable(planetgen_tests ${PLANETGEN_TEST_SOURCES})
