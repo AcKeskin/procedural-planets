@@ -82,7 +82,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
-The executable ends up in `build/bin/Release/`. The `planetgen.dll` shared library is built alongside, and `shaders/` and `data/` are copied next to the exe, so it runs from any folder.
+The executable ends up in `build/bin/Release/`. The `planetgen.dll` shared library is built alongside, and `shaders/` and `data/` are copied next to the exe. Start it from that folder (double-clicking does this); it loads `shaders/` and `data/` relative to the working directory.
 
 Run the tests (they need a GPU; they use a hidden window) with:
 
