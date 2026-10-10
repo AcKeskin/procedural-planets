@@ -13,8 +13,6 @@ Inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-S
 
 ## Gallery
 
-From orbit down through the clouds, at planet radius 5000:
-
 <p align="center">
   <img src="docs/images/flyover.gif" alt="Orbit around the planet, then a descent through the clouds to a low view over the land" width="480">
 </p>
@@ -40,8 +38,6 @@ An optional once-per-body bake on a coarse cube-sphere grid. It adds tectonic pl
 
 Turn it on in the Terrain panel: **Generation > Macro World > Enable Macro World** (needs Use Tectonics). In a body JSON, set `"macroWorld": { "enabled": true }`. It is off by default. Its river carving still shows as stair-stepped streaks up close, which is why it is not on for Earth yet.
 
-The erosion passes are ported from [Jujedie/PlanetGenerator](https://github.com/Jujedie/PlanetGenerator) (MIT, see `third_party/NOTICE-PlanetGenerator.md`).
-
 ## Features
 
 **Terrain and generation**
@@ -66,7 +62,7 @@ The erosion passes are ported from [Jujedie/PlanetGenerator](https://github.com/
 **App**
 - **Multi-Body Types** — Earth-like planets, volcanic worlds, crystalline moons — each with type-specific shaders, palettes, and GUI
 - **Parameter Randomizer** — One-click randomization of all planet parameters within Earth-like constraints
-- **Cinematic System** — Turntable camera with keyframe animation and screenshot/GIF capture
+- **Cinematic System** — Turntable camera (F5) and headless capture: single screenshots, turntable frame sequences, and a showcase that cycles through random worlds
 - **Instrument Mode** — Script the camera and any setting from a JSON timeline (`--script`) or a live socket (`--live`), and capture frames; the README media is rendered this way
 - **Live Tweaking** — Grouped ImGui panels with tooltips for every setting
 
@@ -86,7 +82,13 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
-The executable ends up in `build/bin/Release/`. The `planetgen.dll` shared library is built alongside.
+The executable ends up in `build/bin/Release/`. The `planetgen.dll` shared library is built alongside, and `shaders/` and `data/` are copied next to the exe, so it runs from any folder.
+
+Run the tests (76, on the GPU through a hidden window) with:
+
+```bash
+ctest --test-dir build -C Release
+```
 
 ## Dependencies
 
@@ -98,8 +100,9 @@ Everything is handled through CMake FetchContent, so you don't need to install a
 | [GLM](https://github.com/g-truc/glm) | 1.0.1 | Mathematics |
 | [ImGui](https://github.com/ocornut/imgui) | docking | Debug GUI |
 | [gl3w](https://github.com/skaslev/gl3w) | latest | OpenGL loader |
-| [stb](https://github.com/nothings/stb) | latest | Image loading |
+| [stb](https://github.com/nothings/stb) | latest | Image loading and PNG export |
 | [nlohmann/json](https://github.com/nlohmann/json) | 3.11.3 | JSON parsing |
+| [Catch2](https://github.com/catchorg/Catch2) | 3.6.0 | Tests |
 
 ## Controls
 
@@ -125,6 +128,18 @@ All parameters are exposed in ImGui panels, grouped by topic with tooltips:
 - **Atmosphere** — scattering colours and strength, haze (Mie), density, quality; the Earth Preset button restores the defaults
 - **Clouds** — coverage, density, cloud size, base altitude, thickness, drift speed, shadow strength and quality. Clouds are part of the atmosphere, so they hide when the atmosphere is off
 
+### Command line
+
+Without arguments the app opens the interactive window. These flags run it headless or scripted:
+
+| Flag | What it does |
+|------|--------------|
+| `--screenshot <path>` | Render a few warm-up frames, write one PNG, exit. Takes `--seed`, `--width`, `--height`, `--camera x,y,z`, `--light x,y,z`, `--frames` |
+| `--cinematic --out-pattern <out/f_%04d.png>` | Render a turntable as a PNG sequence (`--cinematic-frames`, `--fps`, `--orbit-speed`) |
+| `--showcase --out-pattern <...>` | Orbit while generating a new random world every few seconds (`--planets`, `--hold-frames`) |
+| `--script <timeline.json>` | Run a JSON timeline of camera moves, setting changes and captures (samples in `data/scripts/`) |
+| `--live [port]` | Open the window and accept the same JSON commands over a local socket (default port 8787) |
+
 ## Project Structure
 
 ```
@@ -142,6 +157,7 @@ src/                    The showcase app — frame loop, LOD, rendering, GUI
 │   ├── BodyRuntime          Render-time view of the active body (no subclassing)
 │   └── GenerationScheduler  Async compute dispatch with GPU fence sync
 └── app/                Application entry, input handling, headless capture
+    └── instrument/     --script / --live command timelines and parameter registry
 
 libplanetgen/           Standalone terrain generation library (DLL)
 ├── include/planetgen/  Public C API + C++ RAII wrapper
@@ -165,7 +181,8 @@ shaders/
 
 data/
 ├── bodies/             Body type configs (earth.json, volcanic.json, crystalline.json)
-└── palettes/           Color palettes per body type (earth.json, volcanic.json, etc.)
+├── palettes/           Color palettes per body type (earth.json, volcanic.json, etc.)
+└── scripts/            Sample instrument timelines for --script
 ```
 
 ## Architecture
@@ -204,6 +221,7 @@ The app drives terrain through the library's **per-patch** entry point (`pg_gene
 ## References
 
 - [Sebastian Lague — Solar System](https://github.com/SebLague/Solar-System) — studied for compute-based terrain generation approach
+- [Jujedie — PlanetGenerator](https://github.com/Jujedie/PlanetGenerator) — the macro world's erosion passes are ported from it (MIT, see `third_party/NOTICE-PlanetGenerator.md`)
 - [Inigo Quilez — Smooth Min/Max](https://iquilezles.org/articles/smin/) — polynomial smooth blending functions
 - [Ben Golus — Triplanar Shader](https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a) — triplanar mapping with reoriented normal blending
 - [Andrew Schneider — The Real-time Volumetric Cloudscapes of Horizon Zero Dawn](https://www.guerrilla-games.com/read/the-real-time-volumetric-cloudscapes-of-horizon-zero-dawn) — weather map, Perlin-Worley noise and the powder term for the clouds
