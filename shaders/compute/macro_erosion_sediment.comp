@@ -1,0 +1,103 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#include "macro_grid.glsl"
+#include "macro_params.glsl"
+
+// Macro erosion pass 3/4: erosion + deposition from transport capacity. Mass moves
+// between a cell's height and its suspended sediment (the flow pass carries the
+// sediment downstream). Ported from Jujedie/PlanetGenerator erosion_sediment.glsl
+// at commit 18c1988 (the last version that still incises; MIT, see
+// third_party/NOTICE-PlanetGenerator.md). Changes: cube-sphere cardinal
+// neighbours, near-equal-area cells so no cos(latitude) metric, sea level 0.
+//
+// Image 0: geo in, image 1: geo out, image 2: flux (R, read).
+
+layout(rgba32f, binding = 0) uniform image2DArray geoIn;
+layout(rgba32f, binding = 1) uniform image2DArray geoOut;
+layout(rgba32f, binding = 2) uniform image2DArray flux;
+
+const float MIN_WATER = 0.00005;
+const float MIN_SLOPE = 0.001;
+const float BEDROCK_HARDNESS = 0.5;
+const float CAPACITY_LENGTH_SCALE_M = 500.0;
+const float LAND_EROSION_FLOOR_M = 1.0;
+
+const ivec2 CARDINAL[4] = ivec2[4](ivec2(-1, 0), ivec2(1, 0), ivec2(0, -1), ivec2(0, 1));
+
+float maxSlopeDown(int face, ivec2 ij, float surface, int n)
+{
+    float best = 0.0;
+    for (int k = 0; k < 4; k++)
+    {
+        ivec3 c = mg_neighbour(face, ij, CARDINAL[k].x, CARDINAL[k].y, n);
+        vec4 g = imageLoad(geoIn, ivec3(c.yz, c.x));
+        best = max(best, (surface - (g.r + g.a)) / cellSizeMeters);
+    }
+    return best;
+}
+
+void main()
+{
+    int n = int(resolution);
+    ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
+    int face = int(gl_GlobalInvocationID.z);
+    if (ij.x >= n || ij.y >= n)
+        return;
+
+    ivec3 texel = ivec3(ij, face);
+    vec4 g = imageLoad(geoIn, texel);
+    float cellFlux = imageLoad(flux, texel).r;
+
+    float height = g.r;
+    float bedrock = g.g;
+    float sediment = g.b;
+    float water = g.a;
+
+    if (height < 0.0)
+    {
+        imageStore(geoOut, texel, g);
+        return;
+    }
+
+    float slope = maxSlopeDown(face, ij, height + water, n);
+
+    // Transport capacity from water depth, flow speed (flux / depth) and slope.
+    float velocity = clamp(cellFlux / max(water, MIN_WATER), 0.0, 25.0);
+    float capacity = max(capacityMultiplier * slope * sqrt(velocity) * water * CAPACITY_LENGTH_SCALE_M, 0.0);
+
+    float dHeight = 0.0;
+    float dSediment = 0.0;
+    if (sediment < capacity && water > MIN_WATER && slope > MIN_SLOPE)
+    {
+        float amount = (capacity - sediment) * erosionRate;
+
+        // Incise organised channels; leave only a small diffuse residue elsewhere.
+        float channel = smoothstep(channelFluxThreshold, channelFluxThreshold * 3.5, cellFlux);
+        amount *= mix(0.03, 1.0, channel);
+
+        amount /= mix(0.1, 1.0, bedrock * BEDROCK_HARDNESS);
+
+        // Never erode land below sea level.
+        amount = min(amount, max(height - LAND_EROSION_FLOOR_M, 0.0));
+        amount = clamp(amount, 0.0, maxErosionPerPassMeters);
+
+        dHeight = -amount;
+        dSediment = amount;
+    }
+    else if (sediment > capacity)
+    {
+        float amount = min((sediment - capacity) * depositionRate, sediment);
+        amount = min(amount, maxErosionPerPassMeters * 1.5);
+        dHeight = amount;
+        dSediment = -amount;
+    }
+
+    // Eroded or deposited material is looser than the rock it came from.
+    if (dHeight < 0.0)
+        bedrock = max(bedrock - 0.001, 0.0);
+    else if (dHeight > 0.0)
+        bedrock = max(bedrock - 0.005, 0.0);
+
+    imageStore(geoOut, texel, vec4(height + dHeight, bedrock, max(sediment + dSediment, 0.0), water));
+}

@@ -282,7 +282,7 @@ struct alignas(16) MacroParams
     float    temperatureExponent;
     float    channelFluxThreshold;
     uint32_t passIndex;
-    float    _pad0;
+    float    maxErosionPerPassMeters;
 };
 
 static_assert(sizeof(MacroParams) == 8 * 16, "MacroParams std140 layout mismatch");

@@ -1,6 +1,7 @@
 #include "MacroWorldPass.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace planetgen
 {
@@ -72,22 +73,25 @@ MacroParams MakeMacroParams(const BodyConfig& config, uint32_t seed)
     p.temperatureLapseRate = config.shading.temperatureLapseRate;
 
     p.temperatureExponent = config.shading.temperatureExponent;
-    p.channelFluxThreshold = 0.0f;
+    // Upstream's resolution-aware channel threshold (orchestrator.gd, 18c1988).
+    const float cellKm = p.cellSizeMeters / 1000.0f;
+    p.channelFluxThreshold = std::clamp(0.008f * std::pow(std::max(cellKm, 0.01f), 0.25f), 0.005f, 0.04f);
     p.passIndex = 0;
+    p.maxErosionPerPassMeters = 12.0f;
     return p;
 }
 
 MacroWorldBake::MacroWorldBake(IComputeBackend& backend, const ShaderRegistry& registry,
                                const BodyConfig& config, uint32_t seed)
     : _backend(backend), _registry(registry), _params(MakeMacroParams(config, seed)),
-      _res(_params.resolution)
+      _erosionIterations(config.macroWorld.erosionIterations), _res(_params.resolution)
 {
     _ubo = _backend.CreateParamBuffer(sizeof(MacroParams));
 }
 
 MacroWorldBake::~MacroWorldBake()
 {
-    for (GpuTextureHandle t : { _geo, _field })
+    for (GpuTextureHandle t : { _geo, _geoTmp, _flux, _field })
         if (t)
             _backend.DestroyTexture(t);
     _backend.DestroyParamBuffer(_ubo);
@@ -123,9 +127,44 @@ bool MacroWorldBake::Plates(GpuTextureHandle continentMask)
     return true;
 }
 
+bool MacroWorldBake::Erode(int iterations)
+{
+    const uint32_t rainfall = _registry.Resolve(BuiltinProgram::MacroErosionRainfall);
+    const uint32_t flow = _registry.Resolve(BuiltinProgram::MacroErosionFlow);
+    const uint32_t sediment = _registry.Resolve(BuiltinProgram::MacroErosionSediment);
+    if (!rainfall || !flow || !sediment || !_geo)
+        return false;
+
+    if (!_geoTmp)
+        _geoTmp = NewArray();
+    if (!_flux)
+        _flux = NewArray();
+
+    // Each round ends back in _geo: rainfall in place, flow _geo -> _geoTmp,
+    // sediment _geoTmp -> _geo. The flow pass zeroes the flux on round 0.
+    for (int i = 0; i < iterations; ++i)
+    {
+        const uint32_t pass = static_cast<uint32_t>(i);
+
+        _backend.BindImage2DArray(_geo, 0);
+        Dispatch(rainfall, pass);
+
+        _backend.BindImage2DArray(_geo, 0);
+        _backend.BindImage2DArray(_geoTmp, 1);
+        _backend.BindImage2DArray(_flux, 2);
+        Dispatch(flow, pass);
+
+        _backend.BindImage2DArray(_geoTmp, 0);
+        _backend.BindImage2DArray(_geo, 1);
+        _backend.BindImage2DArray(_flux, 2);
+        Dispatch(sediment, pass);
+    }
+    return true;
+}
+
 bool MacroWorldBake::RunAll(GpuTextureHandle continentMask)
 {
-    if (!Plates(continentMask))
+    if (!Plates(continentMask) || !Erode(_erosionIterations))
         return false;
 
     // Until the later stages exist the geo texture is the field.

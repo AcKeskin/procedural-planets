@@ -9,6 +9,8 @@
 #include "model/BodyConfigJson.h"
 
 #include <algorithm>
+#include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <cmath>
 #include <cstdint>
@@ -439,6 +441,48 @@ TEST_CASE("macro_world bake: field is seamless across cube-face edges", "[gpu][m
     CHECK(worst < 1e-4);
 
     gpu.DestroyTexture(field);
+    }
+    pg_context_destroy(ctx);
+}
+
+TEST_CASE("macro_world erosion: lowers land and conserves height + sediment", "[gpu][macro_world]")
+{
+    const int Res = 128;
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+    {
+        const auto cfg = MacroEarth(Res);
+        MaskHolder mask(ctx, cfg, 42u);
+
+        planetgen::MacroWorldBake bake(*ctx->backend, ctx->registry, cfg, 42u);
+        REQUIRE(bake.Plates(mask.tex));
+        const auto before = DownloadField(ctx, bake.Geo(), Res);
+        REQUIRE(bake.Erode(cfg.macroWorld.erosionIterations));
+        const auto after = DownloadField(ctx, bake.Geo(), Res);
+
+        double landBefore = 0.0, landAfter = 0.0, massBefore = 0.0, massAfter = 0.0, scale = 0.0;
+        double deepestCut = 0.0;
+        int landCells = 0;
+        for (size_t c = 0; c < before.size() / 4; ++c)
+        {
+            const double hb = before[c * 4], ha = after[c * 4];
+            massBefore += hb + before[c * 4 + 2];
+            massAfter += ha + after[c * 4 + 2];
+            scale += std::fabs(hb);
+            if (hb > 0.0)
+            {
+                landBefore += hb;
+                landAfter += ha;
+                deepestCut = std::max(deepestCut, hb - ha);
+                ++landCells;
+            }
+        }
+        REQUIRE(landCells > 0);
+        INFO("mean land height " << landBefore / landCells << " -> " << landAfter / landCells
+             << " m, deepest cut " << deepestCut << " m, mass drift " << (massAfter - massBefore));
+        CHECK(landAfter < landBefore);
+        CHECK(deepestCut > 50.0);
+        CHECK(std::fabs(massAfter - massBefore) / scale < 1e-5);
     }
     pg_context_destroy(ctx);
 }

@@ -1,0 +1,78 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#include "macro_grid.glsl"
+#include "macro_params.glsl"
+
+// Macro erosion pass 4/4: drainage flux accumulation, one cell of propagation per
+// dispatch (ping-pong). A cell collects the flux of every neighbour whose steepest
+// descent points at it. Ported from Jujedie/PlanetGenerator
+// erosion_flux_accumulation.glsl (MIT, see third_party/NOTICE-PlanetGenerator.md).
+// Changes: cube-sphere neighbours; "drains to me" compares the neighbour's target
+// cell instead of an opposite direction index (direction frames rotate across cube
+// faces, and the original index pairing was not opposite for its neighbour order);
+// full propagation (no decay) so the result counts upstream cells.
+//
+// Image 0: surface (R + A = height + water), image 1: flux in (R), image 2: flux out (R).
+
+layout(rgba32f, binding = 0) uniform image2DArray surfaceTex;
+layout(rgba32f, binding = 1) uniform image2DArray fluxIn;
+layout(rgba32f, binding = 2) uniform image2DArray fluxOut;
+
+const ivec2 NEIGHBOURS[8] = ivec2[8](
+    ivec2(-1, -1), ivec2(0, -1), ivec2(1, -1),
+    ivec2(-1,  0),               ivec2(1,  0),
+    ivec2(-1,  1), ivec2(0,  1), ivec2(1,  1));
+
+float surfaceAt(ivec3 c)
+{
+    vec4 g = imageLoad(surfaceTex, ivec3(c.yz, c.x));
+    return g.r + g.a;
+}
+
+// Steepest down-slope neighbour of c, or c itself when nothing is lower.
+ivec3 drainTarget(ivec3 c, int n)
+{
+    float s = surfaceAt(c);
+    float best = 0.0;
+    ivec3 target = c;
+    for (int k = 0; k < 8; k++)
+    {
+        ivec3 nc = mg_neighbour(c.x, c.yz, NEIGHBOURS[k].x, NEIGHBOURS[k].y, n);
+        float slope = (s - surfaceAt(nc)) / length(vec2(NEIGHBOURS[k]));
+        if (slope > best)
+        {
+            best = slope;
+            target = nc;
+        }
+    }
+    return target;
+}
+
+void main()
+{
+    int n = int(resolution);
+    ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
+    int face = int(gl_GlobalInvocationID.z);
+    if (ij.x >= n || ij.y >= n)
+        return;
+
+    ivec3 self = ivec3(face, ij);
+    ivec3 texel = ivec3(ij, face);
+    float current = passIndex == 0u ? 0.0 : imageLoad(fluxIn, texel).r;
+
+    // Ocean cells are river mouths: they keep what reached them, never pass it on.
+    float incoming = 0.0;
+    for (int k = 0; k < 8; k++)
+    {
+        ivec3 nc = mg_neighbour(face, ij, NEIGHBOURS[k].x, NEIGHBOURS[k].y, n);
+        if (imageLoad(surfaceTex, ivec3(nc.yz, nc.x)).r < 0.0)
+            continue;
+        if (drainTarget(nc, n) == self)
+            incoming += passIndex == 0u ? 0.0 : imageLoad(fluxIn, ivec3(nc.yz, nc.x)).r;
+    }
+
+    // Every land cell contributes one unit of its own runoff.
+    float own = imageLoad(surfaceTex, texel).r < 0.0 ? 0.0 : 1.0;
+    imageStore(fluxOut, texel, vec4(max(current, own + incoming), 0.0, 0.0, 0.0));
+}

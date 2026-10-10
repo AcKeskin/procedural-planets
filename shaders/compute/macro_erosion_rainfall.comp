@@ -1,0 +1,62 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#include "macro_grid.glsl"
+#include "macro_params.glsl"
+
+// Macro erosion pass 1/4: rainfall + evaporation, in place on the geo texture.
+// Ported from Jujedie/PlanetGenerator erosion_rainfall.glsl (MIT, see
+// third_party/NOTICE-PlanetGenerator.md). Changes: cube-sphere cells instead of an
+// equirect image; no climate texture yet, so precipitation is uniform (1) and
+// temperature comes from latitude + elevation.
+//
+// Image 0: geo (R = height m, G = bedrock, B = sediment, A = water), read-write.
+
+layout(rgba32f, binding = 0) uniform image2DArray geo;
+
+const float MIN_WATER = 0.0001;
+
+// Rough surface temperature in degrees C: warm equator, cold poles, colder up high.
+float cellTemperature(vec3 dir, float heightM)
+{
+    float lat = asin(clamp(abs(dir.y), 0.0, 1.0));
+    return -25.0 + 55.0 * pow(cos(lat), temperatureExponent) - 6.5 * max(heightM, 0.0) / 1000.0;
+}
+
+void main()
+{
+    int n = int(resolution);
+    ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
+    int face = int(gl_GlobalInvocationID.z);
+    if (ij.x >= n || ij.y >= n)
+        return;
+
+    ivec3 texel = ivec3(ij, face);
+    vec4 g = imageLoad(geo, texel);
+    float height = g.r;
+    float water = g.a;
+
+    float temperature = cellTemperature(mg_cellDir(face, ij, n), height);
+    float precipitation = 1.0;
+
+    // Rain only on land; snow gives less liquid water right away.
+    if (height > 0.0)
+    {
+        float rain = rainRate * precipitation;
+        if (temperature < 0.0)
+            rain *= 0.3;
+        water += rain;
+    }
+
+    // Warmer cells evaporate more.
+    if (water > MIN_WATER)
+    {
+        float tempFactor = clamp((temperature + 20.0) / 60.0, 0.1, 2.0);
+        water *= (1.0 - evaporationRate * tempFactor);
+        if (water < MIN_WATER)
+            water = 0.0;
+    }
+
+    g.a = water;
+    imageStore(geo, texel, g);
+}

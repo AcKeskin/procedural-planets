@@ -33,7 +33,7 @@ constexpr uint32_t kMacroMaskSamplerUnit = 4;
 constexpr uint32_t kMacroParamBinding = 3;
 
 // Bake elevations are meters so the ported erosion constants keep their meaning.
-constexpr float kMacroMetersPerUnit = 8000.0f;
+constexpr float kMacroMetersPerUnit = 4000.0f;
 // Planet radius the erosion's physical cell size is computed for (Earth).
 constexpr float kMacroPlanetRadiusMeters = 6371000.0f;
 
@@ -60,6 +60,10 @@ public:
     // A = water) from plates + the continent mask. False if the program is missing.
     bool Plates(GpuTextureHandle continentMask);
 
+    // Stage 2. Hydraulic erosion on the geo texture, `iterations` rounds of
+    // rainfall -> flow -> sediment. Total height + sediment is conserved.
+    bool Erode(int iterations);
+
     // Run every stage. Returns false (and leaves no field) on a missing program.
     bool RunAll(GpuTextureHandle continentMask);
 
@@ -76,10 +80,13 @@ private:
     IComputeBackend& _backend;
     const ShaderRegistry& _registry;
     MacroParams _params{};
+    int _erosionIterations = 0;
     uint32_t _res = 0;
     GpuBufferHandle _ubo = 0;
 
     GpuTextureHandle _geo = 0;
+    GpuTextureHandle _geoTmp = 0; // erosion ping-pong partner of _geo
+    GpuTextureHandle _flux = 0;   // erosion outflow accumulator (R)
     GpuTextureHandle _field = 0;
 };
 

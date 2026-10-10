@@ -42,5 +42,5 @@ layout(std140, binding = 3) uniform MacroParamsBlock
     float temperatureExponent;
     float channelFluxThreshold;
     uint  passIndex;
-    float _macroPad0;
+    float maxErosionPerPassMeters;
 };
