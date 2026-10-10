@@ -682,6 +682,10 @@ void Application::RenderGui()
 
         _terrainStats.patchCount = _renderer.QuadTree().GetActiveLeafCount();
         _terrainStats.visiblePatchCount = _renderer.QuadTree().GetVisiblePatchCount();
+        const render::GpuTimings gpu = _renderer.Timings();
+        _terrainStats.gpuTerrainMs = gpu.terrainMs;
+        _terrainStats.gpuOceanMs = gpu.oceanMs;
+        _terrainStats.gpuEffectsMs = gpu.effectsMs;
 
         bool randomize = false;
         bool needsRegen =

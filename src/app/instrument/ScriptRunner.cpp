@@ -214,6 +214,11 @@ bool ScriptRunner::CaptureTo(const std::string& path)
     const bool ran = !_app._headlessCaptureRequested;
     if (!ran)
         std::cerr << "[Script] capture did not run for '" << path << "'" << std::endl;
+
+    // Logged per capture so scripted runs double as perf probes.
+    const render::GpuTimings gpu = _app._renderer.Timings();
+    std::cout << "[Script] gpu ms: terrain " << gpu.terrainMs << ", ocean " << gpu.oceanMs << ", effects "
+              << gpu.effectsMs << ", total " << gpu.TotalMs() << " (" << path << ")" << std::endl;
     return ran;
 }
 

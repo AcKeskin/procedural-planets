@@ -99,8 +99,11 @@ void Renderer::DrawScene(const RenderContext& ctx)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     DrawSpace(ctx, invView, invProjection);
+    _terrainTimer.Begin();
     DrawPlanet(ctx, viewProjection);
+    _terrainTimer.End();
 
+    _oceanTimer.Begin();
     if (ctx.body && ctx.seaLevel > 0.0f && ctx.ocean && ctx.scene)
     {
         _oceanRenderer.Render(ctx.view,
@@ -113,7 +116,9 @@ void Renderer::DrawScene(const RenderContext& ctx)
                               ctx.time,
                               *ctx.ocean);
     }
+    _oceanTimer.End();
 
+    _effectsTimer.Begin();
     // Clouds draw into the scene (over the surface, before the atmosphere post-process) so the
     // limb + aerial perspective scatter over the cloud tops.
     if (ctx.clouds && ctx.scene)
@@ -135,6 +140,7 @@ void Renderer::DrawScene(const RenderContext& ctx)
     glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     DrawAtmosphereOrPassthrough(ctx, invView, invProjection);
+    _effectsTimer.End();
 }
 
 void Renderer::DrawSpace(const RenderContext& ctx, const glm::mat4& invView, const glm::mat4& invProjection)

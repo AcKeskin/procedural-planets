@@ -7,6 +7,7 @@
 #include "BodyRuntime.h"
 #include "BiomePalette.h"
 #include "GpuBuffer.h"
+#include "GpuTimer.h"
 #include "lod/PlanetQuadTree.h"
 #include "effects/OceanRenderer.h"
 #include "effects/AtmosphereRenderer.h"
@@ -40,6 +41,15 @@ struct RenderContext
     const BodyRuntime* body = nullptr; // null when no body loaded; carries shading/AO via Config()
     float planetRadius = 1.0f;
     float seaLevel = 0.0f;
+};
+
+// GPU time of the scene passes, in milliseconds (smoothed, a few frames behind).
+struct GpuTimings
+{
+    float terrainMs = 0.0f;
+    float oceanMs = 0.0f;
+    float effectsMs = 0.0f; // clouds + atmosphere/post
+    float TotalMs() const { return terrainMs + oceanMs + effectsMs; }
 };
 
 // Owns the planet draw + LOD pipeline: quad-tree, async patch scheduler, surface/
@@ -79,6 +89,11 @@ public:
     int FramebufferWidth() const { return _fbWidth; }
     int FramebufferHeight() const { return _fbHeight; }
 
+    GpuTimings Timings() const
+    {
+        return { _terrainTimer.Milliseconds(), _oceanTimer.Milliseconds(), _effectsTimer.Milliseconds() };
+    }
+
     GenerationScheduler& Scheduler() { return _scheduler; }
     lod::PlanetQuadTree& QuadTree() { return _quadTree; }
 
@@ -106,6 +121,11 @@ private:
 
     int _fbWidth = 0;
     int _fbHeight = 0;
+
+    // Back-to-back (a GL_TIME_ELAPSED query cannot nest), so their sum is the scene time.
+    GpuTimer _terrainTimer;
+    GpuTimer _oceanTimer;
+    GpuTimer _effectsTimer;
 };
 
 } // namespace planets::render
