@@ -84,7 +84,7 @@ cmake --build build --config Release
 
 The executable ends up in `build/bin/Release/`. The `planetgen.dll` shared library is built alongside, and `shaders/` and `data/` are copied next to the exe, so it runs from any folder.
 
-Run the tests (76, on the GPU through a hidden window) with:
+Run the tests (they need a GPU; they use a hidden window) with:
 
 ```bash
 ctest --test-dir build -C Release
