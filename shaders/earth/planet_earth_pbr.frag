@@ -276,11 +276,12 @@ void main()
     }
 
     // --- DETAIL NORMAL from the analytic gradient of the bump fbm. Octaves join as the footprint
-    // shrinks, so the grain sharpens toward the ground and never aliases from far away. Each octave
-    // tilts the normal about the same amount (amp halves, frequency doubles). ---
+    // shrinks, so the grain sharpens toward the ground and never aliases from far away. ---
     const float kBumpFrequency = 45.0;
     const float kBumpTilt = 0.012; // normal tilt per unit of gradient
-    vec3 grad = fbmFootprint(matPos, kBumpFrequency, 8, footprint, 0.5).yzw;
+    // Normals light non-linearly, so they shimmer sooner than colour: bump octaves fade at twice
+    // the footprint, and each finer octave is a little shallower (gain 0.4).
+    vec3 grad = fbmFootprint(matPos, kBumpFrequency, 8, footprint * 2.0, 0.4).yzw;
     grad -= geoN * dot(grad, geoN); // keep the perturbation tangential
     float bumpStrength = kBumpTilt * (1.0 - snowW * 0.6);
     const float kTextureBump = 0.6; // tilt from the material normal maps
