@@ -245,6 +245,13 @@ vec4 sphericalVoronoi(vec3 dir, int numPlates, uint seed)
 // to unit 4 without a loose uniform. continentMaskAvailable now lives in the UBO.
 layout(binding = 4) uniform sampler3D continentMask;
 
+// Macro world field (cube-sphere texture array, R = elevation, G = river flux),
+// bound to unit 5. The library compiles this shader twice; only the variant with
+// MACRO_WORLD defined reads it, so the default program stays bit-identical to the
+// pre-macro output (even untaken branches change the compiler's float codegen).
+#include "macro_grid.glsl"
+layout(binding = 5) uniform sampler2DArray macroField;
+
 // Sample R=continentalness, G=accretionAge from the baked 3D texture.
 // Direction is in [-1,1]³ sphere surface → remap to [0,1]³ UVW.
 vec2 sampleContinentMask(vec3 dir)
@@ -378,6 +385,22 @@ float evaluateHeight(vec3 dir)
     float continentShape;
     float mountainMask;
 
+#ifdef MACRO_WORLD
+    float riverDamp = 1.0;
+    {
+        // Macro layer: the baked plates + eroded + drainage-filled elevation is the base.
+        // A small warp (about one macro cell) keeps coastlines from tracing the grid.
+        vec3 macroDir = normalize(dir + 0.004 * vec3(
+            fbm(dir, vec3(171.0), 2, contScale * 12.0, 0.5, 2.0, 1.0, seed + 90u),
+            fbm(dir, vec3(272.0), 2, contScale * 12.0, 0.5, 2.0, 1.0, seed + 91u),
+            fbm(dir, vec3(373.0), 2, contScale * 12.0, 0.5, 2.0, 1.0, seed + 92u)));
+        vec4 macro = mg_sample(macroField, macroDir);
+        continentShape = macro.r;
+        mountainMask = Blend(0.0, mountainBlend, continentShape);
+        // Big rivers flatten the detail on top so it cannot dam their valleys.
+        riverDamp = 1.0 - 0.85 * smoothstep(3.0, 7.0, macro.g);
+    }
+#else
     if (useTectonics != 0)
     {
         vec4 voronoi = sphericalVoronoi(dir, numPlates, seed + 500u);
@@ -487,7 +510,9 @@ float evaluateHeight(vec3 dir)
         float noiseMask = Blend(0.0, mountainBlend * 0.5, maskNoise);
         mountainMask = elevationMask * noiseMask;
     }
+#endif
 
+#ifndef MACRO_WORLD // the macro plates already carry boundary relief
     // --- Step 7: Boundary mountain refinement from baked mask ---
     // When the mask is available, coast/convergent boundaries on continental crust
     // get fold belts; ocean-side gets arcs/trenches modulated by the mask value.
@@ -512,6 +537,7 @@ float evaluateHeight(vec3 dir)
         continentShape += foldBelt - trenchDeepen;
         mountainMask = max(mountainMask, bProx * bContinental * max(0.0, bt));
     }
+#endif
 
     if (useOceanFloor != 0 && continentShape < 0.0)
     {
@@ -593,6 +619,10 @@ float evaluateHeight(vec3 dir)
                            0.5, 2.0, 1.0, seed + 72u);
     float rangeMask = smoothstep(1.0 - rangeCoverage - 0.18, 1.0 - rangeCoverage + 0.18,
                                  rangeField * 0.5 + 0.5);
+#ifdef MACRO_WORLD
+    // Ranges stand where the baked plates raised the land, not where noise says.
+    rangeMask = smoothstep(0.4, 0.75, continentShape);
+#endif
 
     // Mountain STRUCTURE: few bold ridgelines (4 octaves only — NOT a deep stack, which furs).
     float mtnStructure = ridgeNoise(dir, vec3(7777.0), 4, reliefScale * 0.9 * globalFrequency,
@@ -623,6 +653,11 @@ float evaluateHeight(vec3 dir)
     // peaks 10% of the radius (the "exaggerated relief map" look). 0.25 keeps boundary character
     // without doubling the height.
     float tectonicUplift = ridges * mountainMask * 0.25;
+
+#ifdef MACRO_WORLD
+    landRelief *= riverDamp;
+    tectonicUplift *= riverDamp;
+#endif
 
     float terrainHeight = (continentShape + tectonicUplift + landRelief) * heightScale;
 

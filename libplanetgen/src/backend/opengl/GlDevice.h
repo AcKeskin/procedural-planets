@@ -52,9 +52,16 @@ public:
     void BindTexture3D(GpuTextureHandle texture, uint32_t samplerUnit);
     void DestroyTexture(GpuTextureHandle texture);
 
+    // 2D-texture array (RGBA32F) — macro world field and its bake temporaries.
+    GpuTextureHandle CreateTexture2DArray_RGBA32F(uint32_t resolution, uint32_t layers);
+    void BindImage2DArray(GpuTextureHandle texture, uint32_t imageUnit);
+    void BindTexture2DArray(GpuTextureHandle texture, uint32_t samplerUnit);
+    void DownloadTexture(GpuTextureHandle texture, void* data, size_t sizeBytes);
+
     void Dispatch(uint32_t groupsX, uint32_t groupsY = 1, uint32_t groupsZ = 1);
     void Barrier();
     void ImageBarrier();
+    void Finish();
 
 private:
     int GetUniformLocation(const std::string& name);

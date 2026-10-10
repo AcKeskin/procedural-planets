@@ -131,10 +131,22 @@ PgContext pg_context_create(const PgContextDesc* desc)
     };
 
     reg(BP::Height,          planetgen::shaders::height_earth_comp,       "height");
+    reg(BP::HeightMacro,     planetgen::WithDefine(planetgen::shaders::height_earth_comp, "MACRO_WORLD"),
+        "height_macro");
     reg(BP::ShadingEarth,    planetgen::shaders::shading_earth_comp,      "shading_earth");
+    reg(BP::ShadingEarthMacro, planetgen::WithDefine(planetgen::shaders::shading_earth_comp, "MACRO_WORLD"),
+        "shading_earth_macro");
     reg(BP::ShadingGeneric,  planetgen::shaders::shading_generic_comp,    "shading_generic");
     reg(BP::Erosion,         planetgen::shaders::erosion_earth_comp,      "erosion");
     reg(BP::ContinentGrowth, planetgen::shaders::continent_growth_comp,   "continent_growth");
+    reg(BP::MacroPlates,     planetgen::shaders::macro_plates_comp,       "macro_plates");
+    reg(BP::MacroErosionRainfall, planetgen::shaders::macro_erosion_rainfall_comp, "macro_erosion_rainfall");
+    reg(BP::MacroErosionFlow,     planetgen::shaders::macro_erosion_flow_comp,     "macro_erosion_flow");
+    reg(BP::MacroErosionSediment, planetgen::shaders::macro_erosion_sediment_comp, "macro_erosion_sediment");
+    reg(BP::MacroDrainageFlux,    planetgen::shaders::macro_erosion_flux_comp,     "macro_drainage_flux");
+    reg(BP::MacroFill,            planetgen::shaders::macro_fill_comp,             "macro_fill");
+    reg(BP::MacroRivers,          planetgen::shaders::macro_rivers_comp,           "macro_rivers");
+    reg(BP::MacroClimate,         planetgen::shaders::macro_climate_comp,          "macro_climate");
 
     return ctx;
 }
@@ -445,8 +457,9 @@ PgResult pg_generate_mesh(PgBody body, uint32_t rings, uint32_t segments, uint32
 
     planetgen::GenerationPipeline pipeline(*ctx->backend, ctx->registry, ctx->palettes);
     const planetgen::GenerationPipeline::MaskCache maskCache{ &body->maskTexture, &body->maskBuiltKey };
+    const planetgen::GenerationPipeline::MacroCache macroCache{ &ctx->macroTexture, &ctx->macroBuiltKey };
     planetgen::PipelineResult pr =
-        pipeline.Generate(body->config, mesh.positions.data(), vertexCount, seed, maskCache);
+        pipeline.Generate(body->config, mesh.positions.data(), vertexCount, seed, maskCache, macroCache);
 
     if (pr.count == 0)
     {
@@ -493,8 +506,10 @@ PgError pg_generate_patch(PgBody body, const float* vertices, uint32_t vertex_co
     {
         planetgen::GenerationPipeline pipeline(*ctx->backend, ctx->registry, ctx->palettes);
         const planetgen::GenerationPipeline::MaskCache maskCache{ &body->maskTexture, &body->maskBuiltKey };
+        const planetgen::GenerationPipeline::MacroCache macroCache{ &ctx->macroTexture, &ctx->macroBuiltKey };
         const bool ok = pipeline.GeneratePatch(body->config, vertices, vertex_count, seed,
-                                               height_buffer, normal_buffer, shading_buffer, maskCache);
+                                               height_buffer, normal_buffer, shading_buffer,
+                                               maskCache, macroCache);
         if (!ok)
         {
             ctx->SetError(PG_ERROR_NOT_INITIALIZED, "per-patch generation produced no dispatch");

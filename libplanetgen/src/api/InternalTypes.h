@@ -20,11 +20,25 @@ enum class PgResultType
 // Internal context — owns the compute backend and shader registry.
 // Named shader fields removed; the registry owns all program handles now.
 // Defined at global scope to match C API forward declaration.
+//
+// The macro world field is cached here, not on the body: hosts often recreate the
+// body on every config edit, and the field only depends on its cache key (seed +
+// every input the bake reads), so a new body with the same key reuses it.
 struct PgContext_T
 {
     std::unique_ptr<planetgen::IComputeBackend> backend;
     planetgen::ShaderRegistry registry;
     planetgen::PaletteRegistry palettes; // built-in palettes registered in ctor
+
+    planetgen::GpuTextureHandle macroTexture = 0; // 0 = no field baked yet
+    uint64_t macroBuiltKey = 0;
+
+    ~PgContext_T()
+    {
+        // Runs before the members die, so the backend is still alive.
+        if (macroTexture && backend)
+            backend->DestroyTexture(macroTexture);
+    }
 
     // Last-error code + human-readable message. Message is valid until the next
     // call on this context. SetError sets both; ClearError marks success.
@@ -49,9 +63,9 @@ struct PgContext_T
 // `desc` is its flat projection the strategies bind. For bodies created from the
 // flat PgBodyDesc directly, `config` stays default and `desc` is authoritative.
 //
-// The continent-mask texture is cached per body, keyed on (seed, resolution). It is
-// a deterministic function of those inputs, so caching it does not make generation
-// stateful — re-baking would reproduce the same volume.
+// The continent-mask texture is cached per body, keyed on seed + its growth params.
+// It is a deterministic function of those inputs, so caching it does not make
+// generation stateful — re-baking would reproduce the same volume.
 struct PgBody_T
 {
     PgContext_T* ctx = nullptr;

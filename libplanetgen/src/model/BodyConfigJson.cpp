@@ -201,6 +201,27 @@ std::string BodyConfigFromJson(const std::string& jsonStr, BodyConfig& out)
             cfg.erosion.evaporationRate = e.value("evaporationRate", cfg.erosion.evaporationRate);
         }
 
+        // --- MacroWorld ---
+        if (j.contains("macroWorld"))
+        {
+            const auto& m = j["macroWorld"];
+            auto& mw = cfg.macroWorld;
+            mw.enabled             = m.value("enabled", mw.enabled);
+            mw.resolution          = m.value("resolution", mw.resolution);
+            mw.convergentThreshold = m.value("convergentThreshold", mw.convergentThreshold);
+            mw.erosionIterations   = m.value("erosionIterations", mw.erosionIterations);
+            mw.rainRate            = m.value("rainRate", mw.rainRate);
+            mw.evaporationRate     = m.value("evaporationRate", mw.evaporationRate);
+            mw.flowRate            = m.value("flowRate", mw.flowRate);
+            mw.erosionRate         = m.value("erosionRate", mw.erosionRate);
+            mw.depositionRate      = m.value("depositionRate", mw.depositionRate);
+            mw.capacityMultiplier  = m.value("capacityMultiplier", mw.capacityMultiplier);
+            mw.moistureIterations  = m.value("moistureIterations", mw.moistureIterations);
+            mw.windStrength        = m.value("windStrength", mw.windStrength);
+            mw.landDrying          = m.value("landDrying", mw.landDrying);
+            mw.orographicStrength  = m.value("orographicStrength", mw.orographicStrength);
+        }
+
         // --- PaletteRef ---
         if (j.contains("paletteRef"))
         {
@@ -247,6 +268,23 @@ std::string BodyConfigToJson(const BodyConfig& cfg)
         { "iterations",      cfg.erosion.iterations      },
         { "thermalRate",     cfg.erosion.thermalRate     },
         { "thermalThreshold", cfg.erosion.thermalThreshold },
+    };
+
+    j["macroWorld"] = {
+        { "capacityMultiplier",  cfg.macroWorld.capacityMultiplier  },
+        { "convergentThreshold", cfg.macroWorld.convergentThreshold },
+        { "depositionRate",      cfg.macroWorld.depositionRate      },
+        { "enabled",             cfg.macroWorld.enabled             },
+        { "erosionIterations",   cfg.macroWorld.erosionIterations   },
+        { "erosionRate",         cfg.macroWorld.erosionRate         },
+        { "evaporationRate",     cfg.macroWorld.evaporationRate     },
+        { "flowRate",            cfg.macroWorld.flowRate            },
+        { "landDrying",          cfg.macroWorld.landDrying          },
+        { "moistureIterations",  cfg.macroWorld.moistureIterations  },
+        { "orographicStrength",  cfg.macroWorld.orographicStrength  },
+        { "rainRate",            cfg.macroWorld.rainRate            },
+        { "resolution",          cfg.macroWorld.resolution          },
+        { "windStrength",        cfg.macroWorld.windStrength        },
     };
 
     j["heightDetail"] = {

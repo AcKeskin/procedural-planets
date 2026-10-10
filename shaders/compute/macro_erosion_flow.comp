@@ -1,0 +1,107 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#include "macro_grid.glsl"
+#include "macro_params.glsl"
+
+// Macro erosion pass 2/3: water flow between neighbouring cells ("pull" scheme:
+// each cell sends water down-slope and collects what its higher neighbours send).
+// Ported from Jujedie/PlanetGenerator erosion_flow.glsl (MIT, see
+// third_party/NOTICE-PlanetGenerator.md). Changes: 8 neighbours resolved on the
+// cube-sphere grid (cross-face aware), near-equal-area cells so no cos(latitude)
+// metric, Earth gravity, the outflow accumulator starts at 0 on pass 0, and
+// suspended sediment travels with the water. Without that transport, incision
+// saturates at the local capacity and coarse cells never carve a valley. Ocean
+// cells keep the sediment that reaches them, so height + sediment stays conserved.
+//
+// Image 0: geo in, image 1: geo out, image 2: flux (R accumulates outflow, own texel only).
+
+layout(rgba32f, binding = 0) uniform image2DArray geoIn;
+layout(rgba32f, binding = 1) uniform image2DArray geoOut;
+layout(rgba32f, binding = 2) uniform image2DArray flux;
+
+const float MIN_WATER = 0.0001;
+const float MIN_SLOPE = 0.001;
+
+const ivec2 NEIGHBOURS[8] = ivec2[8](
+    ivec2(-1, -1), ivec2(0, -1), ivec2(1, -1),
+    ivec2(-1,  0),               ivec2(1,  0),
+    ivec2(-1,  1), ivec2(0,  1), ivec2(1,  1));
+
+vec4 loadGeo(ivec3 c)
+{
+    return imageLoad(geoIn, ivec3(c.yz, c.x));
+}
+
+float neighbourDistance(int k)
+{
+    return cellSizeMeters * length(vec2(NEIGHBOURS[k]));
+}
+
+// Sum of positive slopes from cell c (surface s) to its down-slope neighbours.
+float totalSlopeDown(ivec3 c, float s, int n)
+{
+    float total = 0.0;
+    for (int k = 0; k < 8; k++)
+    {
+        vec4 g = loadGeo(mg_neighbour(c.x, c.yz, NEIGHBOURS[k].x, NEIGHBOURS[k].y, n));
+        float slope = (s - (g.r + g.a)) / neighbourDistance(k);
+        if (slope > MIN_SLOPE)
+            total += slope;
+    }
+    return total;
+}
+
+void main()
+{
+    int n = int(resolution);
+    ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
+    int face = int(gl_GlobalInvocationID.z);
+    if (ij.x >= n || ij.y >= n)
+        return;
+
+    ivec3 self = ivec3(face, ij);
+    ivec3 texel = ivec3(ij, face);
+    vec4 g = imageLoad(geoIn, texel);
+    float prevFlux = passIndex == 0u ? 0.0 : imageLoad(flux, texel).r;
+
+    bool ocean = g.r < 0.0;
+    float surface = g.r + g.a;
+
+    // Our outflow, split over down-slope neighbours by slope. Ocean cells hold no
+    // simulated flow; they only collect.
+    float outflow = 0.0;
+    float sedimentOut = 0.0;
+    if (!ocean && g.a > MIN_WATER && totalSlopeDown(self, surface, n) > 0.0)
+    {
+        outflow = g.a * flowRate;
+        sedimentOut = g.b * flowRate;
+    }
+
+    // Inflow: each higher land neighbour sends us its slope-weighted share of
+    // water and suspended sediment.
+    float inflow = 0.0;
+    float sedimentIn = 0.0;
+    for (int k = 0; k < 8; k++)
+    {
+        ivec3 nc = mg_neighbour(face, ij, NEIGHBOURS[k].x, NEIGHBOURS[k].y, n);
+        vec4 ng = loadGeo(nc);
+        float nSurface = ng.r + ng.a;
+        float slope = (nSurface - surface) / neighbourDistance(k);
+        if (slope > MIN_SLOPE && ng.a > MIN_WATER && ng.r >= 0.0)
+        {
+            float nTotal = totalSlopeDown(nc, nSurface, n);
+            if (nTotal > 0.0)
+            {
+                float share = flowRate * (slope / nTotal);
+                inflow += ng.a * share;
+                sedimentIn += ng.b * share;
+            }
+        }
+    }
+
+    float water = ocean ? g.a : max(g.a - outflow + inflow, 0.0);
+    float sediment = g.b - sedimentOut + sedimentIn;
+    imageStore(geoOut, texel, vec4(g.r, g.g, sediment, water));
+    imageStore(flux, texel, vec4(prevFlux + outflow, 0.0, 0.0, 0.0));
+}

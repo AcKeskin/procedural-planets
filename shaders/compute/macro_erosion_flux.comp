@@ -1,0 +1,59 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#include "macro_grid.glsl"
+#include "macro_params.glsl"
+
+// Macro rivers: drainage flux accumulation, one cell of propagation per dispatch
+// (ping-pong). Runs in the rivers stage on the depression-filled surface.
+// A cell collects the flux of every neighbour that drains into it, plus one unit
+// of its own runoff, so at convergence it holds its upstream cell count.
+// Ported from Jujedie/PlanetGenerator erosion_flux_accumulation.glsl (MIT, see
+// third_party/NOTICE-PlanetGenerator.md). Changes: cube-sphere neighbours; each
+// neighbour's drain target comes precomputed from the rivers pass (a cell id, so
+// it stays right across cube faces where direction frames rotate); full
+// propagation without decay; a changed counter lets the host stop at convergence.
+//
+// Image 0: drain (R = target id, G = 1 for ocean), image 1: flux in (R), image 2:
+// flux out (R). SSBO 0: changed-cell counter.
+
+layout(rgba32f, binding = 0) uniform image2DArray drain;
+layout(rgba32f, binding = 1) uniform image2DArray fluxIn;
+layout(rgba32f, binding = 2) uniform image2DArray fluxOut;
+layout(std430, binding = 0) buffer Changed { uint changedCells; };
+
+void main()
+{
+    int n = int(resolution);
+    ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
+    int face = int(gl_GlobalInvocationID.z);
+    if (ij.x >= n || ij.y >= n)
+        return;
+
+    ivec3 texel = ivec3(ij, face);
+    float selfId = float((face * n + ij.y) * n + ij.x);
+    float current = passIndex == 0u ? 0.0 : imageLoad(fluxIn, texel).r;
+
+    float incoming = 0.0;
+    if (passIndex != 0u)
+    {
+        for (int dy = -1; dy <= 1; dy++)
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                if (dx == 0 && dy == 0)
+                    continue;
+                ivec3 c = mg_neighbour(face, ij, dx, dy, n);
+                ivec3 ct = ivec3(c.yz, c.x);
+                vec4 d = imageLoad(drain, ct);
+                if (d.g == 0.0 && d.r == selfId)
+                    incoming += imageLoad(fluxIn, ct).r;
+            }
+    }
+
+    // Ocean cells are river mouths: they collect but never pass flux on.
+    float own = imageLoad(drain, texel).g == 0.0 ? 1.0 : 0.0;
+    float updated = max(current, own + incoming);
+    imageStore(fluxOut, texel, vec4(updated, 0.0, 0.0, 0.0));
+    if (updated != current)
+        atomicAdd(changedCells, 1u);
+}

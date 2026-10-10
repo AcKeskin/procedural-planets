@@ -295,6 +295,19 @@ const std::unordered_map<std::string, Entry>& Table()
         // ---- body.erosion.* (needs regen) ----
         {"body.erosion.enabled", {true, BODY_BOOL(t.body->erosion.enabled)}},
         {"body.erosion.iterations", {true, BODY_INT(t.body->erosion.iterations)}},
+
+        // ---- body.macroWorld.* (needs regen; re-bakes the macro field) ----
+        {"body.macroWorld.enabled", {true, BODY_BOOL(t.body->macroWorld.enabled)}},
+        {"body.macroWorld.resolution", {true, BODY_INT(t.body->macroWorld.resolution)}},
+        {"body.macroWorld.convergentThreshold", {true, BODY_FLOAT(t.body->macroWorld.convergentThreshold)}},
+        {"body.macroWorld.erosionIterations", {true, BODY_INT(t.body->macroWorld.erosionIterations)}},
+        {"body.macroWorld.rainRate", {true, BODY_FLOAT(t.body->macroWorld.rainRate)}},
+        {"body.macroWorld.erosionRate", {true, BODY_FLOAT(t.body->macroWorld.erosionRate)}},
+        {"body.macroWorld.depositionRate", {true, BODY_FLOAT(t.body->macroWorld.depositionRate)}},
+        {"body.macroWorld.moistureIterations", {true, BODY_INT(t.body->macroWorld.moistureIterations)}},
+        {"body.macroWorld.windStrength", {true, BODY_FLOAT(t.body->macroWorld.windStrength)}},
+        {"body.macroWorld.landDrying", {true, BODY_FLOAT(t.body->macroWorld.landDrying)}},
+        {"body.macroWorld.orographicStrength", {true, BODY_FLOAT(t.body->macroWorld.orographicStrength)}},
     };
     return table;
 }

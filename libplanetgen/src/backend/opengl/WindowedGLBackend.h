@@ -36,9 +36,15 @@ public:
     void BindTexture3D(GpuTextureHandle texture, uint32_t samplerUnit) override;
     void DestroyTexture(GpuTextureHandle texture) override;
 
+    GpuTextureHandle CreateTexture2DArray_RGBA32F(uint32_t resolution, uint32_t layers) override;
+    void BindImage2DArray(GpuTextureHandle texture, uint32_t imageUnit) override;
+    void BindTexture2DArray(GpuTextureHandle texture, uint32_t samplerUnit) override;
+    void DownloadTexture(GpuTextureHandle texture, void* data, size_t sizeBytes) override;
+
     void Dispatch(uint32_t groupsX, uint32_t groupsY, uint32_t groupsZ) override;
     void Barrier() override;
     void ImageBarrier() override;
+    void Finish() override;
 
     GlDevice& Device() { return _device; }
 

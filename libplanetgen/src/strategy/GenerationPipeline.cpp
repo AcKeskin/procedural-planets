@@ -17,6 +17,18 @@ GpuTextureHandle ResolveMask(IComputeBackend& backend, const ShaderRegistry& reg
         return 0;
     return EnsureContinentMask(backend, registry, config, seed, *mask.texture, *mask.key);
 }
+
+// Resolve the macro world field from the body's cache (bake/reuse), or 0 when no
+// cache was supplied, the layer is off, or there is no mask to bake it from.
+GpuTextureHandle ResolveMacro(IComputeBackend& backend, const ShaderRegistry& registry,
+                              const BodyConfig& config, uint32_t seed,
+                              GpuTextureHandle continentMask,
+                              GenerationPipeline::MacroCache macro)
+{
+    if (!macro.texture || !macro.key)
+        return 0;
+    return EnsureMacroWorld(backend, registry, config, seed, continentMask, *macro.texture, *macro.key);
+}
 } // namespace
 
 GenerationPipeline::GenerationPipeline(IComputeBackend& backend,
@@ -30,7 +42,8 @@ PipelineResult GenerationPipeline::Generate(const BodyConfig& config,
                                             const float* vertices,
                                             uint32_t vertexCount,
                                             uint32_t seed,
-                                            MaskCache mask)
+                                            MaskCache mask,
+                                            MacroCache macro)
 {
     PipelineResult result;
     if (!vertices || vertexCount == 0)
@@ -43,6 +56,7 @@ PipelineResult GenerationPipeline::Generate(const BodyConfig& config,
 
     StrategyContext sc{ _backend, _registry, vertexCount, seed };
     sc.continentMask = ResolveMask(_backend, _registry, config, seed, mask);
+    sc.macroField = ResolveMacro(_backend, _registry, config, seed, sc.continentMask, macro);
 
     // Upload geometry once; all stages read from this SSBO (binding 0).
     const size_t vertexBytes = vertexCount * 3 * sizeof(float);
@@ -101,7 +115,8 @@ bool GenerationPipeline::GeneratePatch(const BodyConfig& config,
                                        GpuBufferHandle outHeights,
                                        GpuBufferHandle outNormals,
                                        GpuBufferHandle outShading,
-                                       MaskCache mask)
+                                       MaskCache mask,
+                                       MacroCache macro)
 {
     if (!vertices || vertexCount == 0 || !outHeights || !outNormals || !outShading)
         return false;
@@ -111,13 +126,15 @@ bool GenerationPipeline::GeneratePatch(const BodyConfig& config,
 
     // Same per-vertex strategies as the whole-mesh path, but writing into the
     // caller's buffers (outXxx) — this is what makes a standalone patch
-    // byte-identical to the whole-mesh region (cross-consistency). The mask is the
-    // same body-cached texture the whole-mesh path samples (per-vertex-pure lookup).
+    // byte-identical to the whole-mesh region (cross-consistency). The mask and the
+    // macro field are the same body-cached textures the whole-mesh path samples
+    // (per-vertex-pure lookups by direction).
     StrategyContext sc{ _backend, _registry, vertexCount, seed };
     sc.outHeights = outHeights;
     sc.outNormals = outNormals;
     sc.outShading = outShading;
     sc.continentMask = ResolveMask(_backend, _registry, config, seed, mask);
+    sc.macroField = ResolveMacro(_backend, _registry, config, seed, sc.continentMask, macro);
 
     // Upload geometry once; all stages read from this SSBO (binding 0).
     const size_t vertexBytes = vertexCount * 3 * sizeof(float);

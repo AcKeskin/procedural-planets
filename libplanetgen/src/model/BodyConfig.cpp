@@ -84,6 +84,38 @@ std::string BodyConfig::Validate() const
             err << "erosion.evaporationRate out of [0, 1]; ";
     }
 
+    // MacroWorld â€” only validate field values when enabled
+    if (macroWorld.enabled)
+    {
+        const auto& m = macroWorld;
+        if (m.resolution < 32 || m.resolution > 1024)
+            err << "macroWorld.resolution out of [32, 1024]; ";
+        if (m.convergentThreshold < -1.0f || m.convergentThreshold > 1.0f)
+            err << "macroWorld.convergentThreshold out of [-1, 1]; ";
+        if (m.erosionIterations < 0 || m.erosionIterations > 1000)
+            err << "macroWorld.erosionIterations out of [0, 1000]; ";
+        if (m.rainRate < 0.0f || m.rainRate > 1.0f)
+            err << "macroWorld.rainRate out of [0, 1]; ";
+        if (m.evaporationRate < 0.0f || m.evaporationRate > 1.0f)
+            err << "macroWorld.evaporationRate out of [0, 1]; ";
+        if (m.flowRate < 0.0f || m.flowRate > 1.0f)
+            err << "macroWorld.flowRate out of [0, 1]; ";
+        if (m.erosionRate < 0.0f || m.erosionRate > 1.0f)
+            err << "macroWorld.erosionRate out of [0, 1]; ";
+        if (m.depositionRate < 0.0f || m.depositionRate > 1.0f)
+            err << "macroWorld.depositionRate out of [0, 1]; ";
+        if (m.capacityMultiplier < 0.0f || m.capacityMultiplier > 100.0f)
+            err << "macroWorld.capacityMultiplier out of [0, 100]; ";
+        if (m.moistureIterations < 0 || m.moistureIterations > 512)
+            err << "macroWorld.moistureIterations out of [0, 512]; ";
+        if (m.windStrength <= 0.0f || m.windStrength > 8.0f)
+            err << "macroWorld.windStrength out of (0, 8]; ";
+        if (m.landDrying < 0.0f || m.landDrying > 1.0f)
+            err << "macroWorld.landDrying out of [0, 1]; ";
+        if (m.orographicStrength < 0.0f || m.orographicStrength > 100.0f)
+            err << "macroWorld.orographicStrength out of [0, 100]; ";
+    }
+
     // PaletteRef
     if (paletteRef.paletteId.empty())
         err << "paletteRef.paletteId must not be empty; ";

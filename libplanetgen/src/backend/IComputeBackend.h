@@ -47,6 +47,16 @@ public:
     virtual void BindTexture3D(GpuTextureHandle texture, uint32_t samplerUnit) = 0;   // sampler source
     virtual void DestroyTexture(GpuTextureHandle texture) = 0;
 
+    // 2D-texture arrays (RGBA32F, one layer per cube face — the macro world field).
+    // Images bind read-write so the same array can be a ping-pong input or output.
+    virtual GpuTextureHandle CreateTexture2DArray_RGBA32F(uint32_t resolution, uint32_t layers) = 0;
+    virtual void BindImage2DArray(GpuTextureHandle texture, uint32_t imageUnit) = 0;     // read-write
+    virtual void BindTexture2DArray(GpuTextureHandle texture, uint32_t samplerUnit) = 0; // sampler source
+
+    // Read back all of level 0 as RGBA float. Bake control + tests only; consumers
+    // sample on the GPU and never read back.
+    virtual void DownloadTexture(GpuTextureHandle texture, void* data, size_t sizeBytes) = 0;
+
     // Dispatch and synchronization
     virtual void Dispatch(uint32_t groupsX, uint32_t groupsY = 1, uint32_t groupsZ = 1) = 0;
     virtual void Barrier() = 0;
@@ -54,6 +64,9 @@ public:
     // Image/texture-fetch memory barrier (after the growth pass writes the mask,
     // before the height stage samples it). Distinct from the SSBO Barrier().
     virtual void ImageBarrier() = 0;
+
+    // Block until all submitted GPU work is done. For timing the bake.
+    virtual void Finish() = 0;
 };
 
 } // namespace planetgen

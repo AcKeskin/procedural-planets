@@ -10,7 +10,7 @@ struct LodConfig;
 struct TerrainStats;
 class BodyRuntime;
 
-// Edits the active body's shape/tectonics/ocean-floor/height-detail/erosion blocks
+// Edits the active body's shape/tectonics/ocean-floor/height-detail/erosion/macro-world blocks
 // directly on its BodyConfig — one generic path for every body type.
 class TerrainPanel
 {

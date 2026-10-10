@@ -231,4 +231,62 @@ struct alignas(16) ContinentGrowthParams
 
 static_assert(sizeof(ContinentGrowthParams) == 2 * 16, "ContinentGrowthParams std140 layout mismatch");
 
+// ============================================================================
+// MacroParams — binding = 3 in every macro_*.comp (shaders/includes/macro_params.glsl)
+// ============================================================================
+struct alignas(16) MacroParams
+{
+    // Row 0
+    uint32_t resolution;
+    uint32_t seed;
+    int32_t  numPlates;
+    float    boundaryWidth;
+
+    // Row 1
+    float convergentThreshold;
+    float convergentMountainScale;
+    float divergentRiftDepth;
+    float plateElevationNoise;
+
+    // Row 2
+    float   continentScale; // already multiplied by globalFrequency
+    int32_t continentLayers;
+    float   continentPersistence;
+    float   continentLacunarity;
+
+    // Row 3 — continent offset (vec3 -> 16-byte slot, last float used)
+    float continentOffsetX;
+    float continentOffsetY;
+    float continentOffsetZ;
+    float continentBaseLevel;
+
+    // Row 4
+    float rainRate;
+    float evaporationRate;
+    float flowRate;
+    float erosionRate;
+
+    // Row 5
+    float depositionRate;
+    float capacityMultiplier;
+    float cellSizeMeters;
+    float metersPerUnit;
+
+    // Row 6
+    float windStrength;
+    float landDrying;
+    float orographicStrength;
+    float temperatureLapseRate;
+
+    // Row 7
+    float    temperatureExponent;
+    float    channelFluxThreshold;
+    uint32_t passIndex;
+    float    maxErosionPerPassMeters;
+};
+
+static_assert(sizeof(MacroParams) == 8 * 16, "MacroParams std140 layout mismatch");
+static_assert(offsetof(MacroParams, continentOffsetX) == 3 * 16,
+              "MacroParams continentOffset must start at row 3");
+
 } // namespace planetgen

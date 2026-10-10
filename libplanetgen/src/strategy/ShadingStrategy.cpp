@@ -2,6 +2,7 @@
 #include "StrategyCommon.h"
 #include "../backend/ParamBlocks.h"
 #include "../backend/ParamMappers.h"
+#include "MacroWorldPass.h"
 
 namespace planetgen
 {
@@ -36,6 +37,15 @@ GpuBufferHandle ShadingStrategy::Run(const StrategyContext& sc,
             return 0;
     }
 
+    // Macro layer: the earth climate model reads baked moisture (MACRO_WORLD variant).
+    const bool useMacro = sc.macroField != 0 && programId == BuiltinProgram::ShadingEarth;
+    if (useMacro)
+    {
+        program = sc.registry.Resolve(BuiltinProgram::ShadingEarthMacro);
+        if (!program)
+            return 0;
+    }
+
     const size_t shadingBytes = sc.vertexCount * 4 * sizeof(float);
     // Per-patch path passes an app-owned shading buffer; otherwise allocate our own.
     const GpuBufferHandle shadingBuf = sc.outShading ? sc.outShading : gpu.CreateBuffer(shadingBytes);
@@ -44,6 +54,8 @@ GpuBufferHandle ShadingStrategy::Run(const StrategyContext& sc,
     gpu.BindBuffer(vertices,   0);
     gpu.BindBuffer(shadingBuf, 1);
     gpu.BindBuffer(heights,    2);
+    if (useMacro)
+        gpu.BindTexture2DArray(sc.macroField, kMacroFieldSamplerUnit);
 
     GpuBufferHandle ubo = 0;
     if (programId == BuiltinProgram::ShadingEarth)

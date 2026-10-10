@@ -1,0 +1,164 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#include "noise.glsl"
+#include "macro_grid.glsl"
+#include "macro_params.glsl"
+
+// Macro world stage 1: plates -> base elevation.
+//
+// Plate assignment is a domain-warped spherical Voronoi: a one-pass stand-in for
+// redblobgames' random flood fill that still gives irregular plate outlines. Each
+// plate drifts along a random tangent; at a boundary the relative drift projected
+// on the boundary normal is the stress. Compression above convergentThreshold
+// builds a mountain belt, tension above it cuts a rift. The continent mask stays
+// the land/ocean authority; plates only add boundary relief.
+//
+// Output (image 0, per cell): R = elevation in meters, G = bedrock hardness,
+// B = sediment, A = water. Erosion consumes this layout directly.
+
+layout(binding = 4) uniform sampler3D continentMask;
+layout(rgba32f, binding = 0) uniform image2DArray geoOut;
+
+const float MACRO_PI = 3.14159265359;
+
+float unitHash(uint x, uint s)
+{
+    return float(noiseHash(x, s)) / float(0xFFFFFFFFu);
+}
+
+vec3 randomUnit(uint id, uint s)
+{
+    float theta = 2.0 * MACRO_PI * unitHash(id * 7u + 3u, s);
+    float z = 2.0 * unitHash(id * 13u + 7u, s + 1u) - 1.0;
+    float r = sqrt(max(0.0, 1.0 - z * z));
+    return vec3(r * cos(theta), z, r * sin(theta));
+}
+
+vec3 plateCenter(int plate)
+{
+    return randomUnit(uint(plate), seed + 500u);
+}
+
+// Tangent drift velocity, speed in [0.5, 1].
+vec3 plateDrift(int plate, vec3 center)
+{
+    vec3 axis = randomUnit(uint(plate), seed + 700u);
+    vec3 v = cross(axis, center);
+    float len = length(v);
+    v = len > 1e-4 ? v / len : vec3(0.0);
+    return v * mix(0.5, 1.0, unitHash(uint(plate) * 29u + 5u, seed + 800u));
+}
+
+// fbm with the height stage's argument order and multiplier.
+float mfbm(vec3 p, vec3 offset, int layers, float scale, float persistence, float lacunarity,
+           float multiplier, uint s)
+{
+    return fbmSeeded(p, offset, layers, scale, lacunarity, persistence, s) * multiplier;
+}
+
+// Continent shape from the baked mask, same recipe as the height stage's mask path
+// (without its per-vertex plate terms, which the macro plates replace).
+float maskElevation(vec3 dir)
+{
+    float warpAmp = 0.12;
+    vec3 sampleDir = normalize(dir + vec3(
+        mfbm(dir, vec3(333.0), 2, continentScale * 1.2, 0.5, 2.0, warpAmp, seed + 50u),
+        mfbm(dir, vec3(444.0), 2, continentScale * 1.2, 0.5, 2.0, warpAmp, seed + 51u),
+        mfbm(dir, vec3(555.0), 2, continentScale * 1.2, 0.5, 2.0, warpAmp, seed + 52u)));
+
+    vec2 mask = texture(continentMask, sampleDir * 0.5 + 0.5).rg;
+    float continentalness = mask.r;
+    float accretionAge    = mask.g;
+
+    float maskThreshold = 0.4;
+    float continentFactor = smoothstep(maskThreshold - 0.22, maskThreshold + 0.22, continentalness);
+
+    float elev = mix(-0.5, 0.5, continentFactor);
+    elev += mfbm(dir, continentOffset, continentLayers, continentScale,
+                 continentPersistence, continentLacunarity, plateElevationNoise, seed);
+    elev += continentBaseLevel;
+
+    if (continentFactor > 0.3)
+    {
+        float cratonFactor = 1.0 - smoothstep(0.0, 0.3, accretionAge);
+        float cratonFlat = snoise(dir * continentScale * 0.5 + vec3(8000.0), seed + 60u) * 0.03;
+        elev += cratonFactor * 0.1 + cratonFlat * cratonFactor;
+
+        float orogenFactor = smoothstep(0.25, 0.45, accretionAge) *
+                             (1.0 - smoothstep(0.65, 0.85, accretionAge));
+        elev += mfbm(dir, vec3(9000.0), 3, continentScale * 2.5, 0.5, 2.0, 0.12 * orogenFactor, seed + 61u);
+
+        float marginFactor = smoothstep(0.75, 1.0, accretionAge) * continentFactor;
+        elev -= marginFactor * 0.15;
+    }
+    return elev;
+}
+
+void main()
+{
+    int n = int(resolution);
+    ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
+    int face = int(gl_GlobalInvocationID.z);
+    if (ij.x >= n || ij.y >= n)
+        return;
+
+    vec3 dir = mg_cellDir(face, ij, n);
+
+    // Warped direction -> irregular plate outlines.
+    vec3 warped = normalize(dir + 0.18 * vec3(
+        mfbm(dir, vec3(17.0), 3, 2.0, 0.5, 2.0, 1.0, seed + 601u),
+        mfbm(dir, vec3(29.0), 3, 2.0, 0.5, 2.0, 1.0, seed + 602u),
+        mfbm(dir, vec3(43.0), 3, 2.0, 0.5, 2.0, 1.0, seed + 603u)));
+
+    float nearDist = 1e10;
+    float secondDist = 1e10;
+    int nearId = 0;
+    int secondId = 0;
+    for (int i = 0; i < numPlates; i++)
+    {
+        float d = acos(clamp(dot(warped, plateCenter(i)), -1.0, 1.0));
+        if (d < nearDist)
+        {
+            secondDist = nearDist;
+            secondId = nearId;
+            nearDist = d;
+            nearId = i;
+        }
+        else if (d < secondDist)
+        {
+            secondDist = d;
+            secondId = i;
+        }
+    }
+
+    // secondDist - nearDist grows ~2x the distance from the boundary, so 2*width
+    // puts the belt edge about one boundaryWidth from the boundary line.
+    float proximity = 1.0 - smoothstep(0.0, 2.0 * boundaryWidth, secondDist - nearDist);
+    float profile = proximity * proximity; // belts peak on the boundary
+
+    vec3 cNear = plateCenter(nearId);
+    vec3 cSecond = plateCenter(secondId);
+    vec3 toOther = cSecond - cNear;
+    toOther -= dir * dot(toOther, dir);
+    float toLen = length(toOther);
+    vec3 boundaryNormal = toLen > 1e-5 ? toOther / toLen : vec3(0.0);
+
+    // Stress in [-1, 1]: > 0 plates approach (compression), < 0 they separate.
+    vec3 driftNear = plateDrift(nearId, cNear);
+    vec3 driftSecond = plateDrift(secondId, cSecond);
+    float speeds = max(1e-4, length(driftNear) + length(driftSecond));
+    float stress = clamp(dot(driftNear - driftSecond, boundaryNormal) / speeds, -1.0, 1.0);
+
+    float convergent = smoothstep(convergentThreshold, convergentThreshold + 0.3, stress);
+    float divergent  = smoothstep(convergentThreshold, convergentThreshold + 0.3, -stress);
+
+    float elev = maskElevation(dir);
+    float landFactor = smoothstep(-0.1, 0.1, elev);
+
+    // Ocean-side compression raises island arcs at half strength.
+    elev += convergent * profile * convergentMountainScale * mix(0.5, 1.0, landFactor);
+    elev -= divergent * profile * divergentRiftDepth;
+
+    imageStore(geoOut, ivec3(ij, face), vec4(elev * metersPerUnit, 1.0, 0.0, 0.0));
+}

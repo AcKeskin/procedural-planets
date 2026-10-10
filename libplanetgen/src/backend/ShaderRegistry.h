@@ -16,6 +16,16 @@ enum class BuiltinProgram : int
     ShadingGeneric = 2,
     Erosion = 3,
     ContinentGrowth = 4,
+    MacroPlates = 5,
+    MacroErosionRainfall = 6,
+    MacroErosionFlow = 7,
+    MacroErosionSediment = 8,
+    MacroDrainageFlux = 9,
+    MacroFill = 10,
+    MacroRivers = 11,
+    MacroClimate = 12,
+    HeightMacro = 13,
+    ShadingEarthMacro = 14,
 };
 
 // Converts a BuiltinProgram id to its canonical string key
@@ -28,9 +38,23 @@ inline std::string BuiltinKey(BuiltinProgram id)
     case BuiltinProgram::ShadingGeneric:  return "__builtin_shading_generic";
     case BuiltinProgram::Erosion:         return "__builtin_erosion";
     case BuiltinProgram::ContinentGrowth: return "__builtin_continent_growth";
+    case BuiltinProgram::MacroPlates:     return "__builtin_macro_plates";
+    case BuiltinProgram::MacroErosionRainfall: return "__builtin_macro_erosion_rainfall";
+    case BuiltinProgram::MacroErosionFlow:     return "__builtin_macro_erosion_flow";
+    case BuiltinProgram::MacroErosionSediment: return "__builtin_macro_erosion_sediment";
+    case BuiltinProgram::MacroDrainageFlux:    return "__builtin_macro_drainage_flux";
+    case BuiltinProgram::MacroFill:            return "__builtin_macro_fill";
+    case BuiltinProgram::MacroRivers:          return "__builtin_macro_rivers";
+    case BuiltinProgram::MacroClimate:         return "__builtin_macro_climate";
+    case BuiltinProgram::HeightMacro:          return "__builtin_height_macro";
+    case BuiltinProgram::ShadingEarthMacro:    return "__builtin_shading_earth_macro";
     }
     return "";
 }
+
+// Returns `source` with `#define <name> 1` inserted after its #version line, for
+// compiling a feature variant of a built-in shader.
+std::string WithDefine(const std::string& source, const std::string& name);
 
 // Maps string keys to compiled GL program handles.
 // Programs are compiled once and cached; never re-compiled unless Unregister is called.

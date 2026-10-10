@@ -120,6 +120,22 @@ float computeMoisture(vec3 dir, float normalizedHeight, uint baseSeed)
     return clamp(hadley + coastalProxy - interiorDrying + noiseContrib, 0.0, 1.0);
 }
 
+#ifdef MACRO_WORLD
+// Macro world field (B = baked moisture), bound to unit 5. Only the MACRO_WORLD
+// program variant reads it, so the default program stays bit-identical.
+#include "macro_grid.glsl"
+layout(binding = 5) uniform sampler2DArray macroField;
+
+// Baked moisture (wind, coasts, rain shadows) plus the same small-scale noise the
+// climate model adds, so biome edges keep their texture.
+float macroMoisture(vec3 dir, uint baseSeed)
+{
+    float moistNoise = multiOctaveNoise(dir, moistureNoiseScale, 3, baseSeed);
+    float noiseContrib = (moistNoise * 2.0 - 1.0) * moistureNoiseStrength;
+    return clamp(mg_sample(macroField, dir).b + noiseContrib, 0.0, 1.0);
+}
+#endif
+
 void main()
 {
     uint id = gl_GlobalInvocationID.x;
@@ -140,7 +156,11 @@ void main()
         float normalizedHeight = clamp(displacement / max(heightScale, 0.001), 0.0, 1.0);
 
         float temperature = computeTemperature(dir, normalizedHeight);
+#ifdef MACRO_WORLD
+        float moisture = macroMoisture(dir, seed + 50u);
+#else
         float moisture = computeMoisture(dir, normalizedHeight, seed + 50u);
+#endif
 
         shadingOutput[id] = vec4(temperature, moisture, detailNoise, smallNoise);
     }

@@ -1,0 +1,75 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#include "macro_grid.glsl"
+#include "macro_params.glsl"
+
+// Macro rivers, two modes picked by passIndex.
+//
+// Pass 0 (drain): steepest descent on the filled surface. Writes each cell's
+// downstream cell as a linear id (face * n + j) * n + i, exact in a float up to
+// 2^24 cells. Ocean cells are sinks (target = self, G = 1).
+//   Image 0: fill (R = filled height m, read), image 1: drain (write).
+//
+// Pass 1 (finalise): writes the macro field the consumers sample.
+//   R = filled elevation in continentShape units, G = log2(1 + upstream area / 1000 km^2).
+//   Image 0: fill (read), image 1: flux (R = upstream cell count, read),
+//   image 2: field (write; B, A filled by the climate stage), image 3: geo (read).
+//   A land cell the fill never reached (no ocean, or the pass cap hit) keeps its
+//   eroded height instead of the fill's "unfilled" sentinel.
+
+layout(rgba32f, binding = 0) uniform image2DArray fill;
+layout(rgba32f, binding = 1) uniform image2DArray aux;
+layout(rgba32f, binding = 2) uniform image2DArray field;
+layout(rgba32f, binding = 3) uniform image2DArray geo;
+
+const float UNFILLED_THRESHOLD_M = 5e8; // half of macro_fill.comp's UNFILLED_M
+
+int linearId(ivec3 c, int n)
+{
+    return (c.x * n + c.z) * n + c.y;
+}
+
+void main()
+{
+    int n = int(resolution);
+    ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
+    int face = int(gl_GlobalInvocationID.z);
+    if (ij.x >= n || ij.y >= n)
+        return;
+
+    ivec3 texel = ivec3(ij, face);
+    float height = imageLoad(fill, texel).r;
+
+    if (passIndex == 0u)
+    {
+        ivec3 target = ivec3(face, ij);
+        if (height >= 0.0)
+        {
+            float best = 0.0;
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    if (dx == 0 && dy == 0)
+                        continue;
+                    ivec3 c = mg_neighbour(face, ij, dx, dy, n);
+                    float slope = (height - imageLoad(fill, ivec3(c.yz, c.x)).r) / length(vec2(dx, dy));
+                    if (slope > best)
+                    {
+                        best = slope;
+                        target = c;
+                    }
+                }
+        }
+        imageStore(aux, texel, vec4(float(linearId(target, n)), height < 0.0 ? 1.0 : 0.0, 0.0, 0.0));
+        return;
+    }
+
+    if (height > UNFILLED_THRESHOLD_M)
+        height = imageLoad(geo, texel).r;
+
+    float upstreamCells = imageLoad(aux, texel).r;
+    float cellAreaKm2 = (cellSizeMeters / 1000.0) * (cellSizeMeters / 1000.0);
+    float riverFlux = log2(1.0 + upstreamCells * cellAreaKm2 / 1000.0);
+    imageStore(field, texel, vec4(height / metersPerUnit, riverFlux, 0.0, 0.0));
+}

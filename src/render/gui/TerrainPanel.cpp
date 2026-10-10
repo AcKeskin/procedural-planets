@@ -47,6 +47,7 @@ bool TerrainPanel::DrawTerrainBlocks(BodyRuntime& body, uint32_t& seed, int& sub
     auto& ofl = body.Config().oceanFloor;
     auto& hd = body.Config().heightDetail;
     auto& er = body.Config().erosion;
+    auto& mw = body.Config().macroWorld;
 
     // Regenerate only when a slider's edit is committed (mouse released), not on
     // every drag frame — otherwise every pixel of a drag would rebuild the planet.
@@ -231,6 +232,38 @@ bool TerrainPanel::DrawTerrainBlocks(BodyRuntime& body, uint32_t& seed, int& sub
         ImGui::SliderFloat("Deposition Rate", &er.depositionRate, 0.001f, 0.02f, "%.3f");
         edited();
         ImGui::SliderFloat("Evaporation Rate", &er.evaporationRate, 0.01f, 0.5f, "%.2f");
+        edited();
+    }
+
+    // Once-per-body bake (plates, erosion, rivers, moisture). Any change here re-bakes.
+    ImGui::Spacing();
+    ImGui::Text("Macro World");
+    ImGui::Separator();
+    if (ImGui::Checkbox("Enable Macro World", &mw.enabled))
+        regen = true;
+    if (mw.enabled)
+    {
+        if (!tec.enabled)
+            ImGui::TextDisabled("Needs tectonics (continent mask).");
+        ImGui::SliderInt("Macro Resolution", &mw.resolution, 128, 1024);
+        edited();
+        ImGui::SliderFloat("Convergent Threshold", &mw.convergentThreshold, -0.5f, 0.9f, "%.2f");
+        edited();
+        ImGui::SliderInt("Macro Erosion Iterations", &mw.erosionIterations, 0, 1000);
+        edited();
+        ImGui::SliderFloat("Rain Rate", &mw.rainRate, 0.001f, 0.05f, "%.3f");
+        edited();
+        ImGui::SliderFloat("Macro Erosion Rate", &mw.erosionRate, 0.0f, 0.5f, "%.3f");
+        edited();
+        ImGui::SliderFloat("Macro Deposition Rate", &mw.depositionRate, 0.0f, 0.5f, "%.3f");
+        edited();
+        ImGui::SliderInt("Moisture Iterations", &mw.moistureIterations, 0, 512);
+        edited();
+        ImGui::SliderFloat("Wind Strength", &mw.windStrength, 0.5f, 8.0f, "%.1f");
+        edited();
+        ImGui::SliderFloat("Land Drying", &mw.landDrying, 0.0f, 0.1f, "%.3f");
+        edited();
+        ImGui::SliderFloat("Orographic Strength", &mw.orographicStrength, 0.0f, 10.0f, "%.2f");
         edited();
     }
 

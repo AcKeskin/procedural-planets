@@ -26,10 +26,8 @@ GpuTextureHandle BakeContinentMask(IComputeBackend& backend,
                                    const BodyConfig& config,
                                    uint32_t seed);
 
-// Cache key for the baked mask — what it must be rebuilt on. Mask geometry depends
-// on (seed, resolution); the growth params derive from config.shape, but for the
-// current model bodies are recreated on config change, so (seed, resolution) is the
-// invalidation signal. Pin finer invalidation later if in-place edits need it.
+// Cache key for the baked mask — what it must be rebuilt on: seed, resolution and
+// the growth params from config.shape (count, size variance, clustering).
 uint64_t MaskCacheKey(const BodyConfig& config, uint32_t seed);
 
 // Return the cached mask for (config, seed), baking (or rebaking on a stale key) as

@@ -159,7 +159,8 @@ void GlDevice::Dispatch(uint32_t groupsX, uint32_t groupsY, uint32_t groupsZ)
 
 void GlDevice::Barrier()
 {
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    // BUFFER_UPDATE: a DownloadBuffer after a dispatch must see the shader's writes.
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
 }
 
 // --- 3D texture (RG32F) — continent mask ---
@@ -209,6 +210,49 @@ void GlDevice::DestroyTexture(GpuTextureHandle texture)
 void GlDevice::ImageBarrier()
 {
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+}
+
+void GlDevice::Finish()
+{
+    glFinish();
+}
+
+// --- 2D texture array (RGBA32F) — macro world field ---
+// Nearest filter: consumers do their own bilinear so taps can cross cube faces,
+// which hardware filtering cannot do across layers.
+
+GpuTextureHandle GlDevice::CreateTexture2DArray_RGBA32F(uint32_t resolution, uint32_t layers)
+{
+    unsigned int tex = 0;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA32F,
+                   static_cast<GLsizei>(resolution),
+                   static_cast<GLsizei>(resolution),
+                   static_cast<GLsizei>(layers));
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    return tex;
+}
+
+void GlDevice::BindImage2DArray(GpuTextureHandle texture, uint32_t imageUnit)
+{
+    glBindImageTexture(imageUnit, texture, 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA32F);
+}
+
+void GlDevice::BindTexture2DArray(GpuTextureHandle texture, uint32_t samplerUnit)
+{
+    glActiveTexture(GL_TEXTURE0 + samplerUnit);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, texture);
+    glActiveTexture(GL_TEXTURE0);
+}
+
+void GlDevice::DownloadTexture(GpuTextureHandle texture, void* data, size_t sizeBytes)
+{
+    glGetTextureImage(texture, 0, GL_RGBA, GL_FLOAT, static_cast<GLsizei>(sizeBytes), data);
 }
 
 } // namespace planetgen

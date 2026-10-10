@@ -107,4 +107,29 @@ void WindowedGLBackend::ImageBarrier()
     _device.ImageBarrier();
 }
 
+void WindowedGLBackend::Finish()
+{
+    _device.Finish();
+}
+
+GpuTextureHandle WindowedGLBackend::CreateTexture2DArray_RGBA32F(uint32_t resolution, uint32_t layers)
+{
+    return _device.CreateTexture2DArray_RGBA32F(resolution, layers);
+}
+
+void WindowedGLBackend::BindImage2DArray(GpuTextureHandle texture, uint32_t imageUnit)
+{
+    _device.BindImage2DArray(texture, imageUnit);
+}
+
+void WindowedGLBackend::BindTexture2DArray(GpuTextureHandle texture, uint32_t samplerUnit)
+{
+    _device.BindTexture2DArray(texture, samplerUnit);
+}
+
+void WindowedGLBackend::DownloadTexture(GpuTextureHandle texture, void* data, size_t sizeBytes)
+{
+    _device.DownloadTexture(texture, data, sizeBytes);
+}
+
 } // namespace planetgen

@@ -187,6 +187,36 @@ struct ErosionBlock
 };
 
 // ============================================================================
+// Block 7b — Macro world layer
+// Once-per-body bake on a coarse cube-sphere grid: plates -> hydraulic erosion ->
+// rivers -> moisture -> biomes. Height and shading sample it by direction.
+// Plate layout reuses tectonics (numPlates, boundaryWidth, convergent/divergent
+// scales) so macro belts line up with the per-vertex uplift term.
+// ============================================================================
+
+struct MacroWorldBlock
+{
+    bool  enabled             = false;
+    int   resolution          = 512;    // cells per cube-face edge (bake ~0.25 s on a desktop GPU)
+    float convergentThreshold = 0.3f;   // boundary stress above this builds mountains
+
+    // Hydraulic erosion (rainfall -> flow -> sediment -> flux accumulation)
+    int   erosionIterations  = 400;
+    float rainRate           = 0.012f;
+    float evaporationRate    = 0.02f;
+    float flowRate           = 0.25f;
+    float erosionRate        = 0.15f;
+    float depositionRate     = 0.12f;
+    float capacityMultiplier = 2.5f;
+
+    // Moisture: advected along latitude-banded prevailing winds
+    int   moistureIterations = 160;
+    float windStrength       = 2.0f;    // cells travelled per iteration
+    float landDrying         = 0.01f;   // moisture lost per step over land
+    float orographicStrength = 1.0f;    // moisture lost per unit of uphill climb
+};
+
+// ============================================================================
 // Block 8 — Palette reference
 // ============================================================================
 
@@ -222,6 +252,7 @@ struct BodyConfig
     HeightDetailBlock heightDetail;
     ShadingBlock    shading;
     ErosionBlock    erosion;
+    MacroWorldBlock macroWorld;
     PaletteRefBlock paletteRef;
     ShaderPathsBlock shaderPaths;
 

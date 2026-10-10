@@ -1,0 +1,63 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#include "macro_grid.glsl"
+#include "macro_params.glsl"
+
+// Macro rivers, depression fill (Planchon-Darboux). Raises every land pit until
+// it spills, leaving a surface where each land cell has a strictly lower
+// neighbour, so steepest descent always reaches the ocean.
+//
+// Pass 0 initialises: ocean = its height, land = "infinitely" high. Later passes
+// lower each land cell to max(height, lowest neighbour + epsilon) in place. The
+// fill only decreases and converges to the same surface in any update order, so
+// the in-place race cannot change the result. The changed counter tells the
+// host when to stop.
+//
+// Image 0: geo (R = height m, read), image 1: fill (R = filled height m, read-write).
+// SSBO 0: changed-cell counter.
+
+layout(rgba32f, binding = 0) uniform image2DArray geo;
+layout(rgba32f, binding = 1) uniform image2DArray fill;
+layout(std430, binding = 0) buffer Changed { uint changedCells; };
+
+const float FILL_EPSILON_M = 0.01;
+const float UNFILLED_M = 1e9;
+
+void main()
+{
+    int n = int(resolution);
+    ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
+    int face = int(gl_GlobalInvocationID.z);
+    if (ij.x >= n || ij.y >= n)
+        return;
+
+    ivec3 texel = ivec3(ij, face);
+    float height = imageLoad(geo, texel).r;
+
+    if (passIndex == 0u)
+    {
+        imageStore(fill, texel, vec4(height < 0.0 ? height : UNFILLED_M, 0.0, 0.0, 0.0));
+        return;
+    }
+    if (height < 0.0)
+        return;
+
+    float current = imageLoad(fill, texel).r;
+    float lowest = UNFILLED_M;
+    for (int dy = -1; dy <= 1; dy++)
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            if (dx == 0 && dy == 0)
+                continue;
+            ivec3 c = mg_neighbour(face, ij, dx, dy, n);
+            lowest = min(lowest, imageLoad(fill, ivec3(c.yz, c.x)).r);
+        }
+
+    float lowered = max(height, min(current, lowest + FILL_EPSILON_M));
+    if (lowered < current)
+    {
+        imageStore(fill, texel, vec4(lowered, 0.0, 0.0, 0.0));
+        atomicAdd(changedCells, 1u);
+    }
+}

@@ -28,6 +28,18 @@ https://github.com/user-attachments/assets/895fe468-6541-4f7e-b797-4cf7dd774165
 
 _(Planet-type showcase video)_
 
+## Macro World Layer
+
+<p align="center">
+  <img src="docs/images/macro_world_flyover.gif" alt="Orbit to low flyover with the macro world layer on" width="480">
+</p>
+
+An optional once-per-body bake on a coarse cube-sphere grid. It adds tectonic plates (mountain belts on convergent boundaries, rifts on divergent ones), hydraulic erosion, rivers that always drain to the sea, and moisture carried by prevailing winds (wet coasts, dry interiors, rain shadows). The terrain samples it as its base height and the climate model reads its moisture. The bake takes about 0.25 s on a desktop GPU.
+
+Turn it on in the Terrain panel: **Generation > Macro World > Enable Macro World** (needs Use Tectonics). In a body JSON, set `"macroWorld": { "enabled": true }`. It is off by default, and off gives the same output as before.
+
+The erosion passes are ported from [Jujedie/PlanetGenerator](https://github.com/Jujedie/PlanetGenerator) (MIT, see `third_party/NOTICE-PlanetGenerator.md`).
+
 ## Features
 
 - **GPU Compute Terrain** — Height and shading generated in two compute shader passes, entirely on the GPU

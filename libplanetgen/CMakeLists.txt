@@ -14,7 +14,17 @@ set(SHADER_SOURCES
     "${SHADER_SOURCE_DIR}/compute/shading_generic.comp"
     "${SHADER_SOURCE_DIR}/compute/erosion_earth.comp"
     "${SHADER_SOURCE_DIR}/compute/continent_growth.comp"
+    "${SHADER_SOURCE_DIR}/compute/macro_plates.comp"
+    "${SHADER_SOURCE_DIR}/compute/macro_erosion_rainfall.comp"
+    "${SHADER_SOURCE_DIR}/compute/macro_erosion_flow.comp"
+    "${SHADER_SOURCE_DIR}/compute/macro_erosion_sediment.comp"
+    "${SHADER_SOURCE_DIR}/compute/macro_erosion_flux.comp"
+    "${SHADER_SOURCE_DIR}/compute/macro_fill.comp"
+    "${SHADER_SOURCE_DIR}/compute/macro_rivers.comp"
+    "${SHADER_SOURCE_DIR}/compute/macro_climate.comp"
     "${SHADER_SOURCE_DIR}/includes/noise.glsl"
+    "${SHADER_SOURCE_DIR}/includes/macro_grid.glsl"
+    "${SHADER_SOURCE_DIR}/includes/macro_params.glsl"
 )
 
 add_custom_command(
@@ -49,6 +59,7 @@ set(PLANETGEN_SOURCES
     src/strategy/ErosionStrategy.cpp
     src/strategy/PaletteProvider.cpp
     src/strategy/ContinentMaskPass.cpp
+    src/strategy/MacroWorldPass.cpp
     src/strategy/GenerationPipeline.cpp
     src/mesh/MeshGen.cpp
 )
@@ -74,6 +85,7 @@ set(PLANETGEN_HEADERS
     src/strategy/ErosionStrategy.h
     src/strategy/PaletteProvider.h
     src/strategy/ContinentMaskPass.h
+    src/strategy/MacroWorldPass.h
     src/strategy/GenerationPipeline.h
     src/strategy/StrategyCommon.h
     src/mesh/MeshGen.h
@@ -139,6 +151,7 @@ set(PLANETGEN_TEST_SOURCES
     tests/test_strategies.cpp
     tests/test_strategy_extension.cpp
     tests/test_public_api.cpp
+    tests/test_macro_world.cpp
 )
 
 add_executable(planetgen_tests ${PLANETGEN_TEST_SOURCES})
@@ -165,6 +178,7 @@ target_sources(planetgen_tests PRIVATE
     src/strategy/ErosionStrategy.cpp
     src/strategy/PaletteProvider.cpp
     src/strategy/ContinentMaskPass.cpp
+    src/strategy/MacroWorldPass.cpp
     src/strategy/GenerationPipeline.cpp
     ${GL3W_SRC}
 )
