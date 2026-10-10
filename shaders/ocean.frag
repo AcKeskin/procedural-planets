@@ -24,6 +24,12 @@ uniform float uWaveScale;
 uniform float uWaveSpeed;
 uniform float uTime;
 
+// Atmosphere parameters (AtmosphereSettings) the reflected sky is derived from.
+uniform int uAtmosphereOn;
+uniform vec3 uWavelengths;        // nm, red/green/blue
+uniform float uScatteringStrength;
+uniform float uAtmosphereIntensity;
+
 out vec4 outColor;
 
 // ---- water body ----
@@ -49,13 +55,18 @@ WaterBody waterBody(float depthUnits)
 // Waves run on the direction scaled to this radius, so they keep their size relative to the
 // planet at any planet radius (the same rule as the ground's material noise).
 const float kWaveReferenceRadius = 10.0;
-const int kWaveCount = 8;
+const int kWaveCount = 16;
 const float kBaseWaveFrequency = 300.0; // radians per reference unit at wave scale 1
 
-// Fixed, well-spread 3D wave directions (plane waves through the sphere).
+// Random, well-spread 3D directions with jittered frequencies and phases: irregular ratios keep
+// the waves from interfering into a regular grid.
 const vec3 kWaveDirs[kWaveCount] = vec3[kWaveCount](
-    vec3( 0.83,  0.15,  0.54), vec3(-0.41,  0.79,  0.46), vec3( 0.12, -0.63,  0.77), vec3(-0.92, -0.25,  0.30),
-    vec3( 0.35,  0.90, -0.26), vec3(-0.18, -0.21, -0.96), vec3( 0.71, -0.56, -0.42), vec3(-0.55,  0.44, -0.71));
+    vec3( 0.55, -0.35,  0.76), vec3( 0.86,  0.30,  0.42), vec3(-0.66,  0.07,  0.75), vec3(-0.47, -0.88, -0.02),
+    vec3(-0.35, -0.93,  0.15), vec3( 0.43, -0.86,  0.28), vec3( 0.46, -0.15, -0.88), vec3( 0.11, -0.75,  0.65),
+    vec3( 0.92,  0.25, -0.31), vec3(-0.79,  0.15,  0.60), vec3( 0.29,  0.95,  0.09), vec3(-0.17,  0.72,  0.68),
+    vec3( 0.52, -0.71,  0.47), vec3( 0.37, -0.38, -0.85), vec3(-0.67, -0.64, -0.38), vec3(-0.67,  0.28,  0.69));
+const float kWaveJitter[kWaveCount] = float[kWaveCount](1.01, 0.87, 0.87, 0.91, 1.05, 0.98, 0.94, 1.03, 0.99, 0.94, 1.09, 1.06, 0.92, 1.02, 1.01, 1.11);
+const float kWavePhase[kWaveCount] = float[kWaveCount](4.58, 1.81, 6.16, 0.74, 2.63, 4.75, 0.95, 3.07, 0.25, 4.20, 4.80, 3.60, 5.50, 1.97, 4.37, 3.73);
 
 struct WaveSurface
 {
@@ -69,24 +80,34 @@ struct WaveSurface
 WaveSurface waveSurface(vec3 dir)
 {
     vec3 p = dir * kWaveReferenceRadius;
-    float footprint = length(fwidth(p)); // reference units per pixel
+    // Larger pixel axis: at grazing angles one axis stretches far, and the average would let
+    // waves through that the pixel cannot hold (moire).
+    float footprint = max(length(dFdx(p)), length(dFdy(p))); // reference units per pixel
+
+    // Low-frequency domain warp: bends the crests so no wave stays a straight line.
+    float f0 = kBaseWaveFrequency * uWaveScale;
+    vec3 warp = vec3(sin(dot(p, vec3(0.8, 0.3, 0.5)) * f0 * 0.11),
+                     sin(dot(p, vec3(-0.4, 0.9, 0.2)) * f0 * 0.13),
+                     sin(dot(p, vec3(0.3, -0.2, 0.9)) * f0 * 0.09)) * (2.0 / f0);
+    vec3 pw = p + warp;
 
     vec3 gradient = vec3(0.0);
     float lostVariance = 0.0;
-    float frequency = kBaseWaveFrequency * uWaveScale;
-    float slope = uWaveStrength;
+    float frequency = f0;
+    float slope = uWaveStrength * 0.6;
     for (int k = 0; k < kWaveCount; ++k)
     {
         vec3 d = normalize(kWaveDirs[k]);
-        float speed = uWaveSpeed * sqrt(frequency) * 0.5; // longer waves travel faster
-        float phase = dot(d, p) * frequency + uTime * speed + float(k) * 1.7;
-        float resolved = 1.0 - smoothstep(0.25, 0.5, frequency * footprint / 6.2832);
+        float f = frequency * kWaveJitter[k];
+        float speed = uWaveSpeed * sqrt(f) * 0.5; // longer waves travel faster
+        float phase = dot(d, pw) * f + uTime * speed + kWavePhase[k];
+        float resolved = 1.0 - smoothstep(0.25, 0.5, f * footprint / 6.2832);
 
         gradient += d * (slope * cos(phase) * resolved);
         lostVariance += 0.5 * slope * slope * (1.0 - resolved);
 
-        frequency *= 1.73;
-        slope *= 0.7;
+        frequency *= 1.32;
+        slope *= 0.84;
     }
 
     gradient -= dir * dot(gradient, dir); // keep the tilt tangential
@@ -108,6 +129,22 @@ float shoreFoam(float depthUnits, vec3 dir)
 }
 
 // ---- reflection ----
+
+// Sky colour seen along rayDir from the sea surface. A cheap stand-in for the atmosphere pass that
+// reads the same parameters: Rayleigh coefficients from the wavelengths, more air (brighter, paler)
+// toward the horizon, a sun reddened by its long path when low, black space with no atmosphere.
+vec3 skyRadiance(vec3 rayDir, vec3 up, vec3 sunDir)
+{
+    if (uAtmosphereOn == 0)
+        return vec3(0.0);
+    vec3 beta = pow(vec3(400.0) / uWavelengths, vec3(4.0)) * uScatteringStrength * 0.02;
+    float airMass = 1.0 / (max(dot(rayDir, up), 0.0) + 0.12);
+    vec3 scatter = 1.0 - exp(-beta * airMass);
+    float sunHeight = dot(up, sunDir);
+    float daylight = smoothstep(-0.15, 0.25, sunHeight);
+    vec3 sunlight = uSunColor * exp(-beta * 0.5 / (max(sunHeight, 0.0) + 0.12));
+    return scatter * sunlight * daylight * uSunIntensity * uAtmosphereIntensity * 2.0;
+}
 
 // Schlick fresnel for water (F0 = 0.02).
 float fresnel(float cosTheta)
@@ -140,11 +177,11 @@ void main()
     float ndh = max(dot(waveNormal, halfVec), 0.0);
     float roughness2 = 0.0005 + waves.slopeVariance;
     float shininess = clamp(2.0 / roughness2 - 2.0, 16.0, 6000.0);
-    float glint = pow(ndh, shininess) * (shininess + 8.0) / (8.0 * 3.14159265) * 0.02;
+    float glint = pow(ndh, shininess) * (shininess + 8.0) / (8.0 * 3.14159265) * 0.25;
 
     float F = fresnel(dot(viewDir, waveNormal));
-    vec3 skyTint = vec3(0.15, 0.28, 0.42);
-    color = mix(color, skyTint * (uAmbientLight + diffuse * uSunIntensity), F);
+    vec3 sky = skyRadiance(reflect(-viewDir, waveNormal), sphereNormal, lightDir);
+    color = mix(color, sky, F);
     color += uSunColor * glint * diffuse * 0.9;
 
     float foam = shoreFoam(depthUnits, sphereNormal);

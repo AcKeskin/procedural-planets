@@ -25,6 +25,12 @@ struct OceanFrame
     float time = 0.0f;
     float seaLevel = 1.0f;    // radial multiplier shared with terrain shading and the atmosphere
     float heightScale = 0.04f; // body shape.heightScale: converts radius-unit depth to terrain units
+
+    // Atmosphere parameters for the reflected sky (atmosphereOn false = airless, black sky).
+    bool atmosphereOn = false;
+    glm::vec3 wavelengths{700.0f, 530.0f, 460.0f};
+    float scatteringStrength = 8.0f;
+    float atmosphereIntensity = 1.0f;
 };
 
 // Draws the ocean over the terrain's own LOD patches, every vertex at sea level, with depth from
