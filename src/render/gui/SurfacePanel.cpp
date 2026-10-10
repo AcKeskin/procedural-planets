@@ -118,8 +118,9 @@ void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& sea
         ImGui::ColorEdit3("Shallow Color", &settings.shallowColor.x);
 
         ImGui::Separator();
-        ImGui::Text("Reflection");
-        ImGui::SliderFloat("Fresnel Power", &settings.fresnelPower, 1.5f, 3.5f);
+        ImGui::Text("Water");
+        ImGui::SliderFloat("Clarity", &settings.clarity, 0.02f, 1.0f, "%.2f");
+        ImGui::SetItemTooltip("How deep you can see into the water before it turns opaque");
 
         ImGui::Separator();
         ImGui::Text("Waves");

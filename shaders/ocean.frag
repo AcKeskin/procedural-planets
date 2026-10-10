@@ -1,25 +1,50 @@
 #version 450 core
 
+// Ocean surface, drawn over the terrain patches (ocean.vert). Three parts:
+//   water body  - colour and opacity from the real water depth (Beer-Lambert absorption)
+//   waves       - surface normal for lighting
+//   reflection  - fresnel-weighted sky + sun glitter
+
 in vec3 fragWorldPos;
-in vec3 fragNormal;
-in float fragDepth;   // water depth in planet-radius units, from the drawn terrain heights
+in vec3 fragNormal;  // unit sphere direction (interpolated)
+in float fragDepth;  // water depth in planet-radius units, from the drawn terrain heights
 
 uniform float uHeightScale; // body shape.heightScale: radius units per terrain unit
 
 uniform vec3 uCameraPos;
 uniform vec3 uLightDir;
-uniform vec3 uSunColor;        // sun-of-record color: tints the specular glint
+uniform vec3 uSunColor;      // sun-of-record color: tints the specular glint
 uniform float uSunIntensity;
-uniform float uAmbientLight;   // keeps water readable off the key light, matching the land
+uniform float uAmbientLight; // keeps water readable off the key light, matching the land
 uniform vec3 uDeepColor;
 uniform vec3 uShallowColor;
-uniform float uFresnelPower;
+uniform float uClarity;      // terrain units of depth light travels before it is mostly absorbed
 uniform float uWaveStrength;
 uniform float uWaveScale;
 uniform float uWaveSpeed;
 uniform float uTime;
 
 out vec4 outColor;
+
+// ---- water body ----
+
+struct WaterBody
+{
+    vec3 color;
+    float opacity; // 0 = see the seabed, 1 = opaque
+};
+
+// depthUnits: water depth in terrain units. Light that reaches the seabed and comes back is
+// exp(-2 * depth / clarity); the rest is the water's own colour, shallow teal shading to deep navy.
+WaterBody waterBody(float depthUnits)
+{
+    float clarity = max(uClarity, 1e-4);
+    float transmittance = exp(-2.0 * depthUnits / clarity);
+    float deepness = 1.0 - exp(-depthUnits / (clarity * 3.0));
+    return WaterBody(mix(uShallowColor, uDeepColor, deepness), 1.0 - transmittance);
+}
+
+// ---- waves ----
 
 // Two sine layers at different frequencies for procedural wave normals
 vec3 calcWaveNormal(vec3 worldPos, vec3 sphereNormal)
@@ -49,58 +74,43 @@ vec3 calcWaveNormal(vec3 worldPos, vec3 sphereNormal)
     return normalize(mix(sphereNormal, sphereNormal + perturbation, uWaveStrength));
 }
 
-// Terrain units of depth that read as the deepest colour (the ocean floor sits around 1-1.5).
-const float kDeepDepthUnits = 1.5;
+// ---- reflection ----
+
+// Schlick fresnel for water (F0 = 0.02).
+float fresnel(float cosTheta)
+{
+    return 0.02 + 0.98 * pow(1.0 - clamp(cosTheta, 0.0, 1.0), 5.0);
+}
 
 void main()
 {
     if (fragDepth <= 0.0)
         discard; // land: the terrain draws here
-    float fragDepth01 = clamp(fragDepth / (uHeightScale * kDeepDepthUnits), 0.0, 1.0);
+
+    float depthUnits = fragDepth / uHeightScale;
+    WaterBody body = waterBody(depthUnits);
 
     vec3 viewDir = normalize(uCameraPos - fragWorldPos);
     vec3 sphereNormal = normalize(fragNormal);
     vec3 waveNormal = calcWaveNormal(fragWorldPos, sphereNormal);
 
-    // Real depth color from the baked bathymetry — shallow (teal) hugging coasts, deep (navy)
-    // offshore — instead of the old view-angle fake. sqrt spreads the shelf across more of the
-    // visible ocean (a raw exp saturates to deep within a thin coastal ring).
-    float depthBlend = sqrt(clamp(fragDepth01, 0.0, 1.0));
-    vec3 oceanColor = mix(uShallowColor, uDeepColor, depthBlend);
-
-    float fresnel = pow(1.0 - max(dot(viewDir, waveNormal), 0.0), uFresnelPower);
-
-    // Diffuse + ambient (sphere normal for consistent illumination). The ambient floor is what
-    // keeps water reading as lit water rather than a black void away from the key light.
+    // Diffuse + ambient on the sphere normal, matching the land's terminator.
     vec3 lightDir = -normalize(uLightDir); // uLightDir points from the sun; negate → toward it (matches land)
     float diffuse = max(dot(sphereNormal, lightDir), 0.0);
-    oceanColor *= uAmbientLight + diffuse * uSunIntensity;
+    vec3 color = body.color * (uAmbientLight + diffuse * uSunIntensity);
 
-    // Sun glitter. A single tight specular lobe over a near-mirror surface collapses to a hard
-    // vertical band (the reflection locus is a thin great circle). Real sea glitter is a BROAD soft
-    // patch — countless wave facets scatter the sun over a range of angles. Model that as a wide
-    // Blinn-Phong lobe (the patch) plus a smaller sharp lobe (individual glints), both over the wave
-    // normal so they shimmer.
+    // Sun glitter: a broad soft patch plus a tight sparkle over the wave normal.
     vec3 halfVec = normalize(viewDir + lightDir);
     float ndh = max(dot(waveNormal, halfVec), 0.0);
-    float glitterPatch = pow(ndh, 60.0);    // broad soft sun-glitter region
-    float glitterSharp = pow(ndh, 900.0);   // tight sparkle within it
-    float glint = glitterPatch * 0.5 + glitterSharp * 0.5;
+    float glint = pow(ndh, 60.0) * 0.5 + pow(ndh, 900.0) * 0.5;
 
-    // Grazing angles pick up a cool sky reflection, not just a brighten.
+    float F = fresnel(dot(viewDir, waveNormal));
     vec3 skyTint = vec3(0.15, 0.28, 0.42);
-    oceanColor = mix(oceanColor, oceanColor + skyTint, fresnel * 0.6);
-    oceanColor += uSunColor * glint * diffuse * 0.9;
+    color = mix(color, skyTint * (uAmbientLight + diffuse * uSunIntensity), F);
+    color += uSunColor * glint * diffuse * 0.9;
 
-    // Shoreline foam: a bright surf band in the shallowest water (near the coastline), animated,
-    // fading out into open water. Keyed on the real bathymetry so it follows the actual coast.
-    float foamBand = 1.0 - smoothstep(0.0, 0.12, fragDepth01);
-    float foamAnim = 0.75 + 0.25 * sin(uTime * uWaveSpeed * 2.0 + fragDepth01 * 60.0);
-    float foam = foamBand * foamAnim * (uAmbientLight + diffuse * uSunIntensity);
-    oceanColor = mix(oceanColor, vec3(0.85, 0.92, 0.95), foam * 0.5);
+    // Reflection makes grazing water opaque even where it is shallow and clear.
+    float alpha = clamp(max(body.opacity, F), 0.0, 1.0);
 
-    // Shallow water reads slightly more transparent than the deep floor.
-    float alpha = clamp(0.65 + depthBlend * 0.33, 0.6, 0.98);
-
-    outColor = vec4(oceanColor, alpha);
+    outColor = vec4(color, alpha);
 }

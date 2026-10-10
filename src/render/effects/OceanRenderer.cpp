@@ -39,7 +39,7 @@ void OceanRenderer::Render(const OceanFrame& frame, const OceanSettings& setting
     _oceanShader.SetFloat("uTime", frame.time);
     _oceanShader.SetVec3("uDeepColor", settings.deepColor);
     _oceanShader.SetVec3("uShallowColor", settings.shallowColor);
-    _oceanShader.SetFloat("uFresnelPower", settings.fresnelPower);
+    _oceanShader.SetFloat("uClarity", settings.clarity);
     _oceanShader.SetFloat("uWaveStrength", settings.waveStrength);
     _oceanShader.SetFloat("uWaveScale", settings.waveScale);
     _oceanShader.SetFloat("uWaveSpeed", settings.waveSpeed);
