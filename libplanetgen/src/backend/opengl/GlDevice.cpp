@@ -159,7 +159,8 @@ void GlDevice::Dispatch(uint32_t groupsX, uint32_t groupsY, uint32_t groupsZ)
 
 void GlDevice::Barrier()
 {
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    // BUFFER_UPDATE: a DownloadBuffer after a dispatch must see the shader's writes.
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
 }
 
 // --- 3D texture (RG32F) — continent mask ---
