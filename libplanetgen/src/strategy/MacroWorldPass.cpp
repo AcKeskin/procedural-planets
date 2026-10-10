@@ -86,7 +86,8 @@ MacroParams MakeMacroParams(const BodyConfig& config, uint32_t seed)
 MacroWorldBake::MacroWorldBake(IComputeBackend& backend, const ShaderRegistry& registry,
                                const BodyConfig& config, uint32_t seed)
     : _backend(backend), _registry(registry), _params(MakeMacroParams(config, seed)),
-      _erosionIterations(config.macroWorld.erosionIterations), _res(_params.resolution)
+      _erosionIterations(config.macroWorld.erosionIterations),
+      _moistureIterations(config.macroWorld.moistureIterations), _res(_params.resolution)
 {
     _ubo = _backend.CreateParamBuffer(sizeof(MacroParams));
 }
@@ -240,9 +241,34 @@ bool MacroWorldBake::Rivers()
     return true;
 }
 
+bool MacroWorldBake::Climate(GpuTextureHandle field)
+{
+    const uint32_t climate = _registry.Resolve(BuiltinProgram::MacroClimate);
+    if (!climate || !field)
+        return false;
+
+    // Moisture ping-pongs between the two erosion scratch arrays, free by now.
+    if (!_flux)
+        _flux = NewArray();
+    if (!_geoTmp)
+        _geoTmp = NewArray();
+    const GpuTextureHandle ping[2] = { _flux, _geoTmp };
+
+    // Pass 0 seeds moisture; passes 1..N advect it one wind step each.
+    const uint32_t passes = static_cast<uint32_t>(std::max(0, _moistureIterations)) + 1u;
+    for (uint32_t pass = 0; pass < passes; ++pass)
+    {
+        _backend.BindImage2DArray(field, 0);
+        _backend.BindImage2DArray(ping[(pass + 1) % 2], 1);
+        _backend.BindTexture2DArray(ping[pass % 2], kMacroMoistureSamplerUnit);
+        Dispatch(climate, pass);
+    }
+    return true;
+}
+
 bool MacroWorldBake::RunAll(GpuTextureHandle continentMask)
 {
-    return Plates(continentMask) && Erode(_erosionIterations) && Rivers();
+    return Plates(continentMask) && Erode(_erosionIterations) && Rivers() && Climate(_field);
 }
 
 GpuTextureHandle MacroWorldBake::TakeField()

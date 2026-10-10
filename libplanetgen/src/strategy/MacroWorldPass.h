@@ -29,8 +29,24 @@ namespace planetgen
 constexpr uint32_t kMacroFieldSamplerUnit = 5;
 // Sampler unit the plate stage reads the continent mask from (same as height).
 constexpr uint32_t kMacroMaskSamplerUnit = 4;
+// Sampler unit the climate pass reads the previous moisture step from.
+constexpr uint32_t kMacroMoistureSamplerUnit = 6;
 // UBO binding of MacroParams in every bake pass.
 constexpr uint32_t kMacroParamBinding = 3;
+
+// Biome ids stored in field A (must match macro_climate.comp).
+enum class MacroBiome : int
+{
+    Ocean = 0,
+    Ice = 1,
+    Tundra = 2,
+    Boreal = 3,
+    TemperateForest = 4,
+    Grassland = 5,
+    Desert = 6,
+    Savanna = 7,
+    Rainforest = 8,
+};
 
 // Bake elevations are meters so the ported erosion constants keep their meaning.
 constexpr float kMacroMetersPerUnit = 4000.0f;
@@ -68,6 +84,11 @@ public:
     // downstream cell, accumulates upstream flux, and writes field R + G.
     bool Rivers();
 
+    // Stage 4. Moisture advected along prevailing winds (rain shadows, dry
+    // interiors) + biome lookup. Reads field R, writes field B + A in place.
+    // Takes the field explicitly so tests can run it on a hand-built elevation.
+    bool Climate(GpuTextureHandle field);
+
     // Run every stage. Returns false (and leaves no field) on a missing program.
     bool RunAll(GpuTextureHandle continentMask);
 
@@ -94,6 +115,7 @@ private:
     const ShaderRegistry& _registry;
     MacroParams _params{};
     int _erosionIterations = 0;
+    int _moistureIterations = 0;
     uint32_t _res = 0;
     GpuBufferHandle _ubo = 0;
 

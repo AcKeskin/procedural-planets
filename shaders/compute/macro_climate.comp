@@ -1,0 +1,149 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#include "macro_grid.glsl"
+#include "macro_params.glsl"
+
+// Macro climate: moisture + biome.
+//
+// Moisture rides latitude-banded prevailing winds (trades, westerlies, polar
+// easterlies) by semi-Lagrangian advection: each pass a cell takes the moisture
+// found one wind step upwind. Oceans refill it, land dries it a little every step,
+// and climbing terrain rains it out: windward slopes get that rain, leeward slopes
+// stay dry (rain shadow), and interiors far from a windward coast end up dry.
+// Back-trajectories near the subtropical wind divide never reach an ocean, so an
+// isotropic ocean-proximity term (spreads from every coast, dries over land at the
+// same rate) is blended in. A latitude factor adds the Hadley-cell pattern (wet
+// tropics, dry subtropics). Biome is a temperature x moisture lookup.
+//
+// Pass 0 seeds the moisture texture; passes 1..N advect. Every pass also writes
+// field B = moisture and A = biome id, so the last pass leaves the final values.
+//
+// Image 0: field (R = elevation units, read; B, A written, own texel only).
+// Image 1: moisture out (R = wind-carried moisture, G = elevation units,
+// B = ocean proximity).
+// Sampler 6: moisture in (same layout), sampled across cube faces.
+
+layout(rgba32f, binding = 0) uniform image2DArray field;
+layout(rgba32f, binding = 1) uniform image2DArray moistureOut;
+layout(binding = 6) uniform sampler2DArray moistureIn;
+
+const float CLIMATE_PI = 3.14159265359;
+// Wind steps are measured in cells of a 256-per-face grid so a bake at any
+// resolution carries moisture the same distance.
+const float REFERENCE_CELL_RAD = (CLIMATE_PI * 0.5) / 256.0;
+
+// Biome ids (MacroBiome in MacroWorldPass.h).
+const float BIOME_OCEAN = 0.0;
+const float BIOME_ICE = 1.0;
+const float BIOME_TUNDRA = 2.0;
+const float BIOME_BOREAL = 3.0;
+const float BIOME_TEMPERATE_FOREST = 4.0;
+const float BIOME_GRASSLAND = 5.0;
+const float BIOME_DESERT = 6.0;
+const float BIOME_SAVANNA = 7.0;
+const float BIOME_RAINFOREST = 8.0;
+
+// Prevailing surface wind (unit-ish tangent vector) at dir.
+vec3 prevailingWind(vec3 dir)
+{
+    float lat = asin(clamp(dir.y, -1.0, 1.0));
+    float latDeg = abs(lat) * (180.0 / CLIMATE_PI);
+    float hemisphere = lat >= 0.0 ? 1.0 : -1.0;
+
+    // -1 = easterly (trades, polar), +1 = westerly (mid latitudes).
+    float zonal = mix(-1.0, 1.0, smoothstep(25.0, 35.0, latDeg));
+    zonal = mix(zonal, -1.0, smoothstep(55.0, 65.0, latDeg));
+    // Trades and polar easterlies blow toward the equator, westerlies poleward.
+    float meridional = 0.25 * zonal * hemisphere;
+
+    vec3 east = cross(vec3(0.0, 1.0, 0.0), dir);
+    float len = length(east);
+    if (len < 1e-4)
+        return vec3(0.0); // poles: calm
+    east /= len;
+    vec3 north = cross(dir, east);
+    return zonal * east + meridional * north;
+}
+
+// Wet ITCZ, dry subtropical highs, wetter mid latitudes, dry poles: [0, 1].
+float hadleyFactor(vec3 dir)
+{
+    float latDeg = asin(clamp(abs(dir.y), 0.0, 1.0)) * (180.0 / CLIMATE_PI);
+    float itcz        =  0.85 * exp(-pow(latDeg / 8.0, 2.0));
+    float subtropical = -0.45 * exp(-pow((latDeg - 28.0) / 10.0, 2.0));
+    float midlat      =  0.35 * exp(-pow((latDeg - 50.0) / 12.0, 2.0));
+    float polar       = -0.30 * exp(-pow((latDeg - 80.0) / 8.0, 2.0));
+    return clamp(0.40 + itcz + subtropical + midlat + polar, 0.0, 1.0);
+}
+
+// [0, 1] like the shading stage: latitude falloff minus altitude cooling.
+float temperature(vec3 dir, float elevation)
+{
+    float lat = asin(clamp(abs(dir.y), 0.0, 1.0));
+    float cooling = smoothstep(0.1, 0.8, clamp(elevation, 0.0, 1.0)) * temperatureLapseRate * 0.3;
+    return clamp(pow(cos(lat), temperatureExponent) - cooling, 0.0, 1.0);
+}
+
+float biome(float t, float m, bool ocean)
+{
+    if (ocean)            return BIOME_OCEAN;
+    if (t < 0.12)         return BIOME_ICE;
+    if (t < 0.28)         return BIOME_TUNDRA;
+    if (t < 0.5)          return m > 0.35 ? BIOME_BOREAL : BIOME_GRASSLAND;
+    if (t < 0.75)
+    {
+        if (m < 0.2)      return BIOME_DESERT;
+        return m > 0.45 ? BIOME_TEMPERATE_FOREST : BIOME_GRASSLAND;
+    }
+    if (m < 0.2)          return BIOME_DESERT;
+    return m > 0.55 ? BIOME_RAINFOREST : BIOME_SAVANNA;
+}
+
+void main()
+{
+    int n = int(resolution);
+    ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
+    int face = int(gl_GlobalInvocationID.z);
+    if (ij.x >= n || ij.y >= n)
+        return;
+
+    ivec3 texel = ivec3(ij, face);
+    vec4 f = imageLoad(field, texel);
+    float elevation = f.r;
+    bool ocean = elevation < 0.0;
+    vec3 dir = mg_cellDir(face, ij, n);
+
+    float carried = ocean ? 1.0 : 0.0;
+    float proximity = ocean ? 1.0 : 0.0;
+    float rainedOut = 0.0;
+    if (passIndex != 0u && !ocean)
+    {
+        float step = windStrength * REFERENCE_CELL_RAD;
+
+        // Proximity: best of four samples one step away, minus a step of drying.
+        vec3 east = cross(vec3(0.0, 1.0, 0.0), dir);
+        east = length(east) > 1e-4 ? normalize(east) : vec3(1.0, 0.0, 0.0);
+        vec3 north = cross(dir, east);
+        float nearby = max(max(mg_sample(moistureIn, normalize(dir + east * step)).b,
+                               mg_sample(moistureIn, normalize(dir - east * step)).b),
+                           max(mg_sample(moistureIn, normalize(dir + north * step)).b,
+                               mg_sample(moistureIn, normalize(dir - north * step)).b));
+        proximity = nearby * (1.0 - landDrying);
+
+        vec3 upwind = normalize(dir - prevailingWind(dir) * step);
+        vec4 up = mg_sample(moistureIn, upwind);
+        // Air over the sea sits at sea level; the sea floor is no climb.
+        float climb = max(0.0, elevation - max(up.g, 0.0));
+        float kept = up.r * exp(-orographicStrength * climb);
+        rainedOut = up.r - kept;
+        carried = kept * (1.0 - landDrying);
+    }
+    imageStore(moistureOut, texel, vec4(carried, elevation, proximity, 0.0));
+
+    float wetness = 0.7 * (carried + 2.0 * rainedOut) + 0.3 * proximity;
+    float moisture = ocean ? 1.0 : clamp(wetness * mix(0.45, 1.0, hadleyFactor(dir)), 0.0, 1.0);
+    f.b = moisture;
+    f.a = biome(temperature(dir, elevation), moisture, ocean);
+    imageStore(field, texel, f);
+}

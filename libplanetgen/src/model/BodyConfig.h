@@ -210,10 +210,10 @@ struct MacroWorldBlock
     float capacityMultiplier = 2.5f;
 
     // Moisture: advected along latitude-banded prevailing winds
-    int   moistureIterations = 48;
+    int   moistureIterations = 160;
     float windStrength       = 2.0f;    // cells travelled per iteration
-    float landDrying         = 0.03f;   // moisture lost per step over land
-    float orographicStrength = 4.0f;    // moisture lost per unit of uphill climb
+    float landDrying         = 0.01f;   // moisture lost per step over land
+    float orographicStrength = 1.0f;    // moisture lost per unit of uphill climb
 };
 
 // ============================================================================

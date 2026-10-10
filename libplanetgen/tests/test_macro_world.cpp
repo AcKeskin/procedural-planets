@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <deque>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -181,6 +182,58 @@ void main()
     values[id] = face >= 0 ? mg_sampleOnFace(field, d, face) : mg_sample(field, d);
 }
 )";
+
+// A hand-built elevation field: ocean everywhere except an equatorial continent
+// (|lat| < 25 deg, lon 0..70 deg) with a tall north-south ridge at lon 35 deg.
+const char* kRidgeField = R"(
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(rgba32f, binding = 0) uniform image2DArray fieldImg;
+void main()
+{
+    int n = imageSize(fieldImg).x;
+    ivec2 ij = ivec2(gl_GlobalInvocationID.xy);
+    int f = int(gl_GlobalInvocationID.z);
+    vec3 d = mg_cellDir(f, ij, n);
+    float lat = degrees(asin(d.y));
+    float lon = degrees(atan(d.z, d.x));
+    float elev = -0.5;
+    if (abs(lat) < 25.0 && lon > 0.0 && lon < 70.0)
+        elev = 0.05 + 0.8 * exp(-pow((lon - 35.0) / 3.0, 2.0));
+    imageStore(fieldImg, ivec3(ij, f), vec4(elev, 0.0, 0.0, 0.0));
+}
+)";
+
+// Cell directions (vec4 per cell) and +x/-x/+y/-y neighbour ids for a grid size.
+struct GridLayout
+{
+    std::vector<float> dirs;
+    std::vector<int32_t> neighbours;
+};
+
+GridLayout ReadGridLayout(PgContext ctx, int n)
+{
+    auto& gpu = *ctx->backend;
+    const uint32_t program = CompileProbe(ctx, "test_macro_grid_neighbours", kNeighbourProbe);
+    const auto dirTex = gpu.CreateTexture2DArray_RGBA32F(n, 6);
+    const size_t cells = static_cast<size_t>(6) * n * n;
+    const auto nbBuf = gpu.CreateBuffer(cells * 4 * sizeof(int32_t));
+
+    gpu.BindShader(program);
+    gpu.BindImage2DArray(dirTex, 0);
+    gpu.BindBuffer(nbBuf, 1);
+    gpu.Dispatch((n + 7) / 8, (n + 7) / 8, 6);
+    gpu.ImageBarrier();
+    gpu.Barrier();
+
+    GridLayout g;
+    g.dirs.resize(cells * 4);
+    g.neighbours.resize(cells * 4);
+    gpu.DownloadTexture(dirTex, g.dirs.data(), g.dirs.size() * sizeof(float));
+    gpu.DownloadBuffer(nbBuf, g.neighbours.data(), g.neighbours.size() * sizeof(int32_t));
+    gpu.DestroyBuffer(nbBuf);
+    gpu.DestroyTexture(dirTex);
+    return g;
+}
 
 // Points exactly on each of the 12 cube edges (kept away from the corners), each
 // emitted twice: sampled from either adjacent face (w = face index).
@@ -548,6 +601,107 @@ TEST_CASE("macro_world rivers: every land cell drains to the ocean without cycle
         CHECK(landCells > 0);
         CHECK(badCells == 0);
         CHECK(riverCells > 0);
+    }
+    pg_context_destroy(ctx);
+}
+
+TEST_CASE("macro_world climate: the leeward side of a ridge is drier than the windward side", "[gpu][macro_world]")
+{
+    const int Res = 128;
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+    auto& gpu = *ctx->backend;
+    {
+        const auto cfg = MacroEarth(Res);
+        const uint32_t ridge = CompileProbe(ctx, "test_macro_ridge_field", kRidgeField);
+        const auto field = gpu.CreateTexture2DArray_RGBA32F(Res, 6);
+        gpu.BindShader(ridge);
+        gpu.BindImage2DArray(field, 0);
+        gpu.Dispatch(Res / 8, Res / 8, 6);
+        gpu.ImageBarrier();
+
+        planetgen::MacroWorldBake bake(gpu, ctx->registry, cfg, 42u);
+        REQUIRE(bake.Climate(field));
+        const auto values = DownloadField(ctx, field, Res);
+        const auto grid = ReadGridLayout(ctx, Res);
+
+        // Trade winds near the equator blow toward increasing longitude here, so the
+        // windward slope is west of lon 35 and the leeward slope east of it.
+        double windward = 0.0, leeward = 0.0;
+        int nw = 0, nl = 0;
+        for (size_t c = 0; c < values.size() / 4; ++c)
+        {
+            const double lat = std::asin(grid.dirs[c * 4 + 1]) * 57.29578;
+            const double lon = std::atan2(grid.dirs[c * 4 + 2], grid.dirs[c * 4]) * 57.29578;
+            if (std::fabs(lat) > 12.0)
+                continue;
+            if (lon > 24.0 && lon < 31.0) { windward += values[c * 4 + 2]; ++nw; }
+            if (lon > 39.0 && lon < 46.0) { leeward += values[c * 4 + 2]; ++nl; }
+        }
+        REQUIRE(nw > 0);
+        REQUIRE(nl > 0);
+        INFO("windward moisture " << windward / nw << ", leeward " << leeward / nl);
+        CHECK(leeward / nl < windward / nw);
+
+        gpu.DestroyTexture(field);
+    }
+    pg_context_destroy(ctx);
+}
+
+TEST_CASE("macro_world climate: coastal land is wetter than continental interiors", "[gpu][macro_world]")
+{
+    const int Res = 128;
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+    {
+        const auto cfg = MacroEarth(Res);
+        MaskHolder mask(ctx, cfg, 42u);
+        const auto field = planetgen::BakeMacroWorld(*ctx->backend, ctx->registry, cfg, 42u, mask.tex);
+        REQUIRE(field != 0);
+        const auto values = DownloadField(ctx, field, Res);
+        const auto grid = ReadGridLayout(ctx, Res);
+        const size_t cells = values.size() / 4;
+
+        // Distance to the nearest ocean cell in grid steps (BFS over 4-neighbours).
+        std::vector<int> dist(cells, -1);
+        std::deque<size_t> queue;
+        for (size_t c = 0; c < cells; ++c)
+            if (values[c * 4] < 0.0f)
+            {
+                dist[c] = 0;
+                queue.push_back(c);
+            }
+        while (!queue.empty())
+        {
+            const size_t c = queue.front();
+            queue.pop_front();
+            for (int k = 0; k < 4; ++k)
+            {
+                const size_t nb = static_cast<size_t>(grid.neighbours[c * 4 + k]);
+                if (dist[nb] < 0)
+                {
+                    dist[nb] = dist[c] + 1;
+                    queue.push_back(nb);
+                }
+            }
+        }
+
+        double coastal = 0.0, interior = 0.0;
+        int nc = 0, ni = 0;
+        for (size_t c = 0; c < cells; ++c)
+        {
+            if (std::fabs(grid.dirs[c * 4 + 1]) > 0.85) // skip polar caps
+                continue;
+            if (dist[c] >= 1 && dist[c] <= 2) { coastal += values[c * 4 + 2]; ++nc; }
+            if (dist[c] >= 6) { interior += values[c * 4 + 2]; ++ni; }
+        }
+        REQUIRE(nc > 0);
+        REQUIRE(ni > 0);
+        INFO("coastal moisture " << coastal / nc << " (" << nc << " cells), interior "
+             << interior / ni << " (" << ni << " cells)");
+        CHECK(coastal / nc > interior / ni);
+
+        ctx->backend->DestroyTexture(field);
     }
     pg_context_destroy(ctx);
 }
