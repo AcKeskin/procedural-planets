@@ -7,7 +7,8 @@ out vec4 fragColor;
 
 uniform sampler2D uSceneTexture;
 
-const float BLOOM_THRESHOLD = 1.0;
+// Above sunlit cloud and snow (up to ~1.6 with the capture sun), below the sun disc and glints.
+const float BLOOM_THRESHOLD = 2.0;
 
 void main()
 {
