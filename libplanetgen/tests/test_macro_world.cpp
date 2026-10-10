@@ -777,3 +777,65 @@ TEST_CASE("macro_world patches: adjacent patches match on their shared edge with
     }
     pg_context_destroy(ctx);
 }
+
+TEST_CASE("macro_world on: height and moisture come from the baked field, off restores the baseline", "[gpu][macro_world]")
+{
+    const int N = 4096;
+    const auto verts = MakeSphereVertices(N);
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+    auto& gpu = *ctx->backend;
+    {
+        planetgen::GpuTextureHandle maskTex = 0, macroTex = 0;
+        uint64_t maskKey = 0, macroKey = 0;
+        planetgen::GenerationPipeline pipeline(gpu, ctx->registry, ctx->palettes);
+        auto run = [&](const planetgen::BodyConfig& cfg)
+        {
+            auto r = pipeline.Generate(cfg, verts.data(), N, 42u, { &maskTex, &maskKey }, { &macroTex, &macroKey });
+            REQUIRE(r.count == static_cast<uint32_t>(N));
+            gpu.DestroyBuffer(r.heightsGpuBuffer);
+            gpu.DestroyBuffer(r.normalsGpuBuffer);
+            gpu.DestroyBuffer(r.shadingGpuBuffer);
+            return r;
+        };
+
+        auto off = LoadEarth();
+        auto on = MacroEarth(128);
+        const auto a = run(off);
+        const auto b = run(on);
+        REQUIRE(macroTex != 0);
+        const auto c = run(off); // same body caches, layer switched back off
+
+        int heightDiffs = 0, moistureDiffs = 0;
+        for (int i = 0; i < N; ++i)
+        {
+            heightDiffs += a.heights[i] != b.heights[i];
+            moistureDiffs += a.shading[i * 4 + 1] != b.shading[i * 4 + 1];
+        }
+        CHECK(heightDiffs > N / 2);
+        CHECK(moistureDiffs > N / 2);
+        CHECK(std::memcmp(a.heights.data(), c.heights.data(), N * sizeof(float)) == 0);
+        CHECK(std::memcmp(a.shading.data(), c.shading.data(), N * 4 * sizeof(float)) == 0);
+
+        gpu.DestroyTexture(maskTex);
+        gpu.DestroyTexture(macroTex);
+    }
+    pg_context_destroy(ctx);
+}
+
+TEST_CASE("macro_world programs: every macro pass and shader variant compiles", "[gpu][macro_world]")
+{
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+    CHECK(pg_context_get_error(ctx) == PG_SUCCESS);
+
+    using BP = planetgen::BuiltinProgram;
+    for (BP id : { BP::MacroPlates, BP::MacroErosionRainfall, BP::MacroErosionFlow, BP::MacroErosionSediment,
+                   BP::MacroErosionFlux, BP::MacroFill, BP::MacroRivers, BP::MacroClimate,
+                   BP::HeightMacro, BP::ShadingEarthMacro })
+    {
+        INFO("program " << planetgen::BuiltinKey(id));
+        CHECK(ctx->registry.Resolve(id) != 0);
+    }
+    pg_context_destroy(ctx);
+}
