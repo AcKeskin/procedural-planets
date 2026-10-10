@@ -830,7 +830,7 @@ TEST_CASE("macro_world programs: every macro pass and shader variant compiles", 
 
     using BP = planetgen::BuiltinProgram;
     for (BP id : { BP::MacroPlates, BP::MacroErosionRainfall, BP::MacroErosionFlow, BP::MacroErosionSediment,
-                   BP::MacroErosionFlux, BP::MacroFill, BP::MacroRivers, BP::MacroClimate,
+                   BP::MacroDrainageFlux, BP::MacroFill, BP::MacroRivers, BP::MacroClimate,
                    BP::HeightMacro, BP::ShadingEarthMacro })
     {
         INFO("program " << planetgen::BuiltinKey(id));

@@ -8,12 +8,13 @@
 //
 // Final field (RGBA32F 2D array, layer = cube face):
 //   R = elevation in continentShape units (0 = sea level), eroded + drainage-filled
-//   G = river flux (normalised log of upstream cell count)
+//   G = river flux, log2(1 + upstream area / 1000 km^2)
 //   B = moisture [0, 1]
 //   A = biome id (MacroBiome)
 //
-// Bindings shared by the bake passes: images 0-3 (per-pass, documented in each
-// .comp), continent mask sampler 4, macro params UBO 3.
+// Bindings in the bake passes: images 0-3 (per pass, documented in each .comp),
+// continent mask sampler 4, moisture sampler 6, macro params UBO 3, changed-cell
+// counter SSBO 0.
 
 #include "../backend/IComputeBackend.h"
 #include "../backend/ParamBlocks.h"

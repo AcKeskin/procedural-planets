@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 namespace planetgen
 {
@@ -191,8 +192,9 @@ uint32_t MacroWorldBake::RunUntilStable(uint32_t program, uint32_t firstPass, ui
         uint32_t changed = 0;
         _backend.DownloadBuffer(_changed, &changed, sizeof(changed));
         if (changed == 0)
-            break;
+            return pass;
     }
+    std::cerr << "[planetgen] macro bake: pass cap " << maxPasses << " hit before convergence" << std::endl;
     return pass;
 }
 
@@ -200,7 +202,7 @@ bool MacroWorldBake::Rivers()
 {
     const uint32_t fill = _registry.Resolve(BuiltinProgram::MacroFill);
     const uint32_t rivers = _registry.Resolve(BuiltinProgram::MacroRivers);
-    const uint32_t flux = _registry.Resolve(BuiltinProgram::MacroErosionFlux);
+    const uint32_t flux = _registry.Resolve(BuiltinProgram::MacroDrainageFlux);
     if (!fill || !rivers || !flux || !_geo)
         return false;
 
@@ -237,6 +239,7 @@ bool MacroWorldBake::Rivers()
     _backend.BindImage2DArray(_fill, 0);
     _backend.BindImage2DArray(upstream, 1);
     _backend.BindImage2DArray(_field, 2);
+    _backend.BindImage2DArray(_geo, 3);
     Dispatch(rivers, 1);
     return true;
 }

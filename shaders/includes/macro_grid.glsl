@@ -69,9 +69,17 @@ ivec3 mg_wrapCell(int f, ivec2 ij, int n)
     return mg_dirToCell(mg_cellDir(f, ij, n), n);
 }
 
+// Neighbour of cell ij. A diagonal step past a cube corner (both axes off the face)
+// has no real cell there: it returns the cell itself, which every stencil treats as
+// a zero-slope tap, instead of a cell some cardinal tap already reaches.
 ivec3 mg_neighbour(int f, ivec2 ij, int dx, int dy, int n)
 {
-    return mg_wrapCell(f, ij + ivec2(dx, dy), n);
+    ivec2 c = ij + ivec2(dx, dy);
+    bool offX = c.x < 0 || c.x >= n;
+    bool offY = c.y < 0 || c.y >= n;
+    if (offX && offY)
+        return ivec3(f, ij);
+    return mg_wrapCell(f, c, n);
 }
 
 // Bilinear sample of d as seen from face f (d must be in front of f). Taps past a

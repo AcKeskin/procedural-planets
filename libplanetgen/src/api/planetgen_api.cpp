@@ -143,7 +143,7 @@ PgContext pg_context_create(const PgContextDesc* desc)
     reg(BP::MacroErosionRainfall, planetgen::shaders::macro_erosion_rainfall_comp, "macro_erosion_rainfall");
     reg(BP::MacroErosionFlow,     planetgen::shaders::macro_erosion_flow_comp,     "macro_erosion_flow");
     reg(BP::MacroErosionSediment, planetgen::shaders::macro_erosion_sediment_comp, "macro_erosion_sediment");
-    reg(BP::MacroErosionFlux,     planetgen::shaders::macro_erosion_flux_comp,     "macro_erosion_flux");
+    reg(BP::MacroDrainageFlux,    planetgen::shaders::macro_erosion_flux_comp,     "macro_drainage_flux");
     reg(BP::MacroFill,            planetgen::shaders::macro_fill_comp,             "macro_fill");
     reg(BP::MacroRivers,          planetgen::shaders::macro_rivers_comp,           "macro_rivers");
     reg(BP::MacroClimate,         planetgen::shaders::macro_climate_comp,          "macro_climate");

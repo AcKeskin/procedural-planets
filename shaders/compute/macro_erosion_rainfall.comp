@@ -4,7 +4,7 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 #include "macro_grid.glsl"
 #include "macro_params.glsl"
 
-// Macro erosion pass 1/4: rainfall + evaporation, in place on the geo texture.
+// Macro erosion pass 1/3: rainfall + evaporation, in place on the geo texture.
 // Ported from Jujedie/PlanetGenerator erosion_rainfall.glsl (MIT, see
 // third_party/NOTICE-PlanetGenerator.md). Changes: cube-sphere cells instead of an
 // equirect image; no climate texture yet, so precipitation is uniform (1) and

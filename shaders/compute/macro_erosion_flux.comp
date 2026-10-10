@@ -4,7 +4,8 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 #include "macro_grid.glsl"
 #include "macro_params.glsl"
 
-// Drainage flux accumulation, one cell of propagation per dispatch (ping-pong).
+// Macro rivers: drainage flux accumulation, one cell of propagation per dispatch
+// (ping-pong). Runs in the rivers stage on the depression-filled surface.
 // A cell collects the flux of every neighbour that drains into it, plus one unit
 // of its own runoff, so at convergence it holds its upstream cell count.
 // Ported from Jujedie/PlanetGenerator erosion_flux_accumulation.glsl (MIT, see
