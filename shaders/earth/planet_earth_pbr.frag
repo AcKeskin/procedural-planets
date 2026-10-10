@@ -13,6 +13,7 @@
 #include "lighting.glsl"
 #include "clouds.glsl"
 #include "pbr.glsl"
+#include "ground_material.glsl"
 
 in vec3 vNormal;
 in vec3 vWorldPos;
@@ -94,10 +95,10 @@ vec4 valueNoiseD(vec3 p)
 }
 
 // Weight of a noise octave of this frequency at this pixel footprint (both in matPos units). An
-// octave fades out between 5 and 2.2 pixels per cycle: finer than that it only shimmers.
+// octave fades out between 6.7 and 2.9 pixels per cycle: finer than that it only shimmers.
 float octaveWeight(float frequency, float footprint)
 {
-    return 1.0 - smoothstep(0.2, 0.45, frequency * footprint);
+    return 1.0 - smoothstep(0.15, 0.35, frequency * footprint);
 }
 
 // fbm that adds octaves as the footprint shrinks, so close views gain grain and far views never
@@ -239,6 +240,36 @@ void main()
     // Fine grain on every material (grass took none before), weaker on snow.
     mat.albedo *= mix(1.0, mix(0.72, 1.28, vFine), 1.0 - snowW * 0.7);
 
+    // Texture detail: the same blend as above, spread over the five texture layers (dry flats get
+    // the soil layer). Only layers with real weight are sampled.
+    float flatW = (1.0 - rockW) * (1.0 - snowW);
+    float soilShare = smoothstep(0.6, 0.85, 1.0 - moisture) * 0.6; // only really dry ground
+    float layerW[5];
+    layerW[GROUND_ROCK]  = rockW * (1.0 - snowW);
+    layerW[GROUND_SNOW]  = snowW;
+    layerW[GROUND_SAND]  = flatW * sandW;
+    layerW[GROUND_SOIL]  = flatW * (1.0 - sandW) * soilShare;
+    layerW[GROUND_GRASS] = flatW * (1.0 - sandW) * (1.0 - soilShare);
+
+    vec3 tw = groundTriplanarWeights(geoN);
+    vec3 texAlbedo = vec3(0.0);
+    vec3 texNormal = vec3(0.0);
+    float texTotal = 0.0;
+    for (int layer = 0; layer < 5; ++layer)
+    {
+        if (layerW[layer] < 0.03)
+            continue;
+        GroundSample g = groundLayer(matPos, tw, layer, footprint);
+        texAlbedo += g.albedo * layerW[layer];
+        texNormal += g.normal * layerW[layer];
+        texTotal += layerW[layer];
+    }
+    if (texTotal > 0.0)
+    {
+        mat.albedo *= texAlbedo / texTotal;
+        texNormal /= texTotal;
+    }
+
     // --- DETAIL NORMAL from the analytic gradient of the bump fbm. Octaves join as the footprint
     // shrinks, so the grain sharpens toward the ground and never aliases from far away. Each octave
     // tilts the normal about the same amount (amp halves, frequency doubles). ---
@@ -247,7 +278,8 @@ void main()
     vec3 grad = fbmFootprint(matPos, kBumpFrequency, 8, footprint, 0.5).yzw;
     grad -= geoN * dot(grad, geoN); // keep the perturbation tangential
     float bumpStrength = kBumpTilt * (1.0 - snowW * 0.6);
-    vec3 N = normalize(geoN - grad * bumpStrength);
+    const float kTextureBump = 0.6; // tilt from the material normal maps
+    vec3 N = normalize(geoN - grad * bumpStrength + (texNormal - geoN * dot(texNormal, geoN)) * kTextureBump);
 
     // --- Cook-Torrance shading ---
     // Ground (grass/soil/sand) is near-matte: real surfaces have almost no specular lobe, and a
@@ -290,10 +322,7 @@ void main()
                        * (1.0 - snowW);
     color += nightLights(normalize(vWorldPos), day, habitability, vec3(1.0, 0.8, 0.45));
 
-    // Reinhard roll-off so highlights don't clip, then a mild gamma lift to keep midtones from
-    // going muddy. No specular boost (the earlier *1.6 was lifting grazing specular into sheen).
-    color = color / (color + vec3(0.8));
-    color = pow(color, vec3(0.9));
+    // No roll-off here: the scene is HDR and tonemap.glsl rolls highlights off once, at the end.
 
     FragColor = vec4(color, 1.0);
 }

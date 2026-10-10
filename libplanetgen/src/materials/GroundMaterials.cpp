@@ -164,9 +164,10 @@ Texel Grass(float u, float v, uint32_t s)
     float blades = PeriodicFbm(u, v, 64, 3, s + 2u);
     float patchy = PeriodicFbm(u, v, 4, 5, s + 3u);
     float height = Clamp01(0.5f * tuft + 0.35f * blades + 0.15f * patchy);
-    Rgb deep{0.10f, 0.22f, 0.07f}, mid{0.20f, 0.36f, 0.12f}, dry{0.42f, 0.42f, 0.20f};
+    Rgb deep{0.06f, 0.15f, 0.04f}, mid{0.24f, 0.42f, 0.14f}, dry{0.46f, 0.45f, 0.22f};
+    // Dry tips per clump only; tile-sized patches would show the repeat.
     Rgb color = Mix(deep, mid, height);
-    color = Mix(color, dry, SmoothStep(0.55f, 0.8f, patchy) * 0.6f * clump.id);
+    color = Mix(color, dry, SmoothStep(0.75f, 1.0f, clump.id) * tuft * 0.5f);
     return {color, height};
 }
 
@@ -196,7 +197,8 @@ Texel Snow(float u, float v, uint32_t s)
 Texel Soil(float u, float v, uint32_t s)
 {
     Cell mud = PeriodicCells(u, v, 10, s + 1u);
-    float crack = 1.0f - SmoothStep(0.0f, 0.05f, mud.edge);
+    // Only some cells crack, and faintly: strong cracks read as veins from a distance.
+    float crack = (1.0f - SmoothStep(0.0f, 0.04f, mud.edge)) * SmoothStep(0.4f, 0.7f, mud.id);
     float plate = PeriodicFbm(u, v, 8, 4, s + 2u);
     Cell pebble = PeriodicCells(u, v, 48, s + 3u);
     float stone = (1.0f - SmoothStep(0.15f, 0.3f, pebble.f1)) * (pebble.id > 0.7f ? 1.0f : 0.0f);
@@ -204,7 +206,7 @@ Texel Soil(float u, float v, uint32_t s)
     Rgb dry{0.45f, 0.36f, 0.26f}, dark{0.30f, 0.23f, 0.16f}, gravel{0.50f, 0.48f, 0.44f};
     Rgb color = Mix(dark, dry, Clamp01(plate * 0.8f + mud.id * 0.3f));
     color = Mix(color, gravel, stone);
-    color = Scale(color, 1.0f - 0.5f * crack);
+    color = Scale(color, 1.0f - 0.25f * crack);
     return {color, height};
 }
 

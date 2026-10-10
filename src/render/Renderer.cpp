@@ -79,6 +79,7 @@ bool Renderer::SetActiveBody(PgBody body,
         _palette.UploadToGpu(_paletteBuffer);
 
     _scheduler.Initialize(body, seed);
+    _groundTextures.Generate(seed);
 
     _quadTree.Initialize(quadTreeConfig, _scheduler, seed);
     _oceanRenderer.Initialize();
@@ -239,6 +240,7 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
         _planetShader.SetInt("uPaletteSize", _palette.GetEntryCount());
     }
 
+    _groundTextures.Bind();
     _quadTree.Render(_planetShader);
 }
 

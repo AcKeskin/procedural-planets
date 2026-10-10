@@ -29,6 +29,7 @@ add_library(render STATIC
     effects/AtmosphereRenderer.cpp
     effects/CloudRenderer.cpp
     effects/BloomPass.cpp
+    effects/GroundTextures.cpp
     cinematic/CinematicController.cpp
     cinematic/CaptureManager.cpp
     # Model and backend sources compiled directly (DLL boundary: symbols not exported via PG_API)
