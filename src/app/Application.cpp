@@ -649,7 +649,7 @@ void Application::RenderGui()
         auto& visibility = _guiManager.GetVisibility();
 
         // Body type selector
-        if (ImGui::Begin("Body Type"))
+        if (ImGui::Begin("Body Type", nullptr, ImGuiWindowFlags_NoCollapse))
         {
             const char* bodyTypes[] = {"Earth", "Volcanic World", "Crystalline World"};
             int prevSelected = _selectedBodyType;
@@ -678,11 +678,10 @@ void Application::RenderGui()
         }
         ImGui::End();
 
-        _scenePanel.Draw(_sceneSettings, visibility.scene);
+        _scenePanel.Draw(_sceneSettings, _atmosphereSettings.enabled, visibility.scene);
 
         _terrainStats.patchCount = _renderer.QuadTree().GetActiveLeafCount();
         _terrainStats.visiblePatchCount = _renderer.QuadTree().GetVisiblePatchCount();
-        _terrainStats.vertexCount = 0;
 
         bool randomize = false;
         bool needsRegen =
@@ -697,10 +696,11 @@ void Application::RenderGui()
 
         needsRegen |= _surfacePanel.Draw(_activeBody.get(), _oceanSettings, _seaLevel, visibility.surface);
         _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
+        _cloudsPanel.Draw(_cloudSettings, visibility.clouds);
         _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
 
         bool playRequested = false;
-        _cinematicPanel.Draw(_cinematicSettings, _lodConfig.planetRadius, playRequested, _cinematicPanelVisible);
+        _cinematicPanel.Draw(_cinematicSettings, _lodConfig.planetRadius, playRequested, visibility.cinematic);
         if (playRequested)
             StartCinematic();
 

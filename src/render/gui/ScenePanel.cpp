@@ -1,24 +1,27 @@
 #include "ScenePanel.h"
 #include "../settings/SceneSettings.h"
+#include "GuiLayout.h"
 #include <imgui.h>
 #include <cmath>
 
 namespace planets::render
 {
 
-void ScenePanel::Draw(SceneSettings& settings, bool& visible)
+void ScenePanel::Draw(SceneSettings& settings, bool atmosphereOwnsHaze, bool& visible)
 {
     if (!visible)
         return;
 
     ImGui::Begin("Scene", &visible);
+    PushLabelColumn();
 
     if (ImGui::CollapsingHeader("Space & Sun", ImGuiTreeNodeFlags_DefaultOpen))
         DrawSpaceContent(settings);
 
     if (ImGui::CollapsingHeader("Lighting", ImGuiTreeNodeFlags_DefaultOpen))
-        DrawLightingContent(settings.lighting);
+        DrawLightingContent(settings.lighting, atmosphereOwnsHaze);
 
+    ImGui::PopItemWidth();
     ImGui::End();
 }
 
@@ -60,7 +63,7 @@ void ScenePanel::DrawSpaceContent(SceneSettings& settings)
     ImGui::SliderFloat("Star Density", &settings.starDensity, 0.0f, 3.0f);
 }
 
-void ScenePanel::DrawLightingContent(LightingSettings& settings)
+void ScenePanel::DrawLightingContent(LightingSettings& settings, bool atmosphereOwnsHaze)
 {
     ImGui::Text("Sun Lighting");
     ImGui::Separator();
@@ -69,7 +72,7 @@ void ScenePanel::DrawLightingContent(LightingSettings& settings)
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Overall brightness of sunlight on terrain");
 
-    ImGui::SliderFloat("Ambient Light", &settings.ambientLight, 0.05f, 0.25f, "%.3f");
+    ImGui::SliderFloat("Ambient Light", &settings.ambientLight, 0.0f, 0.5f, "%.3f");
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Base illumination in shadows");
 
@@ -78,17 +81,19 @@ void ScenePanel::DrawLightingContent(LightingSettings& settings)
 
     ImGui::SliderFloat("Terminator Softness", &settings.terminatorSoftness, 0.0f, 0.3f, "%.3f");
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Width of the soft day/night twilight band (0 = hard edge)");
+        ImGui::SetTooltip("Width of the soft day/night twilight band (0 = hard edge). PBR shader only");
 
     ImGui::SliderFloat("Night Lights", &settings.nightLightStrength, 0.0f, 2.0f, "%.2f");
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Emissive city lights on the habitable night side (0 = off)");
+        ImGui::SetTooltip("Emissive city lights on the habitable night side (0 = off). PBR shader only");
 
     ImGui::Separator();
     ImGui::Text("Specular");
 
     ImGui::SliderFloat("Specular Strength", &settings.specularStrength, 0.0f, 0.5f, "%.2f");
+    ImGui::SetItemTooltip("Generic shader only; the PBR shader (Earth) derives specular from roughness");
     ImGui::SliderFloat("Specular Power", &settings.specularPower, 16.0f, 64.0f, "%.0f");
+    ImGui::SetItemTooltip("Generic shader only; the PBR shader (Earth) derives specular from roughness");
 
     ImGui::Separator();
     ImGui::Text("Atmosphere & Detail");
@@ -97,11 +102,13 @@ void ScenePanel::DrawLightingContent(LightingSettings& settings)
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Distance (planet radii) where surface detail begins fading");
 
+    // The atmosphere pass owns distance fade while it is on; the renderer zeroes this haze then.
+    ImGui::BeginDisabled(atmosphereOwnsHaze);
     ImGui::SliderFloat("Haze Strength", &settings.hazeStrength, 0.0f, 0.4f, "%.2f");
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Atmospheric perspective: desaturation at distance");
-
+    ImGui::SetItemTooltip(atmosphereOwnsHaze ? "Off while the atmosphere is enabled (it handles distance fade)"
+                                             : "Atmospheric perspective: desaturation at distance");
     ImGui::ColorEdit3("Haze Color", &settings.hazeColor.x);
+    ImGui::EndDisabled();
 
     ImGui::Separator();
     if (ImGui::Button("Reset"))

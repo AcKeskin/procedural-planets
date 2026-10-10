@@ -1,6 +1,7 @@
 #include "SurfacePanel.h"
 #include "../settings/OceanSettings.h"
 #include "../BodyRuntime.h"
+#include "GuiLayout.h"
 #include <imgui.h>
 
 namespace planets::render
@@ -13,6 +14,7 @@ bool SurfacePanel::Draw(BodyRuntime* activeBody, effects::OceanSettings& ocean, 
 
     bool regen = false;
     ImGui::Begin("Surface", &visible);
+    PushLabelColumn();
 
     if (activeBody)
         regen |= DrawShadingBlock(*activeBody);
@@ -23,6 +25,7 @@ bool SurfacePanel::Draw(BodyRuntime* activeBody, effects::OceanSettings& ocean, 
             DrawOceanContent(ocean, seaLevel);
     }
 
+    ImGui::PopItemWidth();
     ImGui::End();
     return regen;
 }
@@ -35,19 +38,14 @@ bool SurfacePanel::DrawShadingBlock(BodyRuntime& body)
     ImGui::Text("Body: %s", body.GetTypeName().c_str());
     ImGui::Separator();
 
+    // Only the biome fields the active fragment shaders read. The other ShadingBlock biome and
+    // colour fields feed the legacy planet_earth.frag, which no shipped body uses.
     if (ImGui::CollapsingHeader("Biomes", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        ImGui::Checkbox("Enable Biomes", &sh.biomesEnabled);
-        if (sh.biomesEnabled)
-        {
-            ImGui::SliderFloat("Steepness Threshold", &sh.steepnessThreshold, 0.0f, 1.0f);
-            ImGui::SliderFloat("Flat→Steep Blend", &sh.flatToSteepBlend, 0.0f, 0.5f);
-            ImGui::SliderFloat("Snow Latitude", &sh.snowLatitude, 0.0f, 1.0f);
-            ImGui::SliderFloat("Snow Blend", &sh.snowBlend, 0.0f, 0.5f);
-            ImGui::SliderFloat("Snow Line", &sh.snowLine, 0.0f, 1.0f);
-            ImGui::SliderFloat("Shore Height", &sh.shoreHeight, 0.0f, 0.3f);
-            ImGui::SliderFloat("AO Strength", &sh.aoStrength, 0.0f, 1.0f);
-        }
+        ImGui::SliderFloat("Snow Line", &sh.snowLine, 0.0f, 1.0f);
+        ImGui::SetItemTooltip("Normalized height where snow starts (colder climates lower it)");
+        ImGui::SliderFloat("AO Strength", &sh.aoStrength, 0.0f, 1.0f);
+        ImGui::SetItemTooltip("Darkening of creases and valleys");
     }
 
     if (ImGui::CollapsingHeader("Shading Noise"))
@@ -79,9 +77,11 @@ bool SurfacePanel::DrawShadingBlock(BodyRuntime& body)
             if (ImGui::IsItemDeactivatedAfterEdit())
                 regen = true;
             ImGui::SliderFloat("Lapse Rate", &sh.temperatureLapseRate, 0.5f, 4.0f, "%.1f");
+            ImGui::SetItemTooltip("How much colder it gets with altitude");
             if (ImGui::IsItemDeactivatedAfterEdit())
                 regen = true;
             ImGui::SliderFloat("Temp Exponent", &sh.temperatureExponent, 0.3f, 1.5f, "%.2f");
+            ImGui::SetItemTooltip("Shape of the equator-to-pole temperature falloff");
             if (ImGui::IsItemDeactivatedAfterEdit())
                 regen = true;
             ImGui::SliderFloat("Moisture Scale", &sh.moistureNoiseScale, 0.5f, 3.0f, "%.1f");
@@ -91,28 +91,14 @@ bool SurfacePanel::DrawShadingBlock(BodyRuntime& body)
             if (ImGui::IsItemDeactivatedAfterEdit())
                 regen = true;
             ImGui::SliderFloat("Hadley Intensity", &sh.hadleyIntensity, 0.0f, 2.0f, "%.1f");
+            ImGui::SetItemTooltip("Strength of the latitude rain bands: wet tropics, dry subtropics");
             if (ImGui::IsItemDeactivatedAfterEdit())
                 regen = true;
             ImGui::SliderFloat("Continentality", &sh.continentalityStrength, 0.0f, 0.6f, "%.2f");
+            ImGui::SetItemTooltip("How much wetter coasts are than high interiors");
             if (ImGui::IsItemDeactivatedAfterEdit())
                 regen = true;
         }
-    }
-
-    if (ImGui::CollapsingHeader("Colours"))
-    {
-        ImGui::SliderFloat("Flat Col Blend", &sh.flatColBlend, 0.8f, 2.5f);
-        ImGui::SliderFloat("Flat Col Noise", &sh.flatColBlendNoise, 0.1f, 0.5f);
-        ImGui::Separator();
-        ImGui::ColorEdit3("Shore Low", &sh.colorShoreLow.x);
-        ImGui::ColorEdit3("Shore High", &sh.colorShoreHigh.x);
-        ImGui::ColorEdit3("Flat A Low", &sh.colorFlatLowA.x);
-        ImGui::ColorEdit3("Flat A High", &sh.colorFlatHighA.x);
-        ImGui::ColorEdit3("Flat B Low", &sh.colorFlatLowB.x);
-        ImGui::ColorEdit3("Flat B High", &sh.colorFlatHighB.x);
-        ImGui::ColorEdit3("Steep Low", &sh.colorSteepLow.x);
-        ImGui::ColorEdit3("Steep High", &sh.colorSteepHigh.x);
-        ImGui::ColorEdit3("Snow", &sh.colorSnow.x);
     }
 
     return regen;
@@ -131,11 +117,6 @@ void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& sea
         ImGui::ColorEdit3("Deep Color", &settings.deepColor.x);
         ImGui::ColorEdit3("Shallow Color", &settings.shallowColor.x);
 
-        ImGui::Separator();
-        ImGui::Text("Depth");
-        ImGui::SliderFloat("Depth Multiplier", &settings.depthMultiplier, 1.0f, 30.0f);
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Controls shallow-to-deep color transition");
 
         ImGui::Separator();
         ImGui::Text("Reflection");

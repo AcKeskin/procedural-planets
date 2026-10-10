@@ -1,5 +1,6 @@
 #include "AtmospherePanel.h"
 #include "../settings/AtmosphereSettings.h"
+#include "GuiLayout.h"
 #include <imgui.h>
 #include <glm/glm.hpp>
 
@@ -12,6 +13,7 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
         return;
 
     ImGui::Begin("Atmosphere", &visible);
+    PushLabelColumn();
 
     ImGui::Checkbox("Enable Atmosphere", &settings.enabled);
 
@@ -26,16 +28,21 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
         ImGui::Separator();
         ImGui::Text("Rayleigh Scattering");
 
+        // Rayleigh: scattering by air molecules; it gives the sky its colour.
+        const char* wavelengthTip = "Shorter wavelengths scatter more (blue sky)";
         ImGui::SliderFloat("Red Wavelength", &settings.wavelengths.x, 620.0f, 740.0f, "%.0f nm");
+        ImGui::SetItemTooltip("%s", wavelengthTip);
         ImGui::SliderFloat("Green Wavelength", &settings.wavelengths.y, 480.0f, 560.0f, "%.0f nm");
+        ImGui::SetItemTooltip("%s", wavelengthTip);
         ImGui::SliderFloat("Blue Wavelength", &settings.wavelengths.z, 400.0f, 480.0f, "%.0f nm");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Shorter wavelengths scatter more (blue sky)");
+        ImGui::SetItemTooltip("%s", wavelengthTip);
 
         ImGui::SliderFloat("Scattering Strength", &settings.scatteringStrength, 5.0f, 40.0f);
+        ImGui::SetItemTooltip("Amount of air scattering: higher = thicker, brighter sky");
 
         ImGui::Separator();
         ImGui::Text("Mie Scattering");
+        ImGui::SetItemTooltip("Scattering by dust and droplets: haze and the glow around the sun");
         ImGui::SliderFloat("Mie Coefficient", &settings.mieCoefficient, 0.0f, 0.03f, "%.4f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Haze extinction amount");
@@ -58,6 +65,7 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
 
         ImGui::Separator();
         ImGui::SliderFloat("Intensity", &settings.intensity, 0.5f, 3.0f);
+        ImGui::SetItemTooltip("Overall brightness of the scattered light");
 
         ImGui::Separator();
         ImGui::Text("Dithering");
@@ -96,6 +104,7 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
         }
     }
 
+    ImGui::PopItemWidth();
     ImGui::End();
 }
 

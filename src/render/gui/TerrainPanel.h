@@ -10,7 +10,7 @@ struct LodConfig;
 struct TerrainStats;
 class BodyRuntime;
 
-// Edits the active body's shape/tectonics/ocean-floor/height-detail/erosion/macro-world blocks
+// Edits the active body's shape/tectonics/ocean-floor/height-detail/macro-world blocks
 // directly on its BodyConfig — one generic path for every body type.
 class TerrainPanel
 {
@@ -23,8 +23,7 @@ public:
               bool& randomizeRequested);
 
 private:
-    void DrawGpuContent(const TerrainStats& stats);
-    bool DrawTerrainBlocks(BodyRuntime& body, uint32_t& seed, int& subdivisions, bool& randomizeRequested);
+    bool DrawTerrainBlocks(BodyRuntime& body, uint32_t& seed, bool& randomizeRequested);
     bool DrawLodContent(LodConfig& lod, const TerrainStats& stats);
 };
 

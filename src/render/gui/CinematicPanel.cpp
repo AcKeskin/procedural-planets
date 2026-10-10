@@ -1,6 +1,7 @@
 #include "CinematicPanel.h"
 #include "../settings/CinematicSettings.h"
 #include "../../app/Keybinds.h"
+#include "GuiLayout.h"
 #include <imgui.h>
 #include <algorithm>
 
@@ -19,6 +20,7 @@ void CinematicPanel::Draw(CinematicSettings& settings, float planetRadius, bool&
         return;
 
     ImGui::Begin("Cinematic", &visible);
+    PushLabelColumn();
 
     if (ImGui::CollapsingHeader("Turntable", ImGuiTreeNodeFlags_DefaultOpen))
         DrawTurntableContent(settings.turntable, planetRadius);
@@ -74,6 +76,7 @@ void CinematicPanel::Draw(CinematicSettings& settings, float planetRadius, bool&
         ImGui::BulletText("%s", Keybinds::GuiToggle);
     }
 
+    ImGui::PopItemWidth();
     ImGui::End();
 }
 
