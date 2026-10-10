@@ -700,7 +700,7 @@ void Application::RenderGui()
 
         needsRegen |= _surfacePanel.Draw(_activeBody.get(), _oceanSettings, _seaLevel, visibility.surface);
         _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
-        _cloudsPanel.Draw(_cloudSettings, visibility.clouds);
+        _cloudsPanel.Draw(_cloudSettings, _atmosphereSettings.enabled, visibility.clouds);
         _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
 
         bool playRequested = false;

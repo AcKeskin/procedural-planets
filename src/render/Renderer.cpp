@@ -134,7 +134,8 @@ void Renderer::DrawScene(const RenderContext& ctx)
     _effectsTimer.Begin();
     // Clouds draw into the scene (over the surface, before the atmosphere post-process) so the
     // limb + aerial perspective scatter over the cloud tops.
-    if (ctx.clouds && ctx.scene)
+    const bool atmosphereOn = ctx.atmosphere && ctx.atmosphere->enabled;
+    if (ctx.clouds && ctx.scene && atmosphereOn)
     {
         _cloudRenderer.Render(ctx.view,
                               ctx.projection,
@@ -200,7 +201,7 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
 
         // Cloud shadow params — match the cloud shell's field so the shadow tracks the clouds; zero
         // strength when clouds are disabled so the surface is unaffected.
-        const bool cloudsOn = ctx.clouds && ctx.clouds->enabled;
+        const bool cloudsOn = ctx.clouds && ctx.clouds->enabled && ctx.atmosphere && ctx.atmosphere->enabled;
         _planetShader.SetFloat("uCloudScale", ctx.clouds ? ctx.clouds->scale : 1.0f);
         _planetShader.SetFloat("uCloudCoverage", ctx.clouds ? ctx.clouds->coverage : 0.0f);
         _planetShader.SetFloat("uCloudSpeed", ctx.clouds ? ctx.clouds->speed : 0.0f);
