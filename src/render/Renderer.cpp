@@ -258,6 +258,7 @@ void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
                                    oceanRadius,
                                    ctx.nearPlane,
                                    ctx.farPlane,
+                                   ctx.scene->exposure,
                                    *ctx.atmosphere,
                                    _sceneFbo.GetColorTexture(),
                                    _sceneFbo.GetDepthTexture());
@@ -272,6 +273,7 @@ void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
         glDepthMask(GL_FALSE);
         _passthroughShader.Use();
         _passthroughShader.SetInt("uSceneTexture", 0);
+        _passthroughShader.SetFloat("uExposure", ctx.scene ? ctx.scene->exposure : 1.0f);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, _sceneFbo.GetColorTexture());
         _postProcessor.RenderQuad();

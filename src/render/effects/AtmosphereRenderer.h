@@ -35,6 +35,7 @@ public:
                 float oceanRadius,
                 float nearPlane,
                 float farPlane,
+                float exposure,
                 const AtmosphereSettings& settings,
                 unsigned int sceneTexture,
                 unsigned int depthTexture);

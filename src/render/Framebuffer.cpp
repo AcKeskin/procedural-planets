@@ -70,7 +70,8 @@ bool Framebuffer::Create(uint32_t width, uint32_t height)
 
     // Create color texture attachment
     glCreateTextures(GL_TEXTURE_2D, 1, &_colorTexture);
-    glTextureStorage2D(_colorTexture, 1, GL_RGBA8, width, height);
+    // HDR: the sun, limb and glints go above 1; the final pass tonemaps (tonemap.glsl).
+    glTextureStorage2D(_colorTexture, 1, GL_RGBA16F, width, height);
     glTextureParameteri(_colorTexture, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTextureParameteri(_colorTexture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(_colorTexture, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

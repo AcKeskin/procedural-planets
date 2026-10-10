@@ -36,6 +36,7 @@ struct SceneSettings
     float sunSize = 0.05f;
     glm::vec3 sunColor = glm::vec3(1.0f, 0.95f, 0.8f);
     float starDensity = 1.0f;
+    float exposure = 1.0f; // scales the HDR scene before the tonemap
     LightingSettings lighting;
 };
 

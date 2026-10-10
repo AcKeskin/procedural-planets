@@ -3,6 +3,7 @@
 // lighting.glsl → dayFactor + DUSK_TINT: the sky dusk band reuses the exact curve and warm tint the
 // surface shader applies, so the terminator's sky reddening meets the ground twilight band with no split.
 #include "lighting.glsl"
+#include "tonemap.glsl"
 
 in vec2 vUv;
 
@@ -208,10 +209,10 @@ void main()
         const float epsilon = 0.0001;
         vec3 pointInAtmosphere = rayOrigin + rayDir * (dstToAtmosphere + epsilon);
         vec3 light = calculateLight(pointInAtmosphere, rayDir, dstThroughAtmosphere - epsilon * 2.0, originalColor, vUv);
-        outColor = vec4(light, 1.0);
+        outColor = vec4(tonemap(light), 1.0);
     }
     else
     {
-        outColor = vec4(originalColor, 1.0);
+        outColor = vec4(tonemap(originalColor), 1.0);
     }
 }

@@ -1,7 +1,8 @@
 #version 450 core
 
-// Passthrough fragment shader for direct texture blit
-// No post-processing applied - serves as base for future effects
+// Presents the HDR scene when the atmosphere pass is off: tonemap only.
+
+#include "tonemap.glsl"
 
 in vec2 vTexCoord;
 out vec4 fragColor;
@@ -10,6 +11,5 @@ uniform sampler2D uSceneTexture;
 
 void main()
 {
-    // Sample scene texture directly without modification
-    fragColor = texture(uSceneTexture, vTexCoord);
+    fragColor = vec4(tonemap(texture(uSceneTexture, vTexCoord).rgb), 1.0);
 }

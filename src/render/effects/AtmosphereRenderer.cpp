@@ -162,6 +162,7 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
                                 float oceanRadius,
                                 float nearPlane,
                                 float farPlane,
+                                float exposure,
                                 const AtmosphereSettings& settings,
                                 unsigned int sceneTexture,
                                 unsigned int depthTexture)
@@ -187,6 +188,7 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
 
     _atmosphereShader.SetFloat("uNearPlane", nearPlane);
     _atmosphereShader.SetFloat("uFarPlane", farPlane);
+    _atmosphereShader.SetFloat("uExposure", exposure);
 
     // Optical depth accumulates in world units (∝ planetRadius), so every extinction coefficient is
     // normalized by planetRadius to keep coeff·opticalDepth — and thus the atmosphere's look —
