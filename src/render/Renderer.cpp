@@ -125,13 +125,8 @@ void Renderer::DrawScene(const RenderContext& ctx)
         frame.time = ctx.time;
         frame.seaLevel = ctx.seaLevel;
         frame.heightScale = ctx.body->GetHeightScale();
-        if (ctx.atmosphere)
-        {
-            frame.atmosphereOn = ctx.atmosphere->enabled;
-            frame.wavelengths = ctx.atmosphere->wavelengths;
-            frame.scatteringStrength = ctx.atmosphere->scatteringStrength;
-            frame.atmosphereIntensity = ctx.atmosphere->intensity;
-        }
+        frame.atmosphere = ctx.atmosphere;
+        frame.planetRadius = ctx.planetRadius;
         _oceanRenderer.Render(frame, *ctx.ocean, _quadTree);
     }
     _oceanTimer.End();

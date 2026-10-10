@@ -2,6 +2,7 @@
 
 #include "../Shader.h"
 #include "../settings/OceanSettings.h"
+#include "../settings/AtmosphereSettings.h"
 #include <glm/glm.hpp>
 
 namespace planets::render::lod
@@ -26,11 +27,9 @@ struct OceanFrame
     float seaLevel = 1.0f;     // radial multiplier shared with terrain shading and the atmosphere
     float heightScale = 0.04f; // body shape.heightScale: converts radius-unit depth to terrain units
 
-    // Atmosphere parameters for the reflected sky (atmosphereOn false = airless, black sky).
-    bool atmosphereOn = false;
-    glm::vec3 wavelengths{700.0f, 530.0f, 460.0f};
-    float scatteringStrength = 8.0f;
-    float atmosphereIntensity = 1.0f;
+    // The reflected sky is the atmosphere pass's own sky. Null or disabled = airless, black sky.
+    const AtmosphereSettings* atmosphere = nullptr;
+    float planetRadius = 1.0f;
 };
 
 // Draws the ocean over the terrain's own LOD patches, every vertex at sea level, with depth from
