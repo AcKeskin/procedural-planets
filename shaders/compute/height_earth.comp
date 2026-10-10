@@ -649,7 +649,8 @@ float evaluateHeight(vec3 dir)
     // direction, or patches of different depth disagree on their shared edge. Deep patches
     // resolve it as real shape, coarse ones average it out. Persistence 0.4 makes each finer
     // octave a little less steep, so octaves a coarse mesh undersamples add little normal noise.
-    // The finest octave (~7400 per unit) is what earth.json's normalEpsilon is sized to resolve.
+    // earth.json's normalEpsilon (0.0008) resolves the first octaves only: a step small enough
+    // for all of them combed undersampled noise into streaks on mid-distance patches.
     const float fineReliefScale    = 700.0;
     const float fineReliefStrength = 0.003;
     fineDetail += fbm(dir, vec3(7272.0), 4, fineReliefScale * globalFrequency, 0.4, 2.2, 1.0, seed + 75u)
