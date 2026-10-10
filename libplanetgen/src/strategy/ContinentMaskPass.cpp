@@ -50,9 +50,26 @@ GpuTextureHandle BakeContinentMask(IComputeBackend& backend,
 
 uint64_t MaskCacheKey(const BodyConfig& config, uint32_t seed)
 {
-    const uint32_t res = static_cast<uint32_t>(
-        std::clamp(config.shape.continentMaskResolution, 8, 256));
-    return (static_cast<uint64_t>(seed) << 32) | static_cast<uint64_t>(res);
+    const auto& sh = config.shape;
+    const uint32_t res = static_cast<uint32_t>(std::clamp(sh.continentMaskResolution, 8, 256));
+
+    // FNV-1a over every input the growth pass reads.
+    uint64_t h = 0xcbf29ce484222325ull;
+    auto mix = [&h](const void* data, size_t bytes)
+    {
+        const auto* p = static_cast<const unsigned char*>(data);
+        for (size_t i = 0; i < bytes; ++i)
+        {
+            h ^= p[i];
+            h *= 0x100000001b3ull;
+        }
+    };
+    mix(&seed, sizeof(seed));
+    mix(&res, sizeof(res));
+    mix(&sh.continentCount, sizeof(sh.continentCount));
+    mix(&sh.continentSizeVariance, sizeof(sh.continentSizeVariance));
+    mix(&sh.continentClustering, sizeof(sh.continentClustering));
+    return h;
 }
 
 GpuTextureHandle EnsureContinentMask(IComputeBackend& backend,
