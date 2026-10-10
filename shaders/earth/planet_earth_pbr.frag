@@ -93,6 +93,9 @@ float fbm3(vec3 p, int octaves)
     return sum;
 }
 
+// Planet radius the material and detail-normal noise frequencies were tuned at.
+const float kMaterialReferenceRadius = 10.0;
+
 // ---- triplanar sampling ----
 // Blend weights from the geometric normal, sharpened so seams stay narrow.
 vec3 triplanarWeights(vec3 n)
@@ -178,13 +181,19 @@ void main()
     float temperature = vShadingData.x;
     float moisture    = vShadingData.y;
 
-    // Procedural material variation fields (triplanar, world-space → seam-free, no stretch)
-    float vFine   = triplanarFbm(vWorldPos, 3.0, 4, w);   // fine grain
-    float vMedium = triplanarFbm(vWorldPos, 0.9, 4, w);   // patch-scale variation
+    // Material noise runs on the position scaled to the radius it was tuned at, so the grain
+    // keeps its size relative to the planet at any radius. In raw world units a radius-5000
+    // planet gets 500x finer grain that aliases to per-pixel noise, and the large coordinates
+    // cost the noise input its precision. At the reference radius the scale is exactly 1.
+    vec3 matPos = vWorldPos * (kMaterialReferenceRadius / uPlanetScale);
 
-    Material rock  = rockMaterial(vWorldPos, w, vFine);
-    Material sand  = sandMaterial(vWorldPos, w, vFine);
-    Material grass = grassMaterial(vWorldPos, w, vMedium, moisture);
+    // Procedural material variation fields (triplanar, world-space → seam-free, no stretch)
+    float vFine   = triplanarFbm(matPos, 3.0, 4, w);   // fine grain
+    float vMedium = triplanarFbm(matPos, 0.9, 4, w);   // patch-scale variation
+
+    Material rock  = rockMaterial(matPos, w, vFine);
+    Material sand  = sandMaterial(matPos, w, vFine);
+    Material grass = grassMaterial(matPos, w, vMedium, moisture);
     Material snow  = snowMaterial(vFine);
 
     // --- blend materials by slope / height / climate ---
@@ -216,16 +225,16 @@ void main()
     // per axis) — a forward difference is asymmetric at noise extrema and spikes the normal into
     // specular RINGS (same forward-vs-central lesson as the vertex normals). Clamp the gradient so
     // an extremum can't throw the normal toward the light. Faded out at orbital distance. ---
-    // eps is a SMALL fraction of a noise cell (cell size = 1/bumpScale in world space). Sampling a
+    // eps is a SMALL fraction of a noise cell (cell size = 1/bumpScale in matPos units). Sampling a
     // full cell apart (the earlier bug) washed the gradient out; a tenth-cell step resolves it.
     float bumpScale = 45.0;
     float e = 0.1 / bumpScale;
-    float nXp = triplanarFbm(vWorldPos + vec3(e, 0, 0), bumpScale, 3, w);
-    float nXm = triplanarFbm(vWorldPos - vec3(e, 0, 0), bumpScale, 3, w);
-    float nYp = triplanarFbm(vWorldPos + vec3(0, e, 0), bumpScale, 3, w);
-    float nYm = triplanarFbm(vWorldPos - vec3(0, e, 0), bumpScale, 3, w);
-    float nZp = triplanarFbm(vWorldPos + vec3(0, 0, e), bumpScale, 3, w);
-    float nZm = triplanarFbm(vWorldPos - vec3(0, 0, e), bumpScale, 3, w);
+    float nXp = triplanarFbm(matPos + vec3(e, 0, 0), bumpScale, 3, w);
+    float nXm = triplanarFbm(matPos - vec3(e, 0, 0), bumpScale, 3, w);
+    float nYp = triplanarFbm(matPos + vec3(0, e, 0), bumpScale, 3, w);
+    float nYm = triplanarFbm(matPos - vec3(0, e, 0), bumpScale, 3, w);
+    float nZp = triplanarFbm(matPos + vec3(0, 0, e), bumpScale, 3, w);
+    float nZm = triplanarFbm(matPos - vec3(0, 0, e), bumpScale, 3, w);
     vec3 grad = vec3(nXp - nXm, nYp - nYm, nZp - nZm) / (2.0 * e);
     grad -= geoN * dot(grad, geoN);                  // keep perturbation tangential
     grad = clamp(grad, vec3(-8.0), vec3(8.0));        // cap extremum spikes (ring source) but allow grain
