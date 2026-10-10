@@ -8,6 +8,13 @@
 namespace planets::render::effects
 {
 
+// Sets the uniforms of shaders/includes/sky_radiance.glsl on any shader that includes it.
+void SetSkyUniforms(const Shader& shader,
+                    const AtmosphereSettings& settings,
+                    const glm::vec3& planetCenter,
+                    float planetRadius,
+                    float groundRadius);
+
 // Post-process atmosphere renderer using raymarching
 class AtmosphereRenderer
 {
@@ -35,6 +42,9 @@ public:
                 float oceanRadius,
                 float nearPlane,
                 float farPlane,
+                float exposure,
+                uint32_t bloomTexture,
+                float bloomStrength,
                 const AtmosphereSettings& settings,
                 unsigned int sceneTexture,
                 unsigned int depthTexture);

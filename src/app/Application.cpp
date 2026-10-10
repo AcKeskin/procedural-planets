@@ -105,12 +105,12 @@ bool Application::Initialize()
 
     if (_capture.enabled)
     {
-        // Default capture framing: sit on the light axis looking at the planet center, so the
-        // fully-lit hemisphere faces the camera. An explicit --camera overrides the position but
-        // still looks at origin (LookAt fixes the old -Z-only capture camera).
+        // Default capture framing: sit on the sun side of the light axis looking at the planet
+        // center, so the lit hemisphere faces the camera (lightDir points FROM the sun). An explicit
+        // --camera overrides the position but still looks at origin.
         const glm::vec3 target(0.0f);
         const glm::vec3 eye = _capture.hasCamera ? _capture.cameraPos
-                                                 : glm::normalize(_sceneSettings.lightDir) *
+                                                 : -glm::normalize(_sceneSettings.lightDir) *
                                                        (_lodConfig.planetRadius * _capture.distanceMultiplier);
         _camera.SetMode(core::CameraMode::FreeFly);
         _camera.SetPosition(eye);
@@ -177,15 +177,15 @@ void Application::ApplyCaptureExposure()
 
 void Application::UpdateFollowLight()
 {
-    // Match the well-lit still's geometry: the lit hemisphere faces the camera when the
-    // light direction points from the planet toward the eye (eye ∥ +lightDir). Tilt it
-    // up-and-to-the-side for a key-light terminator (shape, not a flat disc).
+    // Keep the lit hemisphere facing the camera: lightDir points FROM the sun, so it points from
+    // the eye toward the planet (eye ∥ -lightDir). Tilt it up-and-to-the-side for a key-light
+    // terminator (shape, not a flat disc).
     const glm::vec3 toEye = glm::normalize(_camera.GetPosition()); // camera looks at origin
     const glm::vec3 right = _camera.GetRight();
     const glm::vec3 up = _camera.GetUp();
     // Small offset: enough terminator for shape, but keep most of the disc (incl. limbs
     // where land sits during the orbit) lit.
-    _sceneSettings.lightDir = glm::normalize(toEye + up * 0.18f + right * 0.12f);
+    _sceneSettings.lightDir = -glm::normalize(toEye + up * 0.18f + right * 0.12f);
 }
 
 bool Application::DrainGeneration(int minFrames, int maxFrames)
@@ -700,7 +700,7 @@ void Application::RenderGui()
 
         needsRegen |= _surfacePanel.Draw(_activeBody.get(), _oceanSettings, _seaLevel, visibility.surface);
         _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
-        _cloudsPanel.Draw(_cloudSettings, visibility.clouds);
+        _cloudsPanel.Draw(_cloudSettings, _atmosphereSettings.enabled, visibility.clouds);
         _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
 
         bool playRequested = false;

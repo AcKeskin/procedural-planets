@@ -25,6 +25,34 @@ constexpr float RayleighReferenceWavelength = 400.0f;
 constexpr float RayleighPower = 4.0f;
 } // namespace
 
+void SetSkyUniforms(const Shader& shader,
+                    const AtmosphereSettings& settings,
+                    const glm::vec3& planetCenter,
+                    float planetRadius,
+                    float groundRadius)
+{
+    shader.SetVec3("uPlanetCenter", planetCenter);
+    shader.SetFloat("uPlanetRadius", planetRadius);
+    // The shadow edge must sit on what is drawn. Against the bare planet radius above a lower sea,
+    // air between the two cut a line into the sky just over the horizon.
+    shader.SetFloat("uGroundRadius", groundRadius > 0.0f ? groundRadius : planetRadius);
+    shader.SetFloat("uAtmosphereRadius", planetRadius * (1.0f + settings.atmosphereScale));
+
+    // Optical depth accumulates in world units (∝ planetRadius), so every extinction coefficient is
+    // normalized by planetRadius to keep coeff·opticalDepth — and thus the atmosphere's look —
+    // invariant across [5000,50000]. Rayleigh AND Mie must both divide by radius; leaving Mie raw
+    // made its extinction grow with radius and collapse the atmosphere to opaque at large scale.
+    float scatterX = std::pow(RayleighReferenceWavelength / settings.wavelengths.x, RayleighPower);
+    float scatterY = std::pow(RayleighReferenceWavelength / settings.wavelengths.y, RayleighPower);
+    float scatterZ = std::pow(RayleighReferenceWavelength / settings.wavelengths.z, RayleighPower);
+    glm::vec3 scatterCoeffs = glm::vec3(scatterX, scatterY, scatterZ) * settings.scatteringStrength / planetRadius;
+    shader.SetVec3("uScatteringCoefficients", scatterCoeffs);
+    shader.SetFloat("uDensityFalloff", settings.densityFalloff);
+    shader.SetFloat("uIntensity", settings.intensity);
+    shader.SetFloat("uMieCoefficient", settings.mieCoefficient / planetRadius);
+    shader.SetFloat("uMieDensityFalloff", settings.mieDensityFalloff);
+}
+
 AtmosphereRenderer::AtmosphereRenderer() = default;
 
 AtmosphereRenderer::~AtmosphereRenderer()
@@ -162,6 +190,9 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
                                 float oceanRadius,
                                 float nearPlane,
                                 float farPlane,
+                                float exposure,
+                                uint32_t bloomTexture,
+                                float bloomStrength,
                                 const AtmosphereSettings& settings,
                                 unsigned int sceneTexture,
                                 unsigned int depthTexture)
@@ -180,30 +211,18 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
     _atmosphereShader.SetVec3("uLightDir", glm::normalize(lightDir));
     _atmosphereShader.SetVec3("uSunColor", sunColor);
 
-    _atmosphereShader.SetVec3("uPlanetCenter", planetCenter);
-    _atmosphereShader.SetFloat("uPlanetRadius", planetRadius);
-    _atmosphereShader.SetFloat("uAtmosphereRadius", planetRadius * (1.0f + settings.atmosphereScale));
+    SetSkyUniforms(_atmosphereShader, settings, planetCenter, planetRadius, oceanRadius);
     _atmosphereShader.SetFloat("uOceanRadius", oceanRadius);
 
     _atmosphereShader.SetFloat("uNearPlane", nearPlane);
     _atmosphereShader.SetFloat("uFarPlane", farPlane);
-
-    // Optical depth accumulates in world units (∝ planetRadius), so every extinction coefficient is
-    // normalized by planetRadius to keep coeff·opticalDepth — and thus the atmosphere's look —
-    // invariant across [5000,50000]. Rayleigh AND Mie must both divide by radius; leaving Mie raw
-    // made its extinction grow with radius and collapse the atmosphere to opaque at large scale.
-    float scatterX = std::pow(RayleighReferenceWavelength / settings.wavelengths.x, RayleighPower);
-    float scatterY = std::pow(RayleighReferenceWavelength / settings.wavelengths.y, RayleighPower);
-    float scatterZ = std::pow(RayleighReferenceWavelength / settings.wavelengths.z, RayleighPower);
-    glm::vec3 scatterCoeffs = glm::vec3(scatterX, scatterY, scatterZ) * settings.scatteringStrength / planetRadius;
-    _atmosphereShader.SetVec3("uScatteringCoefficients", scatterCoeffs);
+    _atmosphereShader.SetFloat("uExposure", exposure);
+    _atmosphereShader.SetFloat("uBloomStrength", bloomStrength);
+    _atmosphereShader.SetInt("uBloomTexture", 3);
+    glBindTextureUnit(3, bloomTexture);
 
     _atmosphereShader.SetInt("uNumInScatteringPoints", settings.numInScatteringPoints);
     _atmosphereShader.SetInt("uNumOpticalDepthPoints", settings.numOpticalDepthPoints);
-    _atmosphereShader.SetFloat("uDensityFalloff", settings.densityFalloff);
-    _atmosphereShader.SetFloat("uIntensity", settings.intensity);
-    _atmosphereShader.SetFloat("uMieCoefficient", settings.mieCoefficient / planetRadius);
-    _atmosphereShader.SetFloat("uMieDensityFalloff", settings.mieDensityFalloff);
 
     _atmosphereShader.SetFloat("uDitherStrength", settings.ditherStrength);
     _atmosphereShader.SetFloat("uDitherScale", settings.ditherScale);

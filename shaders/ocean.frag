@@ -24,11 +24,10 @@ uniform float uWaveScale;
 uniform float uWaveSpeed;
 uniform float uTime;
 
-// Atmosphere parameters (AtmosphereSettings) the reflected sky is derived from.
+// The reflected sky is the atmosphere pass's own sky (sky_radiance.glsl); 0 = airless, black sky.
 uniform int uAtmosphereOn;
-uniform vec3 uWavelengths;        // nm, red/green/blue
-uniform float uScatteringStrength;
-uniform float uAtmosphereIntensity;
+
+#include "sky_radiance.glsl"
 
 out vec4 outColor;
 
@@ -130,20 +129,27 @@ float shoreFoam(float depthUnits, vec3 dir)
 
 // ---- reflection ----
 
-// Sky colour seen along rayDir from the sea surface. A cheap stand-in for the atmosphere pass that
-// reads the same parameters: Rayleigh coefficients from the wavelengths, more air (brighter, paler)
-// toward the horizon, a sun reddened by its long path when low, black space with no atmosphere.
-vec3 skyRadiance(vec3 rayDir, vec3 up, vec3 sunDir)
+// Fewer samples than the atmosphere pass: the reflection is blurred by waves and fresnel anyway.
+const int kSkyViewSamples = 4;
+const int kSkySunSamples = 3;
+
+// Sky seen along rayDir from the sea surface: the same march as the atmosphere pass, so the
+// reflection matches the sky above it at any sun height.
+vec3 skyRadiance(vec3 origin, vec3 rayDir, vec3 sunDir)
 {
     if (uAtmosphereOn == 0)
         return vec3(0.0);
-    vec3 beta = pow(vec3(400.0) / uWavelengths, vec3(4.0)) * uScatteringStrength * 0.02;
-    float airMass = 1.0 / (max(dot(rayDir, up), 0.0) + 0.12);
-    vec3 scatter = 1.0 - exp(-beta * airMass);
-    float sunHeight = dot(up, sunDir);
-    float daylight = smoothstep(-0.15, 0.25, sunHeight);
-    vec3 sunlight = uSunColor * exp(-beta * 0.5 / (max(sunHeight, 0.0) + 0.12));
-    return scatter * sunlight * daylight * uSunIntensity * uAtmosphereIntensity * 2.0;
+    vec2 shell = skyRaySphere(uPlanetCenter, uAtmosphereRadius, origin, rayDir);
+    if (shell.y <= 0.0)
+        return vec3(0.0);
+    // A reflected ray that dips below the horizon ends on the sea sphere it starts from.
+    float seaRadius = length(origin - uPlanetCenter) * 0.9999;
+    float toPlanet = skyRaySphere(uPlanetCenter, seaRadius, origin, rayDir).x;
+    float segment = min(shell.y, toPlanet - shell.x);
+    if (segment <= 0.0)
+        return vec3(0.0);
+    vec3 start = origin + rayDir * shell.x;
+    return skyScatter(start, rayDir, segment, sunDir, kSkyViewSamples, kSkySunSamples).inScatter * uSunColor;
 }
 
 // Schlick fresnel for water (F0 = 0.02).
@@ -180,7 +186,7 @@ void main()
     float glint = pow(ndh, shininess) * (shininess + 8.0) / (8.0 * 3.14159265) * 0.25;
 
     float F = fresnel(dot(viewDir, waveNormal));
-    vec3 sky = skyRadiance(reflect(-viewDir, waveNormal), sphereNormal, lightDir);
+    vec3 sky = skyRadiance(fragWorldPos, reflect(-viewDir, waveNormal), lightDir);
     color = mix(color, sky, F);
     color += uSunColor * glint * diffuse * 0.9;
 

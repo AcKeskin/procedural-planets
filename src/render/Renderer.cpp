@@ -45,6 +45,11 @@ bool Renderer::Initialize(int width, int height)
         std::cerr << "[Renderer] Failed to load space shader" << std::endl;
         return false;
     }
+    if (!_bloom.Initialize(width, height))
+    {
+        std::cerr << "[Renderer] Failed to initialize bloom" << std::endl;
+        return false;
+    }
     return true;
 }
 
@@ -55,6 +60,7 @@ void Renderer::ResizeFramebuffer(int width, int height)
     _fbWidth = width;
     _fbHeight = height;
     _sceneFbo.Create(width, height);
+    _bloom.Resize(width, height);
 }
 
 bool Renderer::SetActiveBody(PgBody body,
@@ -119,13 +125,8 @@ void Renderer::DrawScene(const RenderContext& ctx)
         frame.time = ctx.time;
         frame.seaLevel = ctx.seaLevel;
         frame.heightScale = ctx.body->GetHeightScale();
-        if (ctx.atmosphere)
-        {
-            frame.atmosphereOn = ctx.atmosphere->enabled;
-            frame.wavelengths = ctx.atmosphere->wavelengths;
-            frame.scatteringStrength = ctx.atmosphere->scatteringStrength;
-            frame.atmosphereIntensity = ctx.atmosphere->intensity;
-        }
+        frame.atmosphere = ctx.atmosphere;
+        frame.planetRadius = ctx.planetRadius;
         _oceanRenderer.Render(frame, *ctx.ocean, _quadTree);
     }
     _oceanTimer.End();
@@ -133,7 +134,8 @@ void Renderer::DrawScene(const RenderContext& ctx)
     _effectsTimer.Begin();
     // Clouds draw into the scene (over the surface, before the atmosphere post-process) so the
     // limb + aerial perspective scatter over the cloud tops.
-    if (ctx.clouds && ctx.scene)
+    const bool atmosphereOn = ctx.atmosphere && ctx.atmosphere->enabled;
+    if (ctx.clouds && ctx.scene && atmosphereOn)
     {
         _cloudRenderer.Render(ctx.view,
                               ctx.projection,
@@ -146,6 +148,7 @@ void Renderer::DrawScene(const RenderContext& ctx)
                               *ctx.clouds);
     }
 
+    _bloom.Render(_sceneFbo.GetColorTexture(), _postProcessor);
     _sceneFbo.Unbind();
     glViewport(0, 0, _fbWidth, _fbHeight);
 
@@ -198,7 +201,7 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
 
         // Cloud shadow params — match the cloud shell's field so the shadow tracks the clouds; zero
         // strength when clouds are disabled so the surface is unaffected.
-        const bool cloudsOn = ctx.clouds && ctx.clouds->enabled;
+        const bool cloudsOn = ctx.clouds && ctx.clouds->enabled && ctx.atmosphere && ctx.atmosphere->enabled;
         _planetShader.SetFloat("uCloudScale", ctx.clouds ? ctx.clouds->scale : 1.0f);
         _planetShader.SetFloat("uCloudCoverage", ctx.clouds ? ctx.clouds->coverage : 0.0f);
         _planetShader.SetFloat("uCloudSpeed", ctx.clouds ? ctx.clouds->speed : 0.0f);
@@ -258,6 +261,9 @@ void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
                                    oceanRadius,
                                    ctx.nearPlane,
                                    ctx.farPlane,
+                                   ctx.scene->exposure,
+                                   _bloom.Texture(),
+                                   ctx.scene->bloomStrength,
                                    *ctx.atmosphere,
                                    _sceneFbo.GetColorTexture(),
                                    _sceneFbo.GetDepthTexture());
@@ -272,6 +278,10 @@ void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
         glDepthMask(GL_FALSE);
         _passthroughShader.Use();
         _passthroughShader.SetInt("uSceneTexture", 0);
+        _passthroughShader.SetFloat("uExposure", ctx.scene ? ctx.scene->exposure : 1.0f);
+        _passthroughShader.SetFloat("uBloomStrength", ctx.scene ? ctx.scene->bloomStrength : 0.0f);
+        _passthroughShader.SetInt("uBloomTexture", 3);
+        glBindTextureUnit(3, _bloom.Texture());
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, _sceneFbo.GetColorTexture());
         _postProcessor.RenderQuad();

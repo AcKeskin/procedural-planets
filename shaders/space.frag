@@ -1,7 +1,7 @@
 #version 450 core
 
 // Space background fragment shader
-// Renders procedural starfield and sun
+// Renders procedural starfield and the sun disc (HDR; the bloom pass adds its glow)
 
 in vec2 vTexCoord;
 in vec3 vViewRay;
@@ -96,32 +96,19 @@ void main()
     float starBrightness = starField(viewDir);
     vec3 stars = starColor(viewDir) * starBrightness;
 
-    // Sun. uLightDir points FROM the sun, so the disc sits in the -uLightDir direction (matching
-    // the lit side of the planet).
+    // Sun: a near real-size disc (uSunSize is its angular radius) with limb darkening. It is far
+    // above 1, so its glow comes from the bloom pass and the atmosphere pass reddens it through
+    // its own transmittance. uLightDir points FROM the sun.
+    const float SUN_RADIANCE = 8.0;
     vec3 sunDir = -normalize(uLightDir);
-    float sunAngle = acos(clamp(dot(viewDir, sunDir), -1.0, 1.0));
+    float sunAngle = 2.0 * asin(clamp(length(viewDir - sunDir) * 0.5, 0.0, 1.0)); // exact near 0, unlike acos
+    float edge = max(fwidth(sunAngle), 1e-6);
+    float disc = 1.0 - smoothstep(uSunSize - edge, uSunSize + edge, sunAngle);
+    float r = min(sunAngle / uSunSize, 1.0);
+    float limb = 1.0 - 0.6 * (1.0 - sqrt(1.0 - r * r));
+    vec3 sunContrib = uSunColor * (SUN_RADIANCE * disc * limb);
 
-    // Bright disc core.
-    float sunDisc = smoothstep(uSunSize, uSunSize * 0.8, sunAngle);
-
-    // Layered glare: a tight bright inner bloom + a wide soft halo, both falling off radially from
-    // the disc. Gives the sun a photographic glare instead of a flat disc.
-    float inner = smoothstep(uSunSize * 6.0, uSunSize, sunAngle);
-    inner = pow(inner, 2.5);
-    float halo = smoothstep(uSunSize * 24.0, uSunSize, sunAngle);
-    halo = pow(halo, 3.0);
-
-    vec3 sunContrib = uSunColor * (sunDisc * 3.0 + inner * 0.9 + halo * 0.25);
-
-    // Combine everything
     vec3 finalColor = spaceColor + stars + sunContrib;
-
-    // Subtle HDR-like glow for bright areas
-    float luminance = dot(finalColor, vec3(0.299, 0.587, 0.114));
-    if (luminance > 1.0)
-    {
-        finalColor = finalColor / luminance * (1.0 + (luminance - 1.0) * 0.5);
-    }
 
     FragColor = vec4(finalColor, 1.0);
 }

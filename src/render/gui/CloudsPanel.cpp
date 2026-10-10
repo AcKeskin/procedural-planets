@@ -6,7 +6,7 @@
 namespace planets::render
 {
 
-void CloudsPanel::Draw(effects::CloudSettings& settings, bool& visible)
+void CloudsPanel::Draw(effects::CloudSettings& settings, bool atmosphereOn, bool& visible)
 {
     if (!visible)
         return;
@@ -14,7 +14,9 @@ void CloudsPanel::Draw(effects::CloudSettings& settings, bool& visible)
     ImGui::Begin("Clouds", &visible);
     PushLabelColumn();
 
+    ImGui::BeginDisabled(!atmosphereOn);
     ImGui::Checkbox("Enable Clouds", &settings.enabled);
+    ImGui::SetItemTooltip(atmosphereOn ? "Show the cloud layer" : "Clouds are part of the atmosphere: enable the atmosphere to show them");
     if (settings.enabled)
     {
         ImGui::Separator();
@@ -31,6 +33,7 @@ void CloudsPanel::Draw(effects::CloudSettings& settings, bool& visible)
         ImGui::SetItemTooltip("How much clouds darken the ground below");
         ImGui::ColorEdit3("Color", &settings.color.x);
     }
+    ImGui::EndDisabled();
 
     ImGui::PopItemWidth();
     ImGui::End();
