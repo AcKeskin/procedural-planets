@@ -5,6 +5,7 @@
 #include "lod/SpherePatch.h"
 #include <planetgen/planetgen.h>
 #include <glm/glm.hpp>
+#include <unordered_set>
 #include <vector>
 #include <memory>
 #include <cstdint>
@@ -83,6 +84,11 @@ public:
 
     // Cancel all pending and in-flight work (before tree rebuild)
     void CancelAll();
+
+    // Drop queued, in-flight and completed work aimed at these nodes (they are about to be
+    // destroyed by a merge). In-flight GPU buffers are released; GL defers the delete until the
+    // dispatch that writes them is done.
+    void Cancel(const std::unordered_set<const lod::QuadTreeNode*>& targets);
 
     bool HasPendingWork() const;
     int GetPendingCount() const { return static_cast<int>(_pending.size()); }

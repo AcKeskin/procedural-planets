@@ -135,12 +135,29 @@ void PlanetQuadTree::ApplyCompletedPatches()
         return;
 
     auto completed = _scheduler->TakeCompleted();
+
+    // Nodes destroyed by a merge earlier in this batch; their results must not be applied.
+    std::unordered_set<const QuadTreeNode*> destroyed;
+
     for (auto& result : completed)
     {
+        if (destroyed.count(result.targetNode) != 0)
+            continue;
+
         _pendingNodes.erase(result.targetNode);
 
         if (result.type == GenerationType::Merge)
         {
+            // A merge destroys the whole subtree, including descendants whose own generation is
+            // still queued or in flight (a child split, or a grandchild born while this merge was
+            // pending). Drop that work now, or its result would land on a freed node.
+            std::unordered_set<const QuadTreeNode*> subtree;
+            CollectDescendants(*result.targetNode, subtree);
+            _scheduler->Cancel(subtree);
+            for (const QuadTreeNode* node : subtree)
+                _pendingNodes.erase(node);
+            destroyed.insert(subtree.begin(), subtree.end());
+
             // Release children's patches before merging
             for (int i = 0; i < 4; ++i)
             {
@@ -283,6 +300,18 @@ void PlanetQuadTree::EnqueueGeneration(QuadTreeNode& node, GenerationType type)
     request.priority = distance;
 
     _scheduler->Enqueue(std::move(request));
+}
+
+void PlanetQuadTree::CollectDescendants(const QuadTreeNode& node, std::unordered_set<const QuadTreeNode*>& out)
+{
+    for (int i = 0; i < 4; ++i)
+    {
+        const QuadTreeNode* child = node.GetChild(i);
+        if (!child)
+            continue;
+        out.insert(child);
+        CollectDescendants(*child, out);
+    }
 }
 
 bool PlanetQuadTree::IsPending(const QuadTreeNode* node) const
