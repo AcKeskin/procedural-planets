@@ -16,5 +16,10 @@ vec3 tonemap(vec3 hdr)
     if (peak <= TONEMAP_KNEE)
         return c;
     float shoulder = TONEMAP_KNEE + (1.0 - TONEMAP_KNEE) * (1.0 - exp(-(peak - TONEMAP_KNEE) / (1.0 - TONEMAP_KNEE)));
-    return c * (shoulder / peak);
+    // Near-neutral light over-exposed in every channel (sunlit cloud, snow, the high sun) burns to
+    // white like film; a saturated highlight (a sunset, the low sun) keeps its hue.
+    float dimmest = min(c.r, min(c.g, c.b));
+    float neutral = smoothstep(0.4, 0.8, dimmest / peak);
+    float burn = (1.0 - exp(-3.0 * max(dimmest - TONEMAP_KNEE, 0.0))) * neutral;
+    return mix(c * (shoulder / peak), vec3(shoulder), burn);
 }
