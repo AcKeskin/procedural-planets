@@ -57,34 +57,74 @@ vec2 skyOpticalDepth(vec3 rayOrigin, vec3 rayDir, float rayLength, int samples)
     return depth;
 }
 
+// Phase functions, scaled so their average over the sphere is 1 (uIntensity keeps its meaning).
+const float SKY_MIE_G = 0.76; // forward lobe of haze: the bright halo around the sun
+
+float skyRayleighPhase(float cosTheta)
+{
+    return 0.75 * (1.0 + cosTheta * cosTheta);
+}
+
+float skyMiePhase(float cosTheta)
+{
+    float g2 = SKY_MIE_G * SKY_MIE_G;
+    return (1.0 - g2) / pow(1.0 + g2 - 2.0 * SKY_MIE_G * cosTheta, 1.5);
+}
+
+// Per-channel extinction for a (Rayleigh, Mie) optical depth.
+vec3 skyTransmittance(vec2 opticalDepth)
+{
+    return exp(-opticalDepth.x * uScatteringCoefficients - opticalDepth.y * uMieCoefficient);
+}
+
+// 1 where the sun is above the local horizon of p, 0 where the planet blocks it. The narrow soft
+// edge keeps the earth shadow in the sky from stepping between the few view samples.
+float skySunVisibility(vec3 p, vec3 sunDir)
+{
+    vec3 offset = p - uPlanetCenter;
+    float along = dot(offset, sunDir);
+    if (along >= 0.0)
+        return 1.0;
+    float closest = length(offset - sunDir * along);
+    float edge = (uAtmosphereRadius - uPlanetRadius) * 0.05;
+    return smoothstep(uPlanetRadius - edge, uPlanetRadius + edge, closest);
+}
+
 struct SkyScatter
 {
     vec3 inScatter;           // light scattered toward the viewer along the ray
-    vec2 viewOpticalDepth;    // (Rayleigh, Mie) along the ray, for dimming what lies behind it
+    vec3 transmittance;       // per-channel extinction along the ray, for what lies behind it
 };
 
-// In-scatter along a ray segment inside the atmosphere. sunDir points toward the sun.
+// Single scattering along a ray segment inside the atmosphere. sunDir points toward the sun. Each
+// sample reads its own sun path, so low sun reddens the sky near the sun and nowhere else.
 SkyScatter skyScatter(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 sunDir, int viewSamples, int sunSamples)
 {
     vec3 inScatterPoint = rayOrigin;
     float stepSize = rayLength / float(viewSamples - 1);
-    vec3 inScattered = vec3(0.0);
+    vec3 rayleigh = vec3(0.0);
+    vec3 mie = vec3(0.0);
     vec2 viewOpticalDepth = vec2(0.0);
 
     for (int i = 0; i < viewSamples; i++)
     {
-        float sunRayLength = skyRaySphere(uPlanetCenter, uAtmosphereRadius, inScatterPoint, sunDir).y;
-        vec2 sunRayOpticalDepth = skyOpticalDepth(inScatterPoint, sunDir, sunRayLength, sunSamples);
-
         vec2 localDensity = skyDensity(inScatterPoint);
         viewOpticalDepth += localDensity * stepSize;
 
-        vec3 transmittance = exp(-(sunRayOpticalDepth.x + viewOpticalDepth.x) * uScatteringCoefficients
-                                - (sunRayOpticalDepth.y + viewOpticalDepth.y) * uMieCoefficient);
-
-        inScattered += localDensity.x * transmittance;
+        float visibility = skySunVisibility(inScatterPoint, sunDir);
+        if (visibility > 0.0)
+        {
+            float sunRayLength = skyRaySphere(uPlanetCenter, uAtmosphereRadius, inScatterPoint, sunDir).y;
+            vec2 sunRayOpticalDepth = skyOpticalDepth(inScatterPoint, sunDir, sunRayLength, sunSamples);
+            vec3 transmittance = skyTransmittance(sunRayOpticalDepth + viewOpticalDepth) * visibility;
+            rayleigh += localDensity.x * transmittance;
+            mie += localDensity.y * transmittance;
+        }
         inScatterPoint += rayDir * stepSize;
     }
 
-    return SkyScatter(inScattered * uScatteringCoefficients * uIntensity * stepSize, viewOpticalDepth);
+    float cosTheta = dot(rayDir, sunDir);
+    vec3 inScatter = rayleigh * uScatteringCoefficients * skyRayleighPhase(cosTheta)
+                   + mie * uMieCoefficient * skyMiePhase(cosTheta);
+    return SkyScatter(inScatter * uIntensity * stepSize, skyTransmittance(viewOpticalDepth));
 }

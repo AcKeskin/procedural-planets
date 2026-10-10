@@ -17,9 +17,9 @@ struct AtmosphereSettings
     float scatteringStrength = 8.0f;
     float densityFalloff = 4.5f;
 
-    // Mie scattering (contributes to extinction, not in-scattering color)
-    float mieCoefficient = 0.005f;
-    float mieDensityFalloff = 4.0f;
+    // Mie scattering: haze near the ground, grey extinction plus the forward halo around the sun
+    float mieCoefficient = 0.8f;
+    float mieDensityFalloff = 12.0f;
 
     int numInScatteringPoints = 10;
     int numOpticalDepthPoints = 10;
