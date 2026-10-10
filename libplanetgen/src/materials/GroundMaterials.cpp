@@ -201,9 +201,11 @@ Texel Soil(float u, float v, uint32_t s)
     float crack = (1.0f - SmoothStep(0.0f, 0.04f, mud.edge)) * SmoothStep(0.4f, 0.7f, mud.id);
     float plate = PeriodicFbm(u, v, 8, 4, s + 2u);
     Cell pebble = PeriodicCells(u, v, 48, s + 3u);
-    float stone = (1.0f - SmoothStep(0.15f, 0.3f, pebble.f1)) * (pebble.id > 0.7f ? 1.0f : 0.0f);
+    // Few pebbles, close to the soil colour: many grey ones read as polka dots once the shader
+    // multiplies them into a brown biome.
+    float stone = (1.0f - SmoothStep(0.12f, 0.25f, pebble.f1)) * (pebble.id > 0.88f ? 0.6f : 0.0f);
     float height = Clamp01(0.6f * plate + 0.3f * mud.id + 0.3f * stone - 0.5f * crack);
-    Rgb dry{0.45f, 0.36f, 0.26f}, dark{0.30f, 0.23f, 0.16f}, gravel{0.50f, 0.48f, 0.44f};
+    Rgb dry{0.45f, 0.36f, 0.26f}, dark{0.30f, 0.23f, 0.16f}, gravel{0.50f, 0.42f, 0.33f};
     Rgb color = Mix(dark, dry, Clamp01(plate * 0.8f + mud.id * 0.3f));
     color = Mix(color, gravel, stone);
     color = Scale(color, 1.0f - 0.25f * crack);
