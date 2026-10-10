@@ -45,11 +45,13 @@ public:
                 float exposure,
                 uint32_t bloomTexture,
                 float bloomStrength,
+                uint32_t cloudTexture,
                 const AtmosphereSettings& settings,
                 unsigned int sceneTexture,
                 unsigned int depthTexture);
 
     bool IsReady() const { return _initialized; }
+    uint32_t BlueNoiseTexture() const { return _blueNoiseTexture; }
 
 private:
     void CreateFullscreenQuad();

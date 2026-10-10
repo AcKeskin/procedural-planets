@@ -224,7 +224,8 @@ const std::unordered_map<std::string, Entry>& Table()
         {"clouds.density", {false, SET_FLOAT(t.clouds->density)}},
         {"clouds.speed", {false, SET_FLOAT(t.clouds->speed)}},
         {"clouds.scale", {false, SET_FLOAT(t.clouds->scale)}},
-        {"clouds.color", {false, SET_VEC3(t.clouds->color)}},
+        {"clouds.thickness", {false, SET_FLOAT(t.clouds->thickness)}},
+        {"clouds.viewSteps", {false, SET_INT(t.clouds->viewSteps)}},
         {"clouds.shadowStrength", {false, SET_FLOAT(t.clouds->shadowStrength)}},
 
         // ---- sea level (real-time) ----

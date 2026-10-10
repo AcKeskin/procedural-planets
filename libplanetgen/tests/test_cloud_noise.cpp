@@ -64,22 +64,25 @@ TEST_CASE("cloud_noise: shape noise spans a usable range", "[cloud_noise]")
     CHECK(hi - lo > 120);
 }
 
-TEST_CASE("cloud_noise: weather is deterministic, has clear and cloudy regions", "[cloud_noise]")
+TEST_CASE("cloud_noise: weather is deterministic and its coverage is spread evenly", "[cloud_noise]")
 {
     const int f = 32;
     auto w = planetgen::GenerateCloudWeather(3u, f);
     REQUIRE(w.size() == static_cast<size_t>(6) * f * f * 2);
     CHECK(w == planetgen::GenerateCloudWeather(3u, f));
 
-    size_t clear = 0, cloudy = 0;
+    // Equalized coverage: about half the sphere is below the midpoint, a fifth in each fifth.
+    size_t below = 0, low = 0, high = 0;
     for (size_t i = 0; i < w.size(); i += 2)
     {
-        clear += w[i] < 20;
-        cloudy += w[i] > 160;
+        below += w[i] < 128;
+        low += w[i] < 51;
+        high += w[i] >= 204;
     }
-    const size_t texels = w.size() / 2;
-    CHECK(clear > texels / 10);
-    CHECK(cloudy > texels / 20);
+    const double texels = static_cast<double>(w.size() / 2);
+    CHECK(std::abs(below / texels - 0.5) < 0.02);
+    CHECK(std::abs(low / texels - 0.2) < 0.02);
+    CHECK(std::abs(high / texels - 0.2) < 0.02);
 }
 
 TEST_CASE("cloud_noise: weather texel directions match the GL cube map faces", "[cloud_noise]")

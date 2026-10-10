@@ -193,6 +193,7 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
                                 float exposure,
                                 uint32_t bloomTexture,
                                 float bloomStrength,
+                                uint32_t cloudTexture,
                                 const AtmosphereSettings& settings,
                                 unsigned int sceneTexture,
                                 unsigned int depthTexture)
@@ -220,6 +221,9 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
     _atmosphereShader.SetFloat("uBloomStrength", bloomStrength);
     _atmosphereShader.SetInt("uBloomTexture", 3);
     glBindTextureUnit(3, bloomTexture);
+    _atmosphereShader.SetInt("uCloudsOn", cloudTexture != 0 ? 1 : 0);
+    _atmosphereShader.SetInt("uCloudTexture", 5);
+    glBindTextureUnit(5, cloudTexture);
 
     _atmosphereShader.SetInt("uNumInScatteringPoints", settings.numInScatteringPoints);
     _atmosphereShader.SetInt("uNumOpticalDepthPoints", settings.numOpticalDepthPoints);

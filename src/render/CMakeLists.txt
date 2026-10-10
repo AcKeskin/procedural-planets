@@ -27,7 +27,7 @@ add_library(render STATIC
     lod/SharedPatchTopology.cpp
     effects/OceanRenderer.cpp
     effects/AtmosphereRenderer.cpp
-    effects/CloudRenderer.cpp
+    effects/CloudVolume.cpp
     effects/BloomPass.cpp
     effects/GroundTextures.cpp
     cinematic/CinematicController.cpp

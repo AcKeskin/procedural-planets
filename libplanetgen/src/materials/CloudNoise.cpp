@@ -173,15 +173,22 @@ float ValueNoise(float x, float y, float z, uint32_t salt)
     return y0 + (y1 - y0) * fz;
 }
 
+// Each octave is rotated, so value-noise cells never line up into rectangles.
 float ValueFbm(float x, float y, float z, int octaves, uint32_t salt)
 {
-    float sum = 0.0f, amp = 0.5f, norm = 0.0f, f = 1.0f;
+    float sum = 0.0f, amp = 0.5f, norm = 0.0f;
     for (int i = 0; i < octaves; ++i)
     {
-        sum += amp * ValueNoise(x * f, y * f, z * f, salt + i * 17u);
+        sum += amp * ValueNoise(x, y, z, salt + i * 17u);
         norm += amp;
         amp *= 0.5f;
-        f *= 2.03f;
+        // Rotation by a fixed orthonormal matrix, times the lacunarity.
+        const float nx = 0.00f * x + 0.80f * y + 0.60f * z;
+        const float ny = -0.80f * x + 0.36f * y - 0.48f * z;
+        const float nz = -0.60f * x - 0.48f * y + 0.64f * z;
+        x = nx * 2.03f;
+        y = ny * 2.03f;
+        z = nz * 2.03f;
     }
     return sum / norm;
 }
@@ -235,6 +242,7 @@ std::vector<uint8_t> GenerateCloudWeather(uint32_t seed, int faceSize)
     CheckSize(faceSize, 16);
     const uint32_t s = seed * 3266489917u + 47u;
     std::vector<uint8_t> out(static_cast<size_t>(6) * faceSize * faceSize * 2);
+    std::vector<float> raw(static_cast<size_t>(6) * faceSize * faceSize);
     std::vector<std::thread> workers;
     for (int face = 0; face < 6; ++face)
     {
@@ -256,14 +264,24 @@ std::vector<uint8_t> GenerateCloudWeather(uint32_t seed, int faceSize)
                         float fields = ValueFbm(px * 9.0f, py * 9.0f, pz * 9.0f, 4, s + 20u);
                         float coverage = Clamp01((systems - 0.3f) * 2.2f) * Clamp01(fields * 1.6f - 0.15f);
                         float type = Clamp01((ValueFbm(px * 3.0f, py * 3.0f, pz * 3.0f, 3, s + 30u) - 0.35f) * 3.0f);
-                        size_t i = ((static_cast<size_t>(face) * faceSize + y) * faceSize + x) * 2;
-                        out[i + 0] = static_cast<uint8_t>(std::lround(Clamp01(coverage) * 255.0f));
-                        out[i + 1] = static_cast<uint8_t>(std::lround(type * 255.0f));
+                        size_t i = (static_cast<size_t>(face) * faceSize + y) * faceSize + x;
+                        raw[i] = coverage;
+                        out[i * 2 + 1] = static_cast<uint8_t>(std::lround(type * 255.0f));
                     }
             });
     }
     for (auto& w : workers)
         w.join();
+
+    // Equalize coverage by rank, so it is spread evenly over [0, 1] and the coverage setting maps
+    // straight to the cloudy fraction of the sphere. Ties keep their index order: deterministic.
+    std::vector<uint32_t> order(raw.size());
+    for (uint32_t i = 0; i < order.size(); ++i)
+        order[i] = i;
+    std::stable_sort(order.begin(), order.end(), [&](uint32_t a, uint32_t b) { return raw[a] < raw[b]; });
+    const float last = static_cast<float>(order.size() - 1);
+    for (size_t rank = 0; rank < order.size(); ++rank)
+        out[static_cast<size_t>(order[rank]) * 2] = static_cast<uint8_t>(std::lround(rank / last * 255.0f));
     return out;
 }
 

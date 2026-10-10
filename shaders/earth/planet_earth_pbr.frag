@@ -8,10 +8,10 @@
 // (uShore*, uFlat*, ...) are simply not declared; SetRenderUniforms' extra sets no-op.
 
 // lighting.glsl → calcFresnel, applyHaze, calcSphericalAO, calcDistanceRadii
-// clouds.glsl → cloudCoverage: soft shadow that matches the cloud shell
+// cloud_layer.glsl → cloudColumn: soft shadow from the same weather as the drawn clouds
 #include "math.glsl"
 #include "lighting.glsl"
-#include "clouds.glsl"
+#include "cloud_layer.glsl"
 #include "pbr.glsl"
 #include "ground_material.glsl"
 #include "biome_palette.glsl"
@@ -29,12 +29,7 @@ uniform float uTerminatorSoftness; // half-width of the soft day/night band (0 =
 uniform float uNightLightStrength; // emissive city lights on the night side (0 = off)
 
 // Cloud shadow: sample the shared coverage field along the sun so shadows track the visible clouds.
-uniform float uCloudScale;
-uniform float uCloudCoverage;
-uniform float uCloudSpeed;
-uniform float uCloudTime;
 uniform float uCloudShadowStrength;
-uniform float uCloudAltitude;
 
 uniform vec3  uCameraPos;
 uniform float uSeaLevel;
@@ -302,11 +297,12 @@ void main()
     float day = dayFactor(sphereNormal, lightDir, uTerminatorSoftness);
     vec3 sunRadiance = duskSunColor(uSunColor, day) * uSunIntensity;
 
-    // Soft cloud shadow: sample the shared coverage field where this fragment's sun ray crosses the
-    // cloud shell (surface direction pushed toward the sun), and dim the direct light. Only on the
-    // lit side (× day), gated by uCloudShadowStrength (0 when clouds are off).
-    vec3 shadowDir = normalize(sphereNormal + lightDir * uCloudAltitude * 6.0);
-    float cloudShadow = cloudCoverage(shadowDir, uCloudScale, uCloudCoverage, uCloudSpeed, uCloudTime);
+    // Soft cloud shadow: the cloud column where this fragment's sun ray crosses the middle of the
+    // cloud layer, from the same weather the clouds are marched with. Only on the lit side (x day),
+    // gated by uCloudShadowStrength (0 when clouds are off).
+    float layerHeight = 0.5 * (uCloudBaseRadius + uCloudTopRadius) / uCloudPlanetRadius - 1.0;
+    vec3 shadowDir = normalize(sphereNormal + lightDir * layerHeight / max(dot(sphereNormal, lightDir), 0.25));
+    float cloudShadow = smoothstep(0.0, 0.6, cloudColumn(shadowDir));
     sunRadiance *= 1.0 - cloudShadow * uCloudShadowStrength * day;
 
     vec3 lit = cookTorrance(mat.albedo, 0.0, roughness, N, viewDir, lightDir, sunRadiance);

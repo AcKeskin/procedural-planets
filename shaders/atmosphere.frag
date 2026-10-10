@@ -11,6 +11,8 @@ out vec4 outColor;
 uniform sampler2D uSceneTexture;
 uniform sampler2D uDepthTexture;
 uniform sampler2D uBlueNoise;
+uniform sampler2D uCloudTexture; // half-res cloud march: rgb light, a transmittance
+uniform int uCloudsOn;
 
 uniform float uDitherStrength;
 uniform float uDitherScale;
@@ -70,6 +72,12 @@ void main()
 {
     // Bloom joins the scene before the composite, so the sun glow is reddened with the disc.
     vec3 originalColor = texture(uSceneTexture, vUv).rgb + bloom(vUv);
+    // Clouds sit in front of what lies behind them; the haze below then covers both.
+    if (uCloudsOn != 0)
+    {
+        vec4 cloud = texture(uCloudTexture, vUv);
+        originalColor = originalColor * cloud.a + cloud.rgb;
+    }
     float depthSample = texture(uDepthTexture, vUv).r;
 
     vec3 rayDir = getViewRay(vUv);
