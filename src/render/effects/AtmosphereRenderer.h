@@ -12,7 +12,8 @@ namespace planets::render::effects
 void SetSkyUniforms(const Shader& shader,
                     const AtmosphereSettings& settings,
                     const glm::vec3& planetCenter,
-                    float planetRadius);
+                    float planetRadius,
+                    float groundRadius);
 
 // Post-process atmosphere renderer using raymarching
 class AtmosphereRenderer

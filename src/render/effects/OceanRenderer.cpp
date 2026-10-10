@@ -41,7 +41,8 @@ void OceanRenderer::Render(const OceanFrame& frame, const OceanSettings& setting
     const bool atmosphereOn = frame.atmosphere && frame.atmosphere->enabled;
     _oceanShader.SetInt("uAtmosphereOn", atmosphereOn ? 1 : 0);
     if (atmosphereOn)
-        SetSkyUniforms(_oceanShader, *frame.atmosphere, glm::vec3(0.0f), frame.planetRadius);
+        SetSkyUniforms(
+            _oceanShader, *frame.atmosphere, glm::vec3(0.0f), frame.planetRadius, frame.planetRadius * frame.seaLevel);
     _oceanShader.SetVec3("uDeepColor", settings.deepColor);
     _oceanShader.SetVec3("uShallowColor", settings.shallowColor);
     _oceanShader.SetFloat("uClarity", settings.clarity);

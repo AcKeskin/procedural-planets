@@ -4,6 +4,7 @@
 
 uniform vec3 uPlanetCenter;
 uniform float uPlanetRadius;
+uniform float uGroundRadius;          // the sphere that casts the earth shadow: sea level, or the planet radius
 uniform float uAtmosphereRadius;
 uniform vec3 uScatteringCoefficients; // Rayleigh, per world unit
 uniform float uDensityFalloff;
@@ -88,7 +89,7 @@ float skySunVisibility(vec3 p, vec3 sunDir)
     vec3 offset = p - uPlanetCenter;
     float r = length(offset);
     float sunHeight = dot(offset / r, sunDir);
-    float ratio = min(uPlanetRadius / r, 1.0);
+    float ratio = min(uGroundRadius / r, 1.0);
     float horizon = -sqrt(1.0 - ratio * ratio);
     return smoothstep(horizon - 0.04, horizon + 0.04, sunHeight);
 }

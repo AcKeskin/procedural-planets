@@ -28,10 +28,14 @@ constexpr float RayleighPower = 4.0f;
 void SetSkyUniforms(const Shader& shader,
                     const AtmosphereSettings& settings,
                     const glm::vec3& planetCenter,
-                    float planetRadius)
+                    float planetRadius,
+                    float groundRadius)
 {
     shader.SetVec3("uPlanetCenter", planetCenter);
     shader.SetFloat("uPlanetRadius", planetRadius);
+    // The shadow edge must sit on what is drawn. Against the bare planet radius above a lower sea,
+    // air between the two cut a line into the sky just over the horizon.
+    shader.SetFloat("uGroundRadius", groundRadius > 0.0f ? groundRadius : planetRadius);
     shader.SetFloat("uAtmosphereRadius", planetRadius * (1.0f + settings.atmosphereScale));
 
     // Optical depth accumulates in world units (∝ planetRadius), so every extinction coefficient is
@@ -207,7 +211,7 @@ void AtmosphereRenderer::Render(const glm::mat4& view,
     _atmosphereShader.SetVec3("uLightDir", glm::normalize(lightDir));
     _atmosphereShader.SetVec3("uSunColor", sunColor);
 
-    SetSkyUniforms(_atmosphereShader, settings, planetCenter, planetRadius);
+    SetSkyUniforms(_atmosphereShader, settings, planetCenter, planetRadius, oceanRadius);
     _atmosphereShader.SetFloat("uOceanRadius", oceanRadius);
 
     _atmosphereShader.SetFloat("uNearPlane", nearPlane);
