@@ -24,6 +24,7 @@ enum class BuiltinProgram : int
     MacroFill = 10,
     MacroRivers = 11,
     MacroClimate = 12,
+    HeightMacro = 13,
 };
 
 // Converts a BuiltinProgram id to its canonical string key
@@ -44,9 +45,14 @@ inline std::string BuiltinKey(BuiltinProgram id)
     case BuiltinProgram::MacroFill:            return "__builtin_macro_fill";
     case BuiltinProgram::MacroRivers:          return "__builtin_macro_rivers";
     case BuiltinProgram::MacroClimate:         return "__builtin_macro_climate";
+    case BuiltinProgram::HeightMacro:          return "__builtin_height_macro";
     }
     return "";
 }
+
+// Returns `source` with `#define <name> 1` inserted after its #version line, for
+// compiling a feature variant of a built-in shader.
+std::string WithDefine(const std::string& source, const std::string& name);
 
 // Maps string keys to compiled GL program handles.
 // Programs are compiled once and cached; never re-compiled unless Unregister is called.

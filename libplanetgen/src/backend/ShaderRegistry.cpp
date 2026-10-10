@@ -4,6 +4,15 @@
 namespace planetgen
 {
 
+std::string WithDefine(const std::string& source, const std::string& name)
+{
+    const size_t lineEnd = source.find('\n');
+    const std::string define = "#define " + name + " 1\n";
+    if (lineEnd == std::string::npos)
+        return source + "\n" + define;
+    return source.substr(0, lineEnd + 1) + define + source.substr(lineEnd + 1);
+}
+
 ShaderRegistry::~ShaderRegistry()
 {
     Clear();

@@ -2,6 +2,7 @@
 #include "StrategyCommon.h"
 #include "../backend/ParamBlocks.h"
 #include "../backend/ParamMappers.h"
+#include "MacroWorldPass.h"
 
 namespace planetgen
 {
@@ -18,7 +19,9 @@ HeightBuffers HeightStrategy::Run(const StrategyContext& sc,
 {
     auto& gpu = sc.backend;
 
-    const uint32_t program = sc.registry.Resolve(BuiltinProgram::Height);
+    // The macro layer has its own program variant (see height_earth.comp).
+    const uint32_t program = sc.registry.Resolve(sc.macroField != 0 ? BuiltinProgram::HeightMacro
+                                                                     : BuiltinProgram::Height);
     if (!program)
         return {};
 
@@ -43,6 +46,10 @@ HeightBuffers HeightStrategy::Run(const StrategyContext& sc,
         gpu.BindTexture3D(sc.continentMask, kContinentMaskSamplerUnit);
         params.continentMaskAvailable = 1;
     }
+
+    // Macro world field: sampled by direction as the base elevation.
+    if (sc.macroField != 0)
+        gpu.BindTexture2DArray(sc.macroField, kMacroFieldSamplerUnit);
 
     const GpuBufferHandle ubo = gpu.CreateParamBuffer(sizeof(params));
     gpu.SetParams(ubo, &params, sizeof(params), kParamBinding);
