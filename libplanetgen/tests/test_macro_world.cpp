@@ -318,10 +318,11 @@ struct MaskHolder
 
 TEST_CASE("macro_world off: Earth output matches the pre-macro baseline", "[gpu][macro_world]")
 {
-    // Dev-GPU baseline, recorded before any macro consumer existed. With the layer
-    // off the height + shading output must stay byte-identical to it. A different
-    // GPU/driver can legitimately produce other bits; re-record there.
-    constexpr uint64_t kBaseline = 0xa21bec17651a82baull;
+    // Dev-GPU baseline. With the layer off the height + shading output must stay
+    // byte-identical to it. Re-recorded when ground v1 added the fine relief octaves
+    // and the finer Earth normal step. A different GPU/driver can legitimately produce
+    // other bits; re-record there.
+    constexpr uint64_t kBaseline = 0xa61191d16333f5a6ull;
 
     PgContext ctx = MakeHeadlessCtx();
     REQUIRE(ctx != nullptr);

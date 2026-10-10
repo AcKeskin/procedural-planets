@@ -646,6 +646,16 @@ float evaluateHeight(vec3 dir)
     float detailGain = mix(0.5, 1.0, rangeMask); // rockier in ranges, gentler on plains
     float fineDetail = surfaceDetail * surfaceDetailStrength * detailGain;
 
+    // Fine ground relief, the same at every LOD depth: heights must stay a pure function of
+    // direction, or patches of different depth disagree on their shared edge. Deep patches
+    // resolve it as real shape, coarse ones average it out. Persistence 0.4 makes each finer
+    // octave a little less steep, so octaves a coarse mesh undersamples add little normal noise.
+    // The finest octave (~7400 per unit) is what earth.json's normalEpsilon is sized to resolve.
+    const float fineReliefScale    = 700.0;
+    const float fineReliefStrength = 0.003;
+    fineDetail += fbm(dir, vec3(7272.0), 4, fineReliefScale * globalFrequency, 0.4, 2.2, 1.0, seed + 75u)
+                * fineReliefStrength * detailGain;
+
     float landRelief = (plains + hills + rangeRelief * rangeStrength * rangeMask + fineDetail) * landMask;
 
     // The tectonic `ridges` term is a SECOND mountain system (plate-boundary uplift). Keep it as
