@@ -265,9 +265,6 @@ CaptureRequest CaptureRequest::Parse(int argc, char** argv)
         }
     }
 
-    if (req.enabled && req.body != "earth")
-        std::cerr << "[Capture] Body '" << req.body << "' not wired; falling back to earth." << std::endl;
-
     return req;
 }
 

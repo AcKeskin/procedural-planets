@@ -12,6 +12,7 @@
 #include "gui/AtmospherePanel.h"
 #include "gui/DebugPanel.h"
 #include "gui/CloudsPanel.h"
+#include "types/BodyRegistry.h"
 #include "settings/SceneSettings.h"
 #include "settings/TerrainSettings.h"
 #include "settings/OceanSettings.h"
@@ -124,6 +125,8 @@ private:
 
     // Load a BodyConfig from data/bodies/<name>.json and switch to it
     void SwitchBody(planetgen::BodyConfig config);
+    // Switches to a planet type from the registry; false (and a log line) when the id is unknown.
+    bool SwitchBodyById(const std::string& id);
 
     // Load a BodyConfig from a path (file-scoped helper made reachable for the runner).
     planetgen::BodyConfig LoadBodyConfigPublic(const std::string& path);
@@ -179,7 +182,9 @@ private:
     std::unique_ptr<pg::Context> _libContext;
     pg::Body _libBody;
 
-    int _selectedBodyType = 0; // GUI selector index
+    std::vector<render::types::BodyEntry> _bodies; // planet types found in data/bodies
+    int _selectedBodyType = 0;                     // index into _bodies
+    std::string _activeBodyId;                     // registry id of the active body
 
     // Frame state
     float _lastTime;

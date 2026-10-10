@@ -30,9 +30,6 @@ planetgen::BodyConfig LoadBodyConfig(const std::string& path)
     return cfg;
 }
 
-// Sync application-owned Earth GUI settings into the body's BodyConfig.
-// Earth is identified by typeName == "earth".
-
 } // namespace
 
 Application::Application()
@@ -96,9 +93,10 @@ bool Application::Initialize()
         ApplyCaptureExposure();
     }
 
-    // Load earth body from JSON and initialize
-    auto earthCfg = LoadBodyConfig("data/bodies/earth.json");
-    SwitchBody(std::move(earthCfg));
+    // Planet types are the JSON files in data/bodies; start on the requested one (Earth by default).
+    _bodies = render::types::ScanBodies("data/bodies");
+    if (!SwitchBodyById(_capture.body) && !SwitchBodyById("earth") && !_bodies.empty())
+        SwitchBodyById(_bodies.front().id);
 
     // Initial generation (LOD-only; GPU is a hard requirement)
     RegenerateLodSystem();
@@ -329,10 +327,8 @@ bool Application::RunGenerationShowcase(const CaptureRequest& request)
     const int planets = (std::max)(1, _capture.planets);
     const int hold = (std::max)(1, _capture.holdFrames);
 
-    // Cycle the three body types for visual contrast (blue earth / red volcanic /
-    // crystalline), randomizing earth segments for extra variety.
-    static const char* bodyPaths[] = {
-        "data/bodies/earth.json", "data/bodies/volcanic.json", "data/bodies/crystalline.json"};
+    // Cycle through every planet type for visual contrast.
+    const int typeCount = (std::max)(1, static_cast<int>(_bodies.size()));
 
     char path[512];
     int written = 0;
@@ -342,13 +338,13 @@ bool Application::RunGenerationShowcase(const CaptureRequest& request)
         // Each segment: switch to the next body type. Earth segments get randomized for
         // variety; volcanic/crystalline keep their authored identity. SwitchBody resets
         // the camera + radius, so re-seat the orbit afterwards.
-        const int type = p % 3;
+        const int type = p % typeCount;
         // Earth segments use the authored earth.json with a stepped seed (reliably
         // land-facing, like the hero still). Volcanic/crystalline keep their identity.
         // Random earths placed their land on the back/poles too often to use here.
         if (type == 0)
             _genConfig.seed = _capture.seed + static_cast<uint32_t>(p);
-        SwitchBody(LoadBodyConfig(bodyPaths[type]));
+        SwitchBodyById(_bodies.empty() ? "earth" : _bodies[type].id);
 
         ApplyCaptureExposure();
         StartCinematic(); // re-seat orbit target/distance for the new radius
@@ -424,8 +420,8 @@ bool Application::RunScript(const CaptureRequest& request)
         return false;
     }
 
-    if (timeline->hasBody && _capture.body != "earth")
-        SwitchBody(LoadBodyConfig("data/bodies/" + _capture.body + ".json"));
+    if (timeline->hasBody && _capture.body != _activeBodyId)
+        SwitchBodyById(_capture.body);
 
     // Initial settle so the first command runs against a fully-generated planet.
     if (!DrainGeneration(_capture.frames, AppDefaults::CaptureDrainMaxFrames))
@@ -651,27 +647,17 @@ void Application::RenderGui()
         // Body type selector
         if (ImGui::Begin("Body Type", nullptr, ImGuiWindowFlags_NoCollapse))
         {
-            const char* bodyTypes[] = {"Earth", "Volcanic World", "Crystalline World"};
-            int prevSelected = _selectedBodyType;
-            ImGui::Combo("Type", &_selectedBodyType, bodyTypes, IM_ARRAYSIZE(bodyTypes));
-
-            if (_selectedBodyType != prevSelected)
+            const char* preview = _bodies.empty() ? "" : _bodies[_selectedBodyType].name.c_str();
+            if (ImGui::BeginCombo("Type", preview))
             {
-                planetgen::BodyConfig newCfg;
-                switch (_selectedBodyType)
+                for (int i = 0; i < static_cast<int>(_bodies.size()); ++i)
                 {
-                case 0:
-                    newCfg = LoadBodyConfig("data/bodies/earth.json");
-                    break;
-                case 1:
-                    newCfg = LoadBodyConfig("data/bodies/volcanic.json");
-                    break;
-                case 2:
-                    newCfg = LoadBodyConfig("data/bodies/crystalline.json");
-                    break;
+                    if (ImGui::Selectable(_bodies[i].name.c_str(), i == _selectedBodyType) && i != _selectedBodyType)
+                        SwitchBodyById(_bodies[i].id);
                 }
-                SwitchBody(std::move(newCfg));
+                ImGui::EndCombo();
             }
+            ImGui::SetItemTooltip("Planet types are the JSON files in data/bodies");
 
             if (_activeBody)
                 ImGui::Text("Active: %s", _activeBody->GetTypeName().c_str());
@@ -747,6 +733,20 @@ void Application::SwitchBody(planetgen::BodyConfig config)
 
     std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << _lodConfig.planetRadius
               << ")" << std::endl;
+}
+
+bool Application::SwitchBodyById(const std::string& id)
+{
+    const int index = render::types::FindBody(_bodies, id);
+    if (index < 0)
+    {
+        std::cerr << "[SwitchBody] Unknown planet type '" << id << "'" << std::endl;
+        return false;
+    }
+    _selectedBodyType = index;
+    _activeBodyId = id;
+    SwitchBody(LoadBodyConfig(_bodies[index].path));
+    return true;
 }
 
 void Application::ShuffleTerrain()

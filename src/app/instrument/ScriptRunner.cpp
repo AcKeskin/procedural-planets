@@ -47,13 +47,14 @@ std::string ScriptRunner::Dispatch(const Command& cmd)
     case CommandType::SetBody:
     {
         const auto& c = std::get<SetBodyCommand>(cmd.payload);
-        std::string path = c.path;
-        if (path.empty())
-            path = "data/bodies/" + c.body + ".json";
-        _app.SwitchBody(_app.LoadBodyConfigPublic(path)); // self-regenerates + reseats camera
+        // By id through the registry; an explicit path loads that file directly.
+        if (!c.path.empty())
+            _app.SwitchBody(_app.LoadBodyConfigPublic(c.path)); // self-regenerates + reseats camera
+        else if (!_app.SwitchBodyById(c.body))
+            return "error: unknown body '" + c.body + "'";
         _dirty = false;
         ReapplyCamera(); // SwitchBody reset the camera to a body default — restore our framing
-        return "ok (body=" + (c.body.empty() ? path : c.body) + ")";
+        return "ok (body=" + (c.body.empty() ? c.path : c.body) + ")";
     }
     case CommandType::SetParam:
     {

@@ -32,6 +32,7 @@ add_library(render STATIC
     effects/GroundTextures.cpp
     cinematic/CinematicController.cpp
     cinematic/CaptureManager.cpp
+    types/BodyRegistry.cpp
     # Model and backend sources compiled directly (DLL boundary: symbols not exported via PG_API)
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfig.cpp
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfigProjection.cpp
@@ -65,3 +66,11 @@ target_link_libraries(render PUBLIC
     OpenGL::GL
     nlohmann_json::nlohmann_json
 )
+
+# Tests for the render-side data code (planet type registry and traits). Runs from the source
+# root so it can read data/.
+add_executable(render_tests
+    tests/test_body_registry.cpp
+)
+target_link_libraries(render_tests PRIVATE render Catch2::Catch2WithMain)
+catch_discover_tests(render_tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

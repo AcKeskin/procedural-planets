@@ -62,7 +62,7 @@ struct SetSeedCommand
 
 struct SetBodyCommand
 {
-    std::string body; // "earth" | "volcanic" | "crystalline"
+    std::string body; // planet type id: a file stem in data/bodies
     std::string path; // optional explicit config path; wins over body if set
 };
 

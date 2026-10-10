@@ -14,7 +14,7 @@ struct CaptureRequest
     bool enabled = false;   // set when --screenshot <path> is present
     std::string outputPath; // required; the PNG destination
     uint32_t seed = 42;
-    std::string body = "earth"; // only earth is wired today
+    std::string body = "earth"; // planet type id: a file stem in data/bodies
     int width = 1280;
     int height = 720;
     int frames = 10; // warm-up frames before the shot
