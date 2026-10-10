@@ -319,16 +319,16 @@ struct MaskHolder
 TEST_CASE("macro_world off: Earth output matches the pre-macro baseline", "[gpu][macro_world]")
 {
     // Dev-GPU baseline. With the layer off the height + shading output must stay
-    // byte-identical to it. Re-recorded when ground v1 added the fine relief octaves
-    // and the finer Earth normal step. A different GPU/driver can legitimately produce
+    // byte-identical to it. Re-recorded for ground v1 (fine relief octaves, finer Earth
+    // normal step, heightScale 0.015). A different GPU/driver can legitimately produce
     // other bits; re-record there.
-    constexpr uint64_t kBaseline = 0xa61191d16333f5a6ull;
+    constexpr uint64_t kBaseline = 0xfea569a62aea976aull;
 
     PgContext ctx = MakeHeadlessCtx();
     REQUIRE(ctx != nullptr);
 
-    const auto cfg = LoadEarth();
-    REQUIRE_FALSE(cfg.macroWorld.enabled);
+    auto cfg = LoadEarth();
+    cfg.macroWorld.enabled = false; // earth.json ships with the layer on; this proves the off path
 
     const uint64_t h = HashGenerate(ctx, cfg, 42u);
     std::printf("macro_world off-parity hash: 0x%016llx\n", static_cast<unsigned long long>(h));
@@ -800,6 +800,7 @@ TEST_CASE("macro_world on: height and moisture come from the baked field, off re
         };
 
         auto off = LoadEarth();
+        off.macroWorld.enabled = false;
         auto on = MacroEarth(128);
         const auto a = run(off);
         const auto b = run(on);

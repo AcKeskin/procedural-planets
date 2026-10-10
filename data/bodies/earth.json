@@ -20,6 +20,9 @@
         "perturbStrengthHigh": 0.004,
         "perturbStrengthLow": 0.001
     },
+    "macroWorld": {
+        "enabled": true
+    },
     "metadata": {
         "atmosphereHeight": 0.08,
         "hasAtmosphere": true,
@@ -99,7 +102,7 @@
             "strength": 2.0
         },
         "globalFrequency": 1.0,
-        "heightScale": 0.06,
+        "heightScale": 0.015,
         "maskNoise": {
             "lacunarity": 1.66,
             "octaves": 3,
