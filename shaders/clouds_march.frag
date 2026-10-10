@@ -27,7 +27,6 @@ uniform float uPixelAngle; // radians per pixel of this (half-res) target
 const int LIGHT_STEPS = 5;
 // Below 1 so sunlit tops keep their shading under the tonemap instead of burning to flat white.
 const float CLOUD_ALBEDO = 0.78;
-const float PI = 3.14159265;
 
 // Henyey-Greenstein, normalized to average 1 over the sphere.
 float hg(float cosTheta, float g)

@@ -216,8 +216,7 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
         _planetShader.SetFloat("uTerminatorSoftness", ctx.scene->lighting.terminatorSoftness);
         _planetShader.SetFloat("uNightLightStrength", ctx.scene->lighting.nightLightStrength);
 
-        // Cloud shadow params — match the cloud shell's field so the shadow tracks the clouds; zero
-        // strength when clouds are disabled so the surface is unaffected.
+        // Cloud shadow reads the same cloud layer uniforms as the march; strength 0 when clouds are off.
         const bool cloudsOn = ctx.clouds && ctx.clouds->enabled && ctx.atmosphere && ctx.atmosphere->enabled;
         if (ctx.clouds)
             _clouds.SetLayerUniforms(_planetShader, *ctx.clouds, CloudLayer(ctx));

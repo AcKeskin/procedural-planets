@@ -72,8 +72,6 @@ public:
                     uint32_t blueNoiseTexture,
                     const PostProcessor& fullscreen);
 
-    uint32_t ResultTexture() const { return _result; }
-
 private:
     void ReleaseTarget();
     void ReleaseNoise();
@@ -88,7 +86,6 @@ private:
     uint32_t _shape = 0;
     uint32_t _detail = 0;
     uint32_t _seed = 0;
-    uint32_t _frame = 0;
 };
 
 } // namespace planets::render::effects

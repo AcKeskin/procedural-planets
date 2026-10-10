@@ -158,8 +158,8 @@ uint32_t CloudVolume::Render(const View& view,
     // Vertical field of view from the projection: tan(fov/2) = 1 / proj[1][1].
     const float tanHalf = 1.0f / glm::inverse(view.invProjection)[1][1];
     _marchShader.SetFloat("uPixelAngle", 2.0f * tanHalf / static_cast<float>(_height));
-    // Golden-ratio offset per frame: the jitter pattern moves, so banding never sits still.
-    _marchShader.SetFloat("uFrameJitter", std::fmod(static_cast<float>(_frame++) * 0.618034f, 1.0f));
+    // Fixed: with no temporal accumulation a moving jitter only adds flicker.
+    _marchShader.SetFloat("uFrameJitter", 0.0f);
     _marchShader.SetInt("uDepthTexture", 0);
     _marchShader.SetInt("uBlueNoise", 1);
     glBindTextureUnit(0, depthTexture);
