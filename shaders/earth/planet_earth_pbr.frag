@@ -19,7 +19,7 @@
 in vec3 vNormal;
 in vec3 vWorldPos;
 in float vHeight;
-in vec4 vShadingData; // climate: x=temp, y=moisture, z=detail, w=small
+in vec4 vShadingData; // climate: x=temp, y=moisture (macro moisture when the macro world is on), z=detail, w=small
 
 out vec4 FragColor;
 
@@ -188,8 +188,6 @@ void main()
     // Surface descriptors
     float steepness = 1.0 - clamp(dot(geoN, sphereNormal), 0.0, 1.0);
     float h = clamp((vHeight - uSeaLevel) / (uHeightMinMax.y - uSeaLevel), 0.0, 1.0);
-    float temperature = vShadingData.x;
-    float moisture    = vShadingData.y;
 
     // Material noise runs on the position scaled to the radius it was tuned at, so the grain
     // keeps its size relative to the planet at any radius. In raw world units a radius-5000
@@ -205,6 +203,12 @@ void main()
     vec4 fine = fbmFootprint(matPos, 3.0, 12, footprint, 0.5);
     float vFine   = fine.x;
     float vMedium = fbmFootprint(matPos, 0.9, 4, footprint, 0.5).x; // patch-scale variation
+
+    // Climate: smooth fields, safe to interpolate per vertex. Per-pixel noise plus the vertex
+    // detail channels (.z warped, .w small-scale) roughen biome borders so they never trace the
+    // mesh triangles.
+    float temperature = clamp(vShadingData.x + (vShadingData.w - 0.5) * 0.06, 0.0, 1.0);
+    float moisture    = clamp(vShadingData.y + (vMedium - 0.5) * 0.18 + (vShadingData.z - 0.5) * 0.12, 0.0, 1.0);
 
     Biome biome = whittakerBiome(temperature, moisture);
 
