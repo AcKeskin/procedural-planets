@@ -75,7 +75,13 @@ void main()
     // Clouds sit in front of what lies behind them; the haze below then covers both.
     if (uCloudsOn != 0)
     {
-        vec4 cloud = texture(uCloudTexture, vUv);
+        // Four bilinear taps one half-res texel apart: smooths the march's per-pixel jitter
+        // pattern and the stair steps of the half-res upsample.
+        vec2 texel = 1.0 / vec2(textureSize(uCloudTexture, 0));
+        vec4 cloud = 0.25 * (texture(uCloudTexture, vUv + vec2(-0.5, -0.5) * texel)
+                           + texture(uCloudTexture, vUv + vec2( 0.5, -0.5) * texel)
+                           + texture(uCloudTexture, vUv + vec2(-0.5,  0.5) * texel)
+                           + texture(uCloudTexture, vUv + vec2( 0.5,  0.5) * texel));
         originalColor = originalColor * cloud.a + cloud.rgb;
     }
     float depthSample = texture(uDepthTexture, vUv).r;

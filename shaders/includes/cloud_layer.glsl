@@ -40,7 +40,8 @@ float cloudCover(float weatherCoverage)
 // Height profile: stratus is a thin low deck, cumulus fills most of the slab with a rounded top.
 float cloudProfile(float h, float type)
 {
-    float bottom = smoothstep(0.0, 0.07, h);
+    // A soft base: a sharp one aliases into a dashed line when seen edge-on from far away.
+    float bottom = smoothstep(0.0, 0.2, h);
     float stratus = 1.0 - smoothstep(0.2, 0.35, h);
     float cumulus = 1.0 - smoothstep(0.55, 1.0, h);
     return bottom * mix(stratus, cumulus, type);

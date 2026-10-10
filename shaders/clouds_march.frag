@@ -141,7 +141,9 @@ void main()
     float cosTheta = dot(dir, sunDir);
 
     // Sunlight reaching the layer, reddened by the air above it; one estimate per ray.
-    vec3 mid = uCameraPos + dir * (0.5 * (segment.x + segment.y));
+    // Where the light estimate is taken: a fixed distance into the layer, so it does not jump
+    // where the segment end jumps (rays that hit terrain vs rays that leave the layer).
+    vec3 mid = uCameraPos + dir * min(segment.x + (uCloudTopRadius - uCloudBaseRadius), 0.5 * (segment.x + segment.y));
     float airToSun = skyRaySphere(uPlanetCenter, uAtmosphereRadius, mid, sunDir).y;
     vec3 sunLight = uSunColor * uSunIntensity * skyTransmittance(skyOpticalDepth(mid, sunDir, airToSun, 6));
     // Sky light from above, bluish, fading with the sun height.
