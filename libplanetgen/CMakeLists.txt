@@ -154,6 +154,7 @@ set(PLANETGEN_TEST_SOURCES
     tests/test_macro_world.cpp
     tests/test_ocean_depth.cpp
     tests/test_ground_materials.cpp
+    tests/test_cloud_noise.cpp
 )
 
 add_executable(planetgen_tests ${PLANETGEN_TEST_SOURCES})
@@ -183,6 +184,7 @@ target_sources(planetgen_tests PRIVATE
     src/strategy/MacroWorldPass.cpp
     src/strategy/GenerationPipeline.cpp
     src/materials/GroundMaterials.cpp
+    src/materials/CloudNoise.cpp
     ${GL3W_SRC}
 )
 
