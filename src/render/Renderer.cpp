@@ -9,8 +9,8 @@ namespace planets::render
 
 namespace
 {
-// Cloud shell altitude actually drawn: never below the terrain's height range, or peaks cut
-// hard-edged holes through the shell. Matches the range BodyRuntime normalizes heights with.
+// Cloud base actually used: never below the terrain's height range, or peaks push up through
+// the layer. Matches the range BodyRuntime normalizes heights with.
 float EffectiveCloudAltitude(const RenderContext& ctx)
 {
     constexpr float HeightRangeMultiplier = 1.5f;
@@ -19,6 +19,16 @@ float EffectiveCloudAltitude(const RenderContext& ctx)
     if (ctx.body)
         altitude = std::max(altitude, ctx.body->GetHeightScale() * HeightRangeMultiplier + ClearanceMargin);
     return altitude;
+}
+
+effects::CloudVolume::Layer CloudLayer(const RenderContext& ctx)
+{
+    effects::CloudVolume::Layer layer;
+    layer.planetRadius = ctx.planetRadius;
+    layer.groundRadius = ctx.SeaLevelRadius() > 0.0f ? ctx.SeaLevelRadius() : ctx.planetRadius;
+    layer.baseAltitude = EffectiveCloudAltitude(ctx);
+    layer.time = ctx.time;
+    return layer;
 }
 } // namespace
 
@@ -66,6 +76,11 @@ bool Renderer::Initialize(int width, int height)
         std::cerr << "[Renderer] Failed to initialize bloom" << std::endl;
         return false;
     }
+    if (!_clouds.Initialize(width, height))
+    {
+        std::cerr << "[Renderer] Failed to initialize clouds" << std::endl;
+        return false;
+    }
     return true;
 }
 
@@ -77,6 +92,7 @@ void Renderer::ResizeFramebuffer(int width, int height)
     _fbHeight = height;
     _sceneFbo.Create(width, height);
     _bloom.Resize(width, height);
+    _clouds.Resize(width, height);
 }
 
 bool Renderer::SetActiveBody(PgBody body,
@@ -99,7 +115,7 @@ bool Renderer::SetActiveBody(PgBody body,
 
     _quadTree.Initialize(quadTreeConfig, _scheduler, seed);
     _oceanRenderer.Initialize();
-    _cloudRenderer.Initialize(quadTreeConfig.planetRadius);
+    _clouds.Generate(seed);
     _atmosphereRenderer.Initialize();
     return true;
 }
@@ -149,24 +165,6 @@ void Renderer::DrawScene(const RenderContext& ctx)
     _oceanTimer.End();
 
     _effectsTimer.Begin();
-    // Clouds draw into the scene (over the surface, before the atmosphere post-process) so the
-    // limb + aerial perspective scatter over the cloud tops.
-    const bool atmosphereOn = ctx.atmosphere && ctx.atmosphere->enabled;
-    if (ctx.clouds && ctx.scene && atmosphereOn)
-    {
-        effects::CloudSettings clouds = *ctx.clouds;
-        clouds.altitude = EffectiveCloudAltitude(ctx);
-        _cloudRenderer.Render(ctx.view,
-                              ctx.projection,
-                              ctx.cameraPos,
-                              ctx.scene->lightDir,
-                              ctx.scene->sunColor,
-                              ctx.scene->lighting.sunIntensity,
-                              ctx.scene->lighting.ambientLight,
-                              ctx.time,
-                              clouds);
-    }
-
     _bloom.Render(_sceneFbo.GetColorTexture(), _postProcessor);
     _sceneFbo.Unbind();
     glViewport(0, 0, _fbWidth, _fbHeight);
@@ -218,14 +216,10 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
         _planetShader.SetFloat("uTerminatorSoftness", ctx.scene->lighting.terminatorSoftness);
         _planetShader.SetFloat("uNightLightStrength", ctx.scene->lighting.nightLightStrength);
 
-        // Cloud shadow params — match the cloud shell's field so the shadow tracks the clouds; zero
-        // strength when clouds are disabled so the surface is unaffected.
+        // Cloud shadow reads the same cloud layer uniforms as the march; strength 0 when clouds are off.
         const bool cloudsOn = ctx.clouds && ctx.clouds->enabled && ctx.atmosphere && ctx.atmosphere->enabled;
-        _planetShader.SetFloat("uCloudScale", ctx.clouds ? ctx.clouds->scale : 1.0f);
-        _planetShader.SetFloat("uCloudCoverage", ctx.clouds ? ctx.clouds->coverage : 0.0f);
-        _planetShader.SetFloat("uCloudSpeed", ctx.clouds ? ctx.clouds->speed : 0.0f);
-        _planetShader.SetFloat("uCloudTime", ctx.time);
-        _planetShader.SetFloat("uCloudAltitude", EffectiveCloudAltitude(ctx));
+        if (ctx.clouds)
+            _clouds.SetLayerUniforms(_planetShader, *ctx.clouds, CloudLayer(ctx));
         _planetShader.SetFloat("uCloudShadowStrength", cloudsOn ? ctx.clouds->shadowStrength : 0.0f);
         _planetShader.SetFloat("uSunIntensity", ctx.scene->lighting.sunIntensity);
         _planetShader.SetFloat("uAmbientLight", ctx.scene->lighting.ambientLight);
@@ -269,6 +263,25 @@ void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
     if (ctx.atmosphere && ctx.atmosphere->enabled && ctx.scene)
     {
         const float oceanRadius = ctx.SeaLevelRadius();
+        // Clouds are part of the atmosphere: marched here, composited by the atmosphere pass.
+        uint32_t cloudTexture = 0;
+        if (ctx.clouds && ctx.clouds->enabled)
+        {
+            effects::CloudVolume::View view;
+            view.invView = invView;
+            view.invProjection = invProjection;
+            view.cameraPos = ctx.cameraPos;
+            view.nearPlane = ctx.nearPlane;
+            view.farPlane = ctx.farPlane;
+            view.lightDir = ctx.scene->lightDir;
+            view.sunColor = ctx.scene->sunColor;
+            view.sunIntensity = ctx.scene->lighting.sunIntensity;
+            cloudTexture = _clouds.Render(view, *ctx.clouds, CloudLayer(ctx), *ctx.atmosphere,
+                                          _sceneFbo.GetDepthTexture(), _atmosphereRenderer.BlueNoiseTexture(),
+                                          _postProcessor);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, _fbWidth, _fbHeight);
+        }
         _atmosphereRenderer.Render(ctx.view,
                                    ctx.projection,
                                    invView,
@@ -284,6 +297,7 @@ void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
                                    ctx.scene->exposure,
                                    _bloom.Texture(),
                                    ctx.scene->bloomStrength,
+                                   cloudTexture,
                                    *ctx.atmosphere,
                                    _sceneFbo.GetColorTexture(),
                                    _sceneFbo.GetDepthTexture());

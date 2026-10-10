@@ -11,7 +11,7 @@
 #include "lod/PlanetQuadTree.h"
 #include "effects/OceanRenderer.h"
 #include "effects/AtmosphereRenderer.h"
-#include "effects/CloudRenderer.h"
+#include "effects/CloudVolume.h"
 #include "effects/BloomPass.h"
 #include "effects/GroundTextures.h"
 #include "settings/CloudSettings.h"
@@ -115,7 +115,7 @@ private:
     lod::PlanetQuadTree _quadTree;
     effects::OceanRenderer _oceanRenderer;
     effects::AtmosphereRenderer _atmosphereRenderer;
-    effects::CloudRenderer _cloudRenderer;
+    effects::CloudVolume _clouds;
     effects::BloomPass _bloom;
     effects::GroundTextures _groundTextures;
 
