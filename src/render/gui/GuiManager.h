@@ -26,7 +26,9 @@ public:
         bool terrain = true;
         bool surface = true;
         bool atmosphere = true;
+        bool clouds = true;
         bool debug = true;
+        bool cinematic = true;
     };
 
     PanelVisibility& GetVisibility() { return _visibility; }

@@ -11,6 +11,7 @@
 #include "gui/SurfacePanel.h"
 #include "gui/AtmospherePanel.h"
 #include "gui/DebugPanel.h"
+#include "gui/CloudsPanel.h"
 #include "settings/SceneSettings.h"
 #include "settings/TerrainSettings.h"
 #include "settings/OceanSettings.h"
@@ -143,6 +144,7 @@ private:
     render::SurfacePanel _surfacePanel;
     render::AtmospherePanel _atmospherePanel;
     render::DebugPanel _debugPanel;
+    render::CloudsPanel _cloudsPanel;
 
     // App-visual settings (generation params live in the active body's BodyConfig).
     render::SceneSettings _sceneSettings;
@@ -166,7 +168,6 @@ private:
     render::CinematicSettings _cinematicSettings;
     render::CaptureManager _captureManager;
     bool _guiVisible = true;
-    bool _cinematicPanelVisible = true;
     bool _screenshotRequested = false;
 
     // Active body — typed config + runtime shim

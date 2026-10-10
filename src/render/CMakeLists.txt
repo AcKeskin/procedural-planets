@@ -10,6 +10,7 @@ add_library(render STATIC
     gui/AtmospherePanel.cpp
     gui/DebugPanel.cpp
     gui/CinematicPanel.cpp
+    gui/CloudsPanel.cpp
     Renderer.cpp
     Mesh.cpp
     GlFence.cpp

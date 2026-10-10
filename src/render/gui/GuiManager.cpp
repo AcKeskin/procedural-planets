@@ -89,6 +89,8 @@ void GuiManager::SetupDockspace()
             ImGui::MenuItem("Terrain", nullptr, &_visibility.terrain);
             ImGui::MenuItem("Surface", nullptr, &_visibility.surface);
             ImGui::MenuItem("Atmosphere", nullptr, &_visibility.atmosphere);
+            ImGui::MenuItem("Clouds", nullptr, &_visibility.clouds);
+            ImGui::MenuItem("Cinematic", nullptr, &_visibility.cinematic);
             ImGui::MenuItem("Debug", nullptr, &_visibility.debug);
             ImGui::Separator();
             if (ImGui::MenuItem("Reset Layout"))
@@ -100,7 +102,8 @@ void GuiManager::SetupDockspace()
         ImGui::EndMenuBar();
     }
 
-    ImGuiID dockspaceId = ImGui::GetID("MainDockspace");
+    // Renamed when the default layout changes, so saved imgui.ini layouts pick up the new one.
+    ImGuiID dockspaceId = ImGui::GetID("MainDockspaceV2");
 
     bool needsBuild = (ImGui::DockBuilderGetNode(dockspaceId) == nullptr) || _resetLayout;
     _resetLayout = false;
@@ -112,15 +115,19 @@ void GuiManager::SetupDockspace()
         ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
 
         ImGuiID dockMain = dockspaceId;
-        ImGuiID dockRight = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.20f, nullptr, &dockMain);
-        ImGuiID dockLeft = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Left, 0.20f, nullptr, &dockMain);
+        ImGuiID dockRight = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.28f, nullptr, &dockMain);
+        ImGuiID dockLeft = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Left, 0.30f, nullptr, &dockMain);
         ImGuiID dockBottom = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Down, 0.15f, nullptr, &dockMain);
+        ImGuiID dockLeftTop = ImGui::DockBuilderSplitNode(dockLeft, ImGuiDir_Up, 0.07f, nullptr, &dockLeft);
 
+        ImGui::DockBuilderDockWindow("Body Type", dockLeftTop);
         ImGui::DockBuilderDockWindow("Scene", dockLeft);
         ImGui::DockBuilderDockWindow("Terrain", dockLeft);
         ImGui::DockBuilderDockWindow("Surface", dockRight);
         ImGui::DockBuilderDockWindow("Atmosphere", dockRight);
+        ImGui::DockBuilderDockWindow("Clouds", dockRight);
         ImGui::DockBuilderDockWindow("Debug", dockBottom);
+        ImGui::DockBuilderDockWindow("Cinematic", dockBottom);
 
         ImGui::DockBuilderFinish(dockspaceId);
     }

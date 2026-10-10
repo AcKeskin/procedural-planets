@@ -1,5 +1,6 @@
 #include "DebugPanel.h"
 #include "../../core/math/Camera.h"
+#include "GuiLayout.h"
 #include <imgui.h>
 
 namespace planets::render
@@ -12,6 +13,7 @@ void DebugPanel::Draw(
         return;
 
     ImGui::Begin("Debug", &visible);
+    PushLabelColumn();
 
     const auto& pos = camera.GetPosition();
     ImGui::Text("Camera Position: %.2f, %.2f, %.2f", pos.x, pos.y, pos.z);
@@ -39,6 +41,7 @@ void DebugPanel::Draw(
     ImGui::BulletText("R - Shuffle Terrain");
     ImGui::BulletText("ESC - Exit");
 
+    ImGui::PopItemWidth();
     ImGui::End();
 }
 
