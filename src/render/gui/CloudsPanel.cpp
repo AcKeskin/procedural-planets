@@ -16,7 +16,8 @@ void CloudsPanel::Draw(effects::CloudSettings& settings, bool atmosphereOn, bool
 
     ImGui::BeginDisabled(!atmosphereOn);
     ImGui::Checkbox("Enable Clouds", &settings.enabled);
-    ImGui::SetItemTooltip(atmosphereOn ? "Show the cloud layer" : "Clouds are part of the atmosphere: enable the atmosphere to show them");
+    ImGui::SetItemTooltip(atmosphereOn ? "Show the cloud layer"
+                                       : "Clouds are part of the atmosphere: enable the atmosphere to show them");
     if (settings.enabled)
     {
         ImGui::Separator();

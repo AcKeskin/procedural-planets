@@ -204,7 +204,8 @@ void PlanetQuadTree::TraverseAndUpdate(QuadTreeNode& node, const glm::vec3& came
 
     if (node.IsLeaf())
     {
-        bool shouldSplit = distance < splitDistance && node.CanSplit(_config.maxDepth) && _activeLeafCount < _config.maxActivePatches;
+        bool shouldSplit =
+            distance < splitDistance && node.CanSplit(_config.maxDepth) && _activeLeafCount < _config.maxActivePatches;
 
         if (shouldSplit && !IsPending(&node))
         {

@@ -36,7 +36,7 @@ struct SceneSettings
     float sunSize = 0.0047f; // angular radius in radians (the real sun: 0.00465)
     glm::vec3 sunColor = glm::vec3(1.0f, 0.95f, 0.8f);
     float starDensity = 1.0f;
-    float exposure = 1.0f; // scales the HDR scene before the tonemap
+    float exposure = 1.0f;      // scales the HDR scene before the tonemap
     float bloomStrength = 1.0f; // glow around light above 1 (sun, glints)
     LightingSettings lighting;
 };

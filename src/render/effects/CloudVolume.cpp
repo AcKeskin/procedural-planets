@@ -46,8 +46,8 @@ uint32_t CreateWeather(const std::vector<uint8_t>& texels, int faceSize)
     const size_t faceBytes = static_cast<size_t>(faceSize) * faceSize * 2;
     for (int face = 0; face < 6; ++face)
     {
-        glTextureSubImage3D(texture, 0, 0, 0, face, faceSize, faceSize, 1, GL_RG, GL_UNSIGNED_BYTE,
-                            texels.data() + face * faceBytes);
+        glTextureSubImage3D(
+            texture, 0, 0, 0, face, faceSize, faceSize, 1, GL_RG, GL_UNSIGNED_BYTE, texels.data() + face * faceBytes);
     }
     glGenerateTextureMipmap(texture);
     glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);

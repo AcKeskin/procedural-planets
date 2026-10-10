@@ -276,8 +276,12 @@ void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
             view.lightDir = ctx.scene->lightDir;
             view.sunColor = ctx.scene->sunColor;
             view.sunIntensity = ctx.scene->lighting.sunIntensity;
-            cloudTexture = _clouds.Render(view, *ctx.clouds, CloudLayer(ctx), *ctx.atmosphere,
-                                          _sceneFbo.GetDepthTexture(), _atmosphereRenderer.BlueNoiseTexture(),
+            cloudTexture = _clouds.Render(view,
+                                          *ctx.clouds,
+                                          CloudLayer(ctx),
+                                          *ctx.atmosphere,
+                                          _sceneFbo.GetDepthTexture(),
+                                          _atmosphereRenderer.BlueNoiseTexture(),
                                           _postProcessor);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glViewport(0, 0, _fbWidth, _fbHeight);

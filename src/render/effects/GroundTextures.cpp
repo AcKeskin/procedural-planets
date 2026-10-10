@@ -23,7 +23,16 @@ uint32_t CreateArray(const std::vector<std::vector<uint8_t>>& layers, int size)
     glTextureStorage3D(texture, levels, GL_RGBA8, size, size, static_cast<GLsizei>(layers.size()));
     for (size_t layer = 0; layer < layers.size(); ++layer)
     {
-        glTextureSubImage3D(texture, 0, 0, 0, static_cast<GLint>(layer), size, size, 1, GL_RGBA, GL_UNSIGNED_BYTE,
+        glTextureSubImage3D(texture,
+                            0,
+                            0,
+                            0,
+                            static_cast<GLint>(layer),
+                            size,
+                            size,
+                            1,
+                            GL_RGBA,
+                            GL_UNSIGNED_BYTE,
                             layers[layer].data());
     }
     glGenerateTextureMipmap(texture);
