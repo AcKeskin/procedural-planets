@@ -130,8 +130,8 @@ float shoreFoam(float depthUnits, vec3 dir)
 // ---- reflection ----
 
 // Fewer samples than the atmosphere pass: the reflection is blurred by waves and fresnel anyway.
-const int kSkyViewSamples = 6;
-const int kSkySunSamples = 4;
+const int kSkyViewSamples = 4;
+const int kSkySunSamples = 3;
 
 // Sky seen along rayDir from the sea surface: the same march as the atmosphere pass, so the
 // reflection matches the sky above it at any sun height.
