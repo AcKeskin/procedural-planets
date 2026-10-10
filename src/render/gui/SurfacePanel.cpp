@@ -117,7 +117,6 @@ void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& sea
         ImGui::ColorEdit3("Deep Color", &settings.deepColor.x);
         ImGui::ColorEdit3("Shallow Color", &settings.shallowColor.x);
 
-
         ImGui::Separator();
         ImGui::Text("Reflection");
         ImGui::SliderFloat("Fresnel Power", &settings.fresnelPower, 1.5f, 3.5f);
