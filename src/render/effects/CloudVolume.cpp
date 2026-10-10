@@ -15,7 +15,7 @@ namespace
 {
 constexpr int ShapeSize = 64;
 constexpr int DetailSize = 32;
-constexpr int WeatherFaceSize = 256;
+constexpr int WeatherFaceSize = 512;
 // Shape tiles per planet radius at scale 1: a cloud cell is about a hundredth of the radius.
 constexpr float ShapeTilesPerRadius = 25.0f;
 // Weather drift in radians per second at speed 1.

@@ -21,6 +21,7 @@ uniform float uCloudShapeScale;  // shape tiles per planet radius
 uniform float uCloudDrift;       // radians the weather has turned (time * speed)
 
 const float CLOUD_DETAIL_SCALE = 5.3; // detail tiles per shape tile
+const float CLOUD_LARGE_SCALE = 0.19; // the large shape octave, relative to the shape tile
 
 // The weather turns slowly about the planet's axis; the 3D noise moves with it.
 vec3 cloudDrift(vec3 v)
@@ -70,10 +71,15 @@ float cloudDensity(vec3 p, float footprint, bool detail)
     vec3 q = cloudDrift(offset) / uCloudPlanetRadius * uCloudShapeScale;
     // Texels per pixel at the shape and detail resolutions (64 and 32 per tile).
     float shapeTexels = footprint / uCloudPlanetRadius * uCloudShapeScale * 64.0;
-    float shape = textureLod(uCloudShape, q, log2(max(shapeTexels, 1.0))).r;
-    // From far away the tile repeat would print as a regular stipple: fade the shape noise to a
-    // constant and let the weather map alone draw the clouds.
-    shape = mix(shape, 0.62, smoothstep(1.5, 6.0, shapeTexels));
+    // Two shape octaves: individual clouds, and a 5x larger one that still breaks the weather
+    // into separate clouds from mid orbit. Each fades to a constant once it is too small to read,
+    // or the tile repeat would print as a regular stipple.
+    float small = textureLod(uCloudShape, q, log2(max(shapeTexels, 1.0))).r;
+    small = mix(small, 0.62, smoothstep(1.0, 3.0, shapeTexels));
+    float largeTexels = shapeTexels * CLOUD_LARGE_SCALE;
+    float large = textureLod(uCloudShape, q * CLOUD_LARGE_SCALE + vec3(0.37, 0.11, 0.73), log2(max(largeTexels, 1.0))).r;
+    large = mix(large, 0.62, smoothstep(1.0, 3.0, largeTexels));
+    float shape = 0.5 * small + 0.5 * large;
     float d = cloudRemap(shape, 1.0 - cover, 1.0) * cover;
     float detailTexels = shapeTexels * CLOUD_DETAIL_SCALE * 0.5;
     float detailWeight = 1.0 - smoothstep(1.0, 4.0, detailTexels);

@@ -262,7 +262,9 @@ std::vector<uint8_t> GenerateCloudWeather(uint32_t seed, int faceSize)
                         // Cloud systems (large) times individual cloud fields (medium).
                         float systems = ValueFbm(px * 2.2f, py * 2.2f, pz * 2.2f, 4, s + 10u);
                         float fields = ValueFbm(px * 9.0f, py * 9.0f, pz * 9.0f, 4, s + 20u);
-                        float coverage = Clamp01((systems - 0.3f) * 2.2f) * Clamp01(fields * 1.6f - 0.15f);
+                        float cells = ValueFbm(px * 40.0f, py * 40.0f, pz * 40.0f, 3, s + 25u);
+                        float coverage = Clamp01((systems - 0.3f) * 2.2f) * Clamp01(fields * 1.6f - 0.15f)
+                                       * (0.55f + 0.45f * cells);
                         float type = Clamp01((ValueFbm(px * 3.0f, py * 3.0f, pz * 3.0f, 3, s + 30u) - 0.35f) * 3.0f);
                         size_t i = (static_cast<size_t>(face) * faceSize + y) * faceSize + x;
                         raw[i] = coverage;

@@ -9,7 +9,7 @@ struct CloudSettings
     bool enabled = true;
     float altitude = 0.025f;  // cloud base above sea level (raised above the terrain automatically)
     float thickness = 0.03f;  // depth of the layer
-    float coverage = 0.45f;   // 0 = clear sky, 1 = overcast
+    float coverage = 0.52f;   // 0 = clear sky, 1 = overcast (0.52 covers about 40% of the disc)
     float density = 300.0f;   // extinction per planet radius in a full cloud
     float speed = 0.15f;      // drift of the weather around the planet
     float scale = 1.0f;       // size of individual clouds (higher = smaller clouds)

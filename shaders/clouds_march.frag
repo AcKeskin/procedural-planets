@@ -25,6 +25,8 @@ uniform float uFrameJitter;
 uniform float uPixelAngle; // radians per pixel of this (half-res) target
 
 const int LIGHT_STEPS = 5;
+// Below 1 so sunlit tops keep their shading under the tonemap instead of burning to flat white.
+const float CLOUD_ALBEDO = 0.78;
 const float PI = 3.14159265;
 
 // Henyey-Greenstein, normalized to average 1 over the sphere.
@@ -109,7 +111,7 @@ vec3 sunScatter(vec3 sunLight, float tau, float cosTheta)
     for (int i = 0; i < 3; ++i)
     {
         float beer = exp(-tau * b) * mix(1.0, 1.0 - exp(-tau * 2.0 * b), 0.5);
-        sum += sunLight * (a * beer * mix(1.0, cloudPhase(cosTheta), c));
+        sum += sunLight * (a * beer * mix(1.0, cloudPhase(cosTheta), c) * CLOUD_ALBEDO);
         a *= 0.5;
         b *= 0.4;
         c *= 0.5;
