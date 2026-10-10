@@ -57,8 +57,10 @@ void Renderer::ResizeFramebuffer(int width, int height)
     _sceneFbo.Create(width, height);
 }
 
-bool Renderer::SetActiveBody(
-    PgBody body, const BodyRuntime& runtime, const lod::QuadTreeConfig& quadTreeConfig, uint32_t seed)
+bool Renderer::SetActiveBody(PgBody body,
+                             const BodyRuntime& runtime,
+                             const lod::QuadTreeConfig& quadTreeConfig,
+                             uint32_t seed)
 {
     if (!_planetShader.LoadFromFiles(runtime.GetVertexShaderPath(), runtime.GetFragmentShaderPath()))
     {

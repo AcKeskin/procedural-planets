@@ -23,7 +23,7 @@ struct OceanFrame
     float sunIntensity = 1.0f;
     float ambientLight = 0.1f;
     float time = 0.0f;
-    float seaLevel = 1.0f;    // radial multiplier shared with terrain shading and the atmosphere
+    float seaLevel = 1.0f;     // radial multiplier shared with terrain shading and the atmosphere
     float heightScale = 0.04f; // body shape.heightScale: converts radius-unit depth to terrain units
 
     // Atmosphere parameters for the reflected sky (atmosphereOn false = airless, black sky).

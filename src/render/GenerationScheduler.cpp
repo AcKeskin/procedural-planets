@@ -118,12 +118,19 @@ std::vector<CompletedGeneration> GenerationScheduler::TakeCompleted()
 
 void GenerationScheduler::Cancel(const std::unordered_set<const lod::QuadTreeNode*>& targets)
 {
-    auto aimedAtTarget = [&targets](const lod::QuadTreeNode* node) { return targets.count(node) != 0; };
+    auto aimedAtTarget = [&targets](const lod::QuadTreeNode* node)
+    {
+        return targets.count(node) != 0;
+    };
 
-    auto taskAimed = [&](const GenerationTask& t) { return aimedAtTarget(t.request.targetNode); };
+    auto taskAimed = [&](const GenerationTask& t)
+    {
+        return aimedAtTarget(t.request.targetNode);
+    };
     _pending.erase(std::remove_if(_pending.begin(), _pending.end(), taskAimed), _pending.end());
     _inFlight.erase(std::remove_if(_inFlight.begin(), _inFlight.end(), taskAimed), _inFlight.end());
-    _completed.erase(std::remove_if(_completed.begin(), _completed.end(),
+    _completed.erase(std::remove_if(_completed.begin(),
+                                    _completed.end(),
                                     [&](const CompletedGeneration& c) { return aimedAtTarget(c.targetNode); }),
                      _completed.end());
 }

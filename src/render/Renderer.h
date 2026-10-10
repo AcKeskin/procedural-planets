@@ -73,10 +73,8 @@ public:
 
     // Build the LOD pipeline around a library body: load its shaders, build the
     // quad-tree, init effects, upload the palette.
-    bool SetActiveBody(PgBody body,
-                       const BodyRuntime& runtime,
-                       const lod::QuadTreeConfig& quadTreeConfig,
-                       uint32_t seed);
+    bool
+    SetActiveBody(PgBody body, const BodyRuntime& runtime, const lod::QuadTreeConfig& quadTreeConfig, uint32_t seed);
 
     // Composite one frame into the scene framebuffer then to the default target.
     void DrawScene(const RenderContext& ctx);
@@ -92,7 +90,7 @@ public:
 
     GpuTimings Timings() const
     {
-        return { _terrainTimer.Milliseconds(), _oceanTimer.Milliseconds(), _effectsTimer.Milliseconds() };
+        return {_terrainTimer.Milliseconds(), _oceanTimer.Milliseconds(), _effectsTimer.Milliseconds()};
     }
 
     GenerationScheduler& Scheduler() { return _scheduler; }

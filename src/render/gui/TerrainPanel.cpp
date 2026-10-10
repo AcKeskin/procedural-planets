@@ -303,7 +303,9 @@ bool TerrainPanel::DrawLodContent(LodConfig& lod, const TerrainStats& stats)
     ImGui::BulletText("Total patches: %d", stats.patchCount);
     ImGui::BulletText("Visible patches: %d", stats.visiblePatchCount);
     ImGui::BulletText("GPU: terrain %.2f ms, ocean %.2f ms, effects %.2f ms",
-                      stats.gpuTerrainMs, stats.gpuOceanMs, stats.gpuEffectsMs);
+                      stats.gpuTerrainMs,
+                      stats.gpuOceanMs,
+                      stats.gpuEffectsMs);
     if (stats.patchCount > 0)
     {
         float cullPercent = 100.0f * (1.0f - static_cast<float>(stats.visiblePatchCount) / stats.patchCount);
