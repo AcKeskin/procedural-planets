@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "planetgen/planetgen.h"
+#include "api/InternalTypes.h"
 #include <vector>
 #include <cmath>
 
@@ -113,5 +114,53 @@ TEST_CASE("HeadlessGLBackend custom GLSL registered and dispatched", "[gpu][head
     pg_result_destroy(sr);
     pg_result_destroy(hr);
     pg_body_destroy(body);
+    pg_context_destroy(ctx);
+}
+
+TEST_CASE("HeadlessGLBackend texture array round-trips a compute-written pattern", "[gpu][headless]")
+{
+    // Each texel gets (x, y, layer, x*y+layer) — any mix-up of axes or layers shows.
+    const std::string src = R"(#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(rgba32f, binding = 0) uniform image2DArray outImg;
+void main()
+{
+    ivec3 c = ivec3(gl_GlobalInvocationID);
+    imageStore(outImg, c, vec4(float(c.x), float(c.y), float(c.z), float(c.x * c.y + c.z)));
+}
+)";
+    const uint32_t Res = 16;
+    const uint32_t Layers = 6;
+
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+    auto& gpu = *ctx->backend;
+
+    REQUIRE(ctx->registry.RegisterProgram("test_texture_array_pattern", src));
+    const uint32_t program = ctx->registry.Resolve("test_texture_array_pattern");
+
+    const auto tex = gpu.CreateTexture2DArray_RGBA32F(Res, Layers);
+    REQUIRE(tex != 0);
+    gpu.BindShader(program);
+    gpu.BindImage2DArray(tex, 0);
+    gpu.Dispatch(Res / 8, Res / 8, Layers);
+    gpu.ImageBarrier();
+
+    std::vector<float> texels(Res * Res * Layers * 4);
+    gpu.DownloadTexture(tex, texels.data(), texels.size() * sizeof(float));
+
+    for (uint32_t z = 0; z < Layers; ++z)
+        for (uint32_t y = 0; y < Res; ++y)
+            for (uint32_t x = 0; x < Res; ++x)
+            {
+                const float* t = &texels[((z * Res + y) * Res + x) * 4];
+                INFO("texel " << x << "," << y << "," << z);
+                REQUIRE(t[0] == float(x));
+                REQUIRE(t[1] == float(y));
+                REQUIRE(t[2] == float(z));
+                REQUIRE(t[3] == float(x * y + z));
+            }
+
+    gpu.DestroyTexture(tex);
     pg_context_destroy(ctx);
 }
