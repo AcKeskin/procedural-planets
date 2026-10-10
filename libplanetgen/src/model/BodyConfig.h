@@ -197,11 +197,11 @@ struct ErosionBlock
 struct MacroWorldBlock
 {
     bool  enabled             = false;
-    int   resolution          = 256;    // cells per cube-face edge
+    int   resolution          = 512;    // cells per cube-face edge (bake ~0.25 s on a desktop GPU)
     float convergentThreshold = 0.3f;   // boundary stress above this builds mountains
 
     // Hydraulic erosion (rainfall -> flow -> sediment -> flux accumulation)
-    int   erosionIterations  = 80;
+    int   erosionIterations  = 400;
     float rainRate           = 0.012f;
     float evaporationRate    = 0.02f;
     float flowRate           = 0.25f;

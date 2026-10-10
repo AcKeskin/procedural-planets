@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
@@ -836,6 +837,31 @@ TEST_CASE("macro_world programs: every macro pass and shader variant compiles", 
     {
         INFO("program " << planetgen::BuiltinKey(id));
         CHECK(ctx->registry.Resolve(id) != 0);
+    }
+    pg_context_destroy(ctx);
+}
+
+TEST_CASE("macro_world timing: the full bake at the default resolution takes under 5 s", "[gpu][macro_world]")
+{
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+    auto& gpu = *ctx->backend;
+    {
+        auto cfg = LoadEarth();
+        cfg.macroWorld.enabled = true; // every other macro param at its default
+        MaskHolder mask(ctx, cfg, 42u);
+        gpu.Finish(); // the mask bake is not part of the timed macro bake
+
+        const auto t0 = std::chrono::steady_clock::now();
+        const auto field = planetgen::BakeMacroWorld(gpu, ctx->registry, cfg, 42u, mask.tex);
+        gpu.Finish();
+        const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        REQUIRE(field != 0);
+
+        std::printf("macro_world bake: %d^2 x 6 cells, %d erosion rounds, %.3f s\n",
+                    cfg.macroWorld.resolution, cfg.macroWorld.erosionIterations, seconds);
+        CHECK(seconds < 5.0);
+        gpu.DestroyTexture(field);
     }
     pg_context_destroy(ctx);
 }
