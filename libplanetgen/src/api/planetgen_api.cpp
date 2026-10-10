@@ -135,6 +135,7 @@ PgContext pg_context_create(const PgContextDesc* desc)
     reg(BP::ShadingGeneric,  planetgen::shaders::shading_generic_comp,    "shading_generic");
     reg(BP::Erosion,         planetgen::shaders::erosion_earth_comp,      "erosion");
     reg(BP::ContinentGrowth, planetgen::shaders::continent_growth_comp,   "continent_growth");
+    reg(BP::MacroPlates,     planetgen::shaders::macro_plates_comp,       "macro_plates");
 
     return ctx;
 }

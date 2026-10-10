@@ -51,7 +51,8 @@ struct PgContext_T
 //
 // The continent-mask texture is cached per body, keyed on (seed, resolution). It is
 // a deterministic function of those inputs, so caching it does not make generation
-// stateful — re-baking would reproduce the same volume.
+// stateful — re-baking would reproduce the same volume. The macro world field is
+// cached the same way, keyed on seed + every param the bake reads.
 struct PgBody_T
 {
     PgContext_T* ctx = nullptr;
@@ -61,10 +62,17 @@ struct PgBody_T
     planetgen::GpuTextureHandle maskTexture = 0; // 0 = not yet baked
     uint64_t maskBuiltKey = 0;
 
+    planetgen::GpuTextureHandle macroTexture = 0; // 0 = layer off or not yet baked
+    uint64_t macroBuiltKey = 0;
+
     ~PgBody_T()
     {
-        if (maskTexture && ctx && ctx->backend)
+        if (!ctx || !ctx->backend)
+            return;
+        if (maskTexture)
             ctx->backend->DestroyTexture(maskTexture);
+        if (macroTexture)
+            ctx->backend->DestroyTexture(macroTexture);
     }
 };
 

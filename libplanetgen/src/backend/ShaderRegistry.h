@@ -16,6 +16,7 @@ enum class BuiltinProgram : int
     ShadingGeneric = 2,
     Erosion = 3,
     ContinentGrowth = 4,
+    MacroPlates = 5,
 };
 
 // Converts a BuiltinProgram id to its canonical string key
@@ -28,6 +29,7 @@ inline std::string BuiltinKey(BuiltinProgram id)
     case BuiltinProgram::ShadingGeneric:  return "__builtin_shading_generic";
     case BuiltinProgram::Erosion:         return "__builtin_erosion";
     case BuiltinProgram::ContinentGrowth: return "__builtin_continent_growth";
+    case BuiltinProgram::MacroPlates:     return "__builtin_macro_plates";
     }
     return "";
 }

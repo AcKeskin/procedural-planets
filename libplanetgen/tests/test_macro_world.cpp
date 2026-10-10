@@ -3,10 +3,13 @@
 #include "planetgen/planetgen.h"
 #include "api/InternalTypes.h"
 #include "strategy/GenerationPipeline.h"
+#include "strategy/ContinentMaskPass.h"
+#include "strategy/MacroWorldPass.h"
 #include "model/BodyConfig.h"
 #include "model/BodyConfigJson.h"
 
 #include <algorithm>
+#include <cstring>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -160,7 +163,8 @@ void main()
 }
 )";
 
-// Samples the field (sampler unit 5) at directions from an SSBO.
+// Samples the field (sampler unit 5) at directions from an SSBO. w >= 0 forces
+// the face the sample is taken from; w < 0 picks it from the direction.
 const char* kSampleProbe = R"(
 layout(local_size_x = 64) in;
 layout(binding = 5) uniform sampler2DArray field;
@@ -170,9 +174,91 @@ void main()
 {
     uint id = gl_GlobalInvocationID.x;
     if (id >= uint(dirs.length())) return;
-    values[id] = mg_sample(field, normalize(dirs[id].xyz));
+    vec3 d = normalize(dirs[id].xyz);
+    int face = int(dirs[id].w);
+    values[id] = face >= 0 ? mg_sampleOnFace(field, d, face) : mg_sample(field, d);
 }
 )";
+
+// Points exactly on each of the 12 cube edges (kept away from the corners), each
+// emitted twice: sampled from either adjacent face (w = face index).
+std::vector<float> EdgePairDirs()
+{
+    std::vector<float> dirs;
+    for (int a = 0; a < 3; ++a)
+        for (int b = a + 1; b < 3; ++b)
+        {
+            const int c = 3 - a - b;
+            for (int sa = -1; sa <= 1; sa += 2)
+                for (int sb = -1; sb <= 1; sb += 2)
+                    for (int k = 0; k <= 32; ++k)
+                    {
+                        double p[3] = {};
+                        p[a] = sa;
+                        p[b] = sb;
+                        p[c] = -0.9 + 1.8 * k / 32.0;
+                        const Vec3 d = Normalize({ p[0], p[1], p[2] });
+                        const float faceA = float(a * 2 + (sa > 0 ? 0 : 1));
+                        const float faceB = float(b * 2 + (sb > 0 ? 0 : 1));
+                        dirs.insert(dirs.end(), { float(d.x), float(d.y), float(d.z), faceA });
+                        dirs.insert(dirs.end(), { float(d.x), float(d.y), float(d.z), faceB });
+                    }
+        }
+    return dirs;
+}
+
+// mg_sample the field at each direction (vec4 per entry) on the GPU.
+std::vector<float> SampleField(PgContext ctx, planetgen::GpuTextureHandle field, const std::vector<float>& dirs)
+{
+    auto& gpu = *ctx->backend;
+    const uint32_t sample = CompileProbe(ctx, "test_macro_grid_sample", kSampleProbe);
+    const size_t count = dirs.size() / 4;
+
+    const auto dirBuf = gpu.CreateBuffer(dirs.size() * sizeof(float));
+    gpu.UploadBuffer(dirBuf, dirs.data(), dirs.size() * sizeof(float));
+    const auto valBuf = gpu.CreateBuffer(count * 4 * sizeof(float));
+
+    gpu.BindShader(sample);
+    gpu.BindTexture2DArray(field, 5);
+    gpu.BindBuffer(dirBuf, 0);
+    gpu.BindBuffer(valBuf, 1);
+    gpu.Dispatch(static_cast<uint32_t>((count + 63) / 64));
+    gpu.Barrier();
+
+    std::vector<float> vals(count * 4);
+    gpu.DownloadBuffer(valBuf, vals.data(), vals.size() * sizeof(float));
+    gpu.DestroyBuffer(dirBuf);
+    gpu.DestroyBuffer(valBuf);
+    return vals;
+}
+
+std::vector<float> DownloadField(PgContext ctx, planetgen::GpuTextureHandle field, uint32_t res)
+{
+    std::vector<float> texels(static_cast<size_t>(res) * res * 6 * 4);
+    ctx->backend->DownloadTexture(field, texels.data(), texels.size() * sizeof(float));
+    return texels;
+}
+
+planetgen::BodyConfig MacroEarth(int resolution)
+{
+    auto cfg = LoadEarth();
+    cfg.macroWorld.enabled = true;
+    cfg.macroWorld.resolution = resolution;
+    return cfg;
+}
+
+// Owns a continent mask for a config so bake tests can run stages directly.
+struct MaskHolder
+{
+    PgContext ctx;
+    planetgen::GpuTextureHandle tex = 0;
+    MaskHolder(PgContext c, const planetgen::BodyConfig& cfg, uint32_t seed) : ctx(c)
+    {
+        tex = planetgen::BakeContinentMask(*ctx->backend, ctx->registry, cfg, seed);
+        REQUIRE(tex != 0);
+    }
+    ~MaskHolder() { ctx->backend->DestroyTexture(tex); }
+};
 
 } // namespace
 
@@ -266,7 +352,6 @@ TEST_CASE("macro_world grid: bilinear sampling is continuous across cube edges",
     auto& gpu = *ctx->backend;
 
     const uint32_t fill = CompileProbe(ctx, "test_macro_grid_fill", kFieldFill);
-    const uint32_t sample = CompileProbe(ctx, "test_macro_grid_sample", kSampleProbe);
 
     const auto field = gpu.CreateTexture2DArray_RGBA32F(n, 6);
     gpu.BindShader(fill);
@@ -274,44 +359,9 @@ TEST_CASE("macro_world grid: bilinear sampling is continuous across cube edges",
     gpu.Dispatch(n / 8, n / 8, 6);
     gpu.ImageBarrier();
 
-    // Pairs of points a hair either side of each of the 12 cube edges.
-    std::vector<float> dirs;
-    const double eps = 1e-4;
-    for (int a = 0; a < 3; ++a)
-        for (int b = a + 1; b < 3; ++b)
-        {
-            const int c = 3 - a - b;
-            for (int sa = -1; sa <= 1; sa += 2)
-                for (int sb = -1; sb <= 1; sb += 2)
-                    for (int k = 0; k <= 16; ++k)
-                    {
-                        const double along = -0.8 + 1.6 * k / 16.0;
-                        for (int side = -1; side <= 1; side += 2)
-                        {
-                            double p[3] = {};
-                            p[a] = sa * (1.0 + side * eps);
-                            p[b] = sb * (1.0 - side * eps);
-                            p[c] = along;
-                            const Vec3 d = Normalize({ p[0], p[1], p[2] });
-                            dirs.insert(dirs.end(), { float(d.x), float(d.y), float(d.z), 0.0f });
-                        }
-                    }
-        }
+    const std::vector<float> dirs = EdgePairDirs();
     const size_t count = dirs.size() / 4;
-
-    const auto dirBuf = gpu.CreateBuffer(dirs.size() * sizeof(float));
-    gpu.UploadBuffer(dirBuf, dirs.data(), dirs.size() * sizeof(float));
-    const auto valBuf = gpu.CreateBuffer(count * 4 * sizeof(float));
-
-    gpu.BindShader(sample);
-    gpu.BindTexture2DArray(field, 5);
-    gpu.BindBuffer(dirBuf, 0);
-    gpu.BindBuffer(valBuf, 1);
-    gpu.Dispatch(static_cast<uint32_t>((count + 63) / 64));
-    gpu.Barrier();
-
-    std::vector<float> vals(count * 4);
-    gpu.DownloadBuffer(valBuf, vals.data(), vals.size() * sizeof(float));
+    const std::vector<float> vals = SampleField(ctx, field, dirs);
 
     double worstSeam = 0.0;
     double worstAnalytic = 0.0;
@@ -324,11 +374,71 @@ TEST_CASE("macro_world grid: bilinear sampling is continuous across cube edges",
         worstAnalytic = std::max(worstAnalytic, std::fabs(vals[p * 4] - (d.x + 0.5 * d.y * d.z)));
     }
     INFO("worst seam jump " << worstSeam << ", worst analytic error " << worstAnalytic);
-    CHECK(worstSeam < 1e-3);
+    CHECK(worstSeam < 1e-5);
     CHECK(worstAnalytic < 0.02);
 
-    gpu.DestroyBuffer(dirBuf);
-    gpu.DestroyBuffer(valBuf);
     gpu.DestroyTexture(field);
+    pg_context_destroy(ctx);
+}
+
+TEST_CASE("macro_world bake: same seed gives a bit-identical field, another seed differs", "[gpu][macro_world]")
+{
+    const int Res = 64;
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+    auto& gpu = *ctx->backend;
+
+    const auto cfg = MacroEarth(Res);
+    {
+    MaskHolder mask(ctx, cfg, 42u);
+
+    const auto a = planetgen::BakeMacroWorld(gpu, ctx->registry, cfg, 42u, mask.tex);
+    const auto b = planetgen::BakeMacroWorld(gpu, ctx->registry, cfg, 42u, mask.tex);
+    const auto c = planetgen::BakeMacroWorld(gpu, ctx->registry, cfg, 7u, mask.tex);
+    REQUIRE(a != 0);
+    REQUIRE(b != 0);
+    REQUIRE(c != 0);
+
+    const auto fa = DownloadField(ctx, a, Res);
+    const auto fb = DownloadField(ctx, b, Res);
+    const auto fc = DownloadField(ctx, c, Res);
+    CHECK(std::memcmp(fa.data(), fb.data(), fa.size() * sizeof(float)) == 0);
+    CHECK(std::memcmp(fa.data(), fc.data(), fa.size() * sizeof(float)) != 0);
+
+    for (auto t : { a, b, c })
+        gpu.DestroyTexture(t);
+    }
+    pg_context_destroy(ctx);
+}
+
+TEST_CASE("macro_world bake: field is seamless across cube-face edges", "[gpu][macro_world]")
+{
+    const int Res = 128;
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+    auto& gpu = *ctx->backend;
+
+    const auto cfg = MacroEarth(Res);
+    {
+    MaskHolder mask(ctx, cfg, 42u);
+    const auto field = planetgen::BakeMacroWorld(gpu, ctx->registry, cfg, 42u, mask.tex);
+    REQUIRE(field != 0);
+
+    const auto dirs = EdgePairDirs();
+    const auto vals = SampleField(ctx, field, dirs);
+
+    double worst = 0.0;
+    for (size_t p = 0; p < vals.size() / 4; p += 2)
+        for (int ch = 0; ch < 4; ++ch)
+        {
+            const double a = vals[p * 4 + ch];
+            const double b = vals[(p + 1) * 4 + ch];
+            worst = std::max(worst, std::fabs(a - b) / std::max(1.0, std::fabs(a)));
+        }
+    INFO("worst relative seam jump " << worst);
+    CHECK(worst < 1e-4);
+
+    gpu.DestroyTexture(field);
+    }
     pg_context_destroy(ctx);
 }

@@ -74,12 +74,12 @@ ivec3 mg_neighbour(int f, ivec2 ij, int dx, int dy, int n)
     return mg_wrapCell(f, ij + ivec2(dx, dy), n);
 }
 
-// Bilinear sample by direction. Taps past a face edge come from the adjacent face,
-// so the result is continuous across cube edges (hardware filtering stops at layers).
-vec4 mg_sample(sampler2DArray field, vec3 d)
+// Bilinear sample of d as seen from face f (d must be in front of f). Taps past a
+// face edge come from the adjacent face, so a point on a cube edge gets the same
+// value from either face (hardware filtering stops at layers).
+vec4 mg_sampleOnFace(sampler2DArray field, vec3 d, int f)
 {
     int n = textureSize(field, 0).x;
-    int f = mg_dirToFace(d);
     vec2 x = (mg_dirToST(d, f) * 0.5 + 0.5) * float(n) - 0.5;
     ivec2 i0 = ivec2(floor(x));
     vec2 w = x - vec2(i0);
@@ -95,4 +95,9 @@ vec4 mg_sample(sampler2DArray field, vec3 d)
     vec4 v11 = texelFetch(field, ivec3(c11.yz, c11.x), 0);
 
     return mix(mix(v00, v10, w.x), mix(v01, v11, w.x), w.y);
+}
+
+vec4 mg_sample(sampler2DArray field, vec3 d)
+{
+    return mg_sampleOnFace(field, d, mg_dirToFace(d));
 }
