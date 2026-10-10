@@ -80,17 +80,17 @@ vec3 skyTransmittance(vec2 opticalDepth)
     return exp(-opticalDepth.x * uScatteringCoefficients - opticalDepth.y * uMieCoefficient);
 }
 
-// 1 where the sun is above the local horizon of p, 0 where the planet blocks it. The narrow soft
-// edge keeps the earth shadow in the sky from stepping between the few view samples.
+// 1 where the sun clears the planet as seen from p, 0 where the planet blocks it. Compares the
+// sun's height with the horizon dip at p's altitude; soft across the horizon, so samples at or
+// below the surface fade with the terminator instead of switching at its plane.
 float skySunVisibility(vec3 p, vec3 sunDir)
 {
     vec3 offset = p - uPlanetCenter;
-    float along = dot(offset, sunDir);
-    if (along >= 0.0)
-        return 1.0;
-    float closest = length(offset - sunDir * along);
-    float edge = (uAtmosphereRadius - uPlanetRadius) * 0.05;
-    return smoothstep(uPlanetRadius - edge, uPlanetRadius + edge, closest);
+    float r = length(offset);
+    float sunHeight = dot(offset / r, sunDir);
+    float ratio = min(uPlanetRadius / r, 1.0);
+    float horizon = -sqrt(1.0 - ratio * ratio);
+    return smoothstep(horizon - 0.04, horizon + 0.04, sunHeight);
 }
 
 struct SkyScatter
