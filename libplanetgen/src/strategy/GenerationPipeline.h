@@ -57,7 +57,7 @@ public:
         uint64_t*         key     = nullptr; // body's cache key (inout)
     };
 
-    // Optional macro world cache, owned by the body like the mask cache. When
+    // Optional macro world cache, owned by the context (shared by its bodies). When
     // non-null and the config enables the layer, the pipeline bakes/reuses the
     // field (it needs the mask) and binds it for height + shading.
     struct MacroCache

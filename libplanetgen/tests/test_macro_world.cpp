@@ -863,3 +863,35 @@ TEST_CASE("macro_world timing: the full bake at the default resolution takes und
     }
     pg_context_destroy(ctx);
 }
+
+TEST_CASE("macro_world cache: a recreated body reuses the field until a bake input changes", "[gpu][macro_world]")
+{
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+
+    auto cfg = MacroEarth(64);
+    auto generate = [&](const planetgen::BodyConfig& c)
+    {
+        // Same pattern as the app: a fresh body from the edited config's JSON.
+        PgBody body = pg_body_create_from_json_string(ctx, planetgen::BodyConfigToJson(c).c_str());
+        REQUIRE(body != nullptr);
+        PgResult r = pg_generate_mesh(body, 8, 16, 42u);
+        REQUIRE(r != nullptr);
+        pg_result_destroy(r);
+        pg_body_destroy(body);
+        return ctx->macroBuiltKey;
+    };
+
+    const uint64_t first = generate(cfg);
+    REQUIRE(first != 0);
+    const auto texture = ctx->macroTexture;
+
+    cfg.shape.heightScale *= 1.5f; // not read by the bake
+    CHECK(generate(cfg) == first);
+    CHECK(ctx->macroTexture == texture);
+
+    cfg.macroWorld.erosionIterations += 1; // read by the bake
+    CHECK(generate(cfg) != first);
+
+    pg_context_destroy(ctx);
+}
