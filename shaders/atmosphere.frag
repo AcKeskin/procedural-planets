@@ -4,6 +4,7 @@
 // surface shader applies, so the terminator's sky reddening meets the ground twilight band with no split.
 #include "lighting.glsl"
 #include "tonemap.glsl"
+#include "sky_radiance.glsl"
 
 in vec2 vUv;
 
@@ -23,77 +24,17 @@ uniform vec3 uCameraPos;
 uniform vec3 uLightDir;          // points FROM the sun, like every other shader
 uniform vec3 uSunColor;           // the sun-of-record's color; tints in-scatter and its dusk band
 
-uniform vec3 uPlanetCenter;
-uniform float uPlanetRadius;
-uniform float uAtmosphereRadius;
 uniform float uOceanRadius;
 
-uniform vec3 uScatteringCoefficients;
-uniform float uDensityFalloff;
-uniform float uIntensity;
 uniform int uNumInScatteringPoints;
 uniform int uNumOpticalDepthPoints;
-
-// Mie contributes to extinction only, not in-scattering color
-uniform float uMieCoefficient;
-uniform float uMieDensityFalloff;
 
 uniform float uNearPlane;
 uniform float uFarPlane;
 
-const float MAX_FLOAT = 3.402823466e+38;
-
 vec2 squareUV(vec2 uv, vec2 screenSize) {
     const float scale = 1000.0;
     return vec2(uv.x * screenSize.x / scale, uv.y * screenSize.y / scale);
-}
-
-// Returns (distanceToSphere, distanceThroughSphere)
-vec2 raySphere(vec3 sphereCenter, float sphereRadius, vec3 rayOrigin, vec3 rayDir)
-{
-    vec3 offset = rayOrigin - sphereCenter;
-    float b = 2.0 * dot(offset, rayDir);
-    float c = dot(offset, offset) - sphereRadius * sphereRadius;
-    float discriminant = b * b - 4.0 * c;
-
-    if (discriminant > 0.0)
-    {
-        float s = sqrt(discriminant);
-        float dstToSphereNear = max(0.0, (-b - s) * 0.5);
-        float dstToSphereFar = (-b + s) * 0.5;
-
-        if (dstToSphereFar >= 0.0)
-        {
-            return vec2(dstToSphereNear, dstToSphereFar - dstToSphereNear);
-        }
-    }
-    return vec2(MAX_FLOAT, 0.0);
-}
-
-// Returns vec2(Rayleigh, Mie) density
-// Linear term (1-h) forces density to zero at atmosphere edge, eliminating fringe artifacts
-vec2 densityAtPoint(vec3 point)
-{
-    float heightAboveSurface = length(point - uPlanetCenter) - uPlanetRadius;
-    float height01 = heightAboveSurface / (uAtmosphereRadius - uPlanetRadius);
-    float rayleigh = exp(-height01 * uDensityFalloff) * (1.0 - height01);
-    float mie = exp(-height01 * uMieDensityFalloff) * (1.0 - height01);
-    return vec2(rayleigh, mie);
-}
-
-// Returns vec2(Rayleigh, Mie) optical depth along a ray
-vec2 opticalDepth(vec3 rayOrigin, vec3 rayDir, float rayLength)
-{
-    vec3 samplePoint = rayOrigin;
-    float stepSize = rayLength / float(uNumOpticalDepthPoints - 1);
-    vec2 depth = vec2(0.0);
-
-    for (int i = 0; i < uNumOpticalDepthPoints; i++)
-    {
-        depth += densityAtPoint(samplePoint) * stepSize;
-        samplePoint += rayDir * stepSize;
-    }
-    return depth;
 }
 
 // Raymarched in-scattering with brightness-adapted surface compositing
@@ -103,29 +44,10 @@ vec3 calculateLight(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 originalC
     float blueNoise = texture(uBlueNoise, squareUV(uv, screenSize) * uDitherScale).r;
     blueNoise = (blueNoise - 0.5) * uDitherStrength;
 
-    vec3 inScatterPoint = rayOrigin;
-    float stepSize = rayLength / float(uNumInScatteringPoints - 1);
-    vec3 inScatteredLight = vec3(0.0);
-    vec2 viewRayOpticalDepth = vec2(0.0);
-
     vec3 sunDir = -normalize(uLightDir); // toward the sun
-    for (int i = 0; i < uNumInScatteringPoints; i++)
-    {
-        float sunRayLength = raySphere(uPlanetCenter, uAtmosphereRadius, inScatterPoint, sunDir).y;
-        vec2 sunRayOpticalDepth = opticalDepth(inScatterPoint, sunDir, sunRayLength);
-
-        vec2 localDensity = densityAtPoint(inScatterPoint);
-        viewRayOpticalDepth += localDensity * stepSize;
-
-        // Combined Rayleigh + Mie extinction
-        vec3 transmittance = exp(-(sunRayOpticalDepth.x + viewRayOpticalDepth.x) * uScatteringCoefficients
-                                - (sunRayOpticalDepth.y + viewRayOpticalDepth.y) * uMieCoefficient);
-
-        inScatteredLight += localDensity.x * transmittance;
-        inScatterPoint += rayDir * stepSize;
-    }
-
-    inScatteredLight *= uScatteringCoefficients * uIntensity * stepSize;
+    SkyScatter scatter = skyScatter(rayOrigin, rayDir, rayLength, sunDir, uNumInScatteringPoints, uNumOpticalDepthPoints);
+    vec3 inScatteredLight = scatter.inScatter;
+    vec2 viewRayOpticalDepth = scatter.viewOpticalDepth;
 
     // Warm the sky through the twilight band. Rayleigh in-scatter is intrinsically blue, so a
     // multiplicative warm tint would only desaturate it — instead shift its hue toward the warm
@@ -197,10 +119,10 @@ void main()
     float linearDepth = linearizeDepth(depthSample);
     float sceneDepth = linearDepth / dot(rayDir, (uInvView * vec4(0.0, 0.0, -1.0, 0.0)).xyz);
 
-    float dstToOcean = raySphere(uPlanetCenter, uOceanRadius, rayOrigin, rayDir).x;
+    float dstToOcean = skyRaySphere(uPlanetCenter, uOceanRadius, rayOrigin, rayDir).x;
     float dstToSurface = min(sceneDepth, dstToOcean);
 
-    vec2 atmosphereHit = raySphere(uPlanetCenter, uAtmosphereRadius, rayOrigin, rayDir);
+    vec2 atmosphereHit = skyRaySphere(uPlanetCenter, uAtmosphereRadius, rayOrigin, rayDir);
     float dstToAtmosphere = atmosphereHit.x;
     float dstThroughAtmosphere = min(atmosphereHit.y, dstToSurface - dstToAtmosphere);
 
