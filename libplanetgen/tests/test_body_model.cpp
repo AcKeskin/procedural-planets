@@ -367,3 +367,62 @@ TEST_CASE("ContinentGrowthParams struct has correct size (std140 2-row)", "[mode
     CHECK(sizeof(planetgen::ContinentGrowthParams) == 32u);
     CHECK(alignof(planetgen::ContinentGrowthParams) == 16u);
 }
+
+// ============================================================================
+// Macro world block
+// ============================================================================
+
+TEST_CASE("macro_world block is off by default and round-trips through JSON", "[model][json][macro_world]")
+{
+    planetgen::BodyConfig original;
+    CHECK_FALSE(original.macroWorld.enabled);
+
+    auto& m = original.macroWorld;
+    m.enabled             = true;
+    m.resolution          = 128;
+    m.convergentThreshold = 0.45f;
+    m.erosionIterations   = 33;
+    m.rainRate            = 0.02f;
+    m.evaporationRate     = 0.03f;
+    m.flowRate            = 0.4f;
+    m.erosionRate         = 0.2f;
+    m.depositionRate      = 0.1f;
+    m.capacityMultiplier  = 3.0f;
+    m.moistureIterations  = 20;
+    m.windStrength        = 1.5f;
+    m.landDrying          = 0.05f;
+    m.orographicStrength  = 6.0f;
+
+    planetgen::BodyConfig parsed;
+    REQUIRE(planetgen::BodyConfigFromJson(planetgen::BodyConfigToJson(original), parsed).empty());
+
+    const auto& p = parsed.macroWorld;
+    CHECK(p.enabled             == m.enabled);
+    CHECK(p.resolution          == m.resolution);
+    CHECK(p.convergentThreshold == m.convergentThreshold);
+    CHECK(p.erosionIterations   == m.erosionIterations);
+    CHECK(p.rainRate            == m.rainRate);
+    CHECK(p.evaporationRate     == m.evaporationRate);
+    CHECK(p.flowRate            == m.flowRate);
+    CHECK(p.erosionRate         == m.erosionRate);
+    CHECK(p.depositionRate      == m.depositionRate);
+    CHECK(p.capacityMultiplier  == m.capacityMultiplier);
+    CHECK(p.moistureIterations  == m.moistureIterations);
+    CHECK(p.windStrength        == m.windStrength);
+    CHECK(p.landDrying          == m.landDrying);
+    CHECK(p.orographicStrength  == m.orographicStrength);
+}
+
+TEST_CASE("macro_world validation rejects out-of-range fields only when enabled", "[model][validation][macro_world]")
+{
+    planetgen::BodyConfig cfg;
+    cfg.macroWorld.resolution = 4;
+    CHECK(cfg.Validate().empty());
+
+    cfg.macroWorld.enabled = true;
+    CHECK(cfg.Validate().find("macroWorld.resolution") != std::string::npos);
+
+    cfg.macroWorld.resolution = 256;
+    cfg.macroWorld.windStrength = 0.0f;
+    CHECK(cfg.Validate().find("macroWorld.windStrength") != std::string::npos);
+}
