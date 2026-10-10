@@ -59,6 +59,9 @@ vec2 skyOpticalDepth(vec3 rayOrigin, vec3 rayDir, float rayLength, int samples)
 
 // Phase functions, scaled so their average over the sphere is 1 (uIntensity keeps its meaning).
 const float SKY_MIE_G = 0.76; // forward lobe of haze: the bright halo around the sun
+// Light scattered more than once, as a share of single scattering. Lifts the sky overhead and
+// fills the earth shadow at twilight without a second march.
+const float SKY_MULTI_SCATTER = 0.3;
 
 float skyRayleighPhase(float cosTheta)
 {
@@ -104,12 +107,19 @@ SkyScatter skyScatter(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 sunDir,
     float stepSize = rayLength / float(viewSamples - 1);
     vec3 rayleigh = vec3(0.0);
     vec3 mie = vec3(0.0);
+    vec3 ambient = vec3(0.0);
     vec2 viewOpticalDepth = vec2(0.0);
 
     for (int i = 0; i < viewSamples; i++)
     {
         vec2 localDensity = skyDensity(inScatterPoint);
         viewOpticalDepth += localDensity * stepSize;
+
+        // Multiple scattering: isotropic, from the whole lit sky above the sample, so it follows
+        // the local sun height and fades a little past the terminator instead of at it.
+        float sunHeight = dot(normalize(inScatterPoint - uPlanetCenter), sunDir);
+        vec3 localScatter = localDensity.x * uScatteringCoefficients + localDensity.y * uMieCoefficient;
+        ambient += localScatter * skyTransmittance(viewOpticalDepth) * smoothstep(-0.2, 0.3, sunHeight);
 
         float visibility = skySunVisibility(inScatterPoint, sunDir);
         if (visibility > 0.0)
@@ -125,6 +135,7 @@ SkyScatter skyScatter(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 sunDir,
 
     float cosTheta = dot(rayDir, sunDir);
     vec3 inScatter = rayleigh * uScatteringCoefficients * skyRayleighPhase(cosTheta)
-                   + mie * uMieCoefficient * skyMiePhase(cosTheta);
+                   + mie * uMieCoefficient * skyMiePhase(cosTheta)
+                   + ambient * SKY_MULTI_SCATTER;
     return SkyScatter(inScatter * uIntensity * stepSize, skyTransmittance(viewOpticalDepth));
 }
