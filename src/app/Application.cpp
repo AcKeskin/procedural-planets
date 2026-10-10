@@ -682,6 +682,10 @@ void Application::RenderGui()
 
         _terrainStats.patchCount = _renderer.QuadTree().GetActiveLeafCount();
         _terrainStats.visiblePatchCount = _renderer.QuadTree().GetVisiblePatchCount();
+        const render::GpuTimings gpu = _renderer.Timings();
+        _terrainStats.gpuTerrainMs = gpu.terrainMs;
+        _terrainStats.gpuOceanMs = gpu.oceanMs;
+        _terrainStats.gpuEffectsMs = gpu.effectsMs;
 
         bool randomize = false;
         bool needsRegen =
@@ -785,7 +789,7 @@ void Application::RegenerateLodSystem()
             _libBody = std::move(rebuilt);
     }
 
-    _renderer.SetActiveBody(_libBody.Handle(), *_activeBody, BuildQuadTreeConfig(), _seaLevel, _genConfig.seed);
+    _renderer.SetActiveBody(_libBody.Handle(), *_activeBody, BuildQuadTreeConfig(), _genConfig.seed);
 
     float farPlane =
         (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);

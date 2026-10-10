@@ -58,7 +58,7 @@ void Renderer::ResizeFramebuffer(int width, int height)
 }
 
 bool Renderer::SetActiveBody(
-    PgBody body, const BodyRuntime& runtime, const lod::QuadTreeConfig& quadTreeConfig, float seaLevel, uint32_t seed)
+    PgBody body, const BodyRuntime& runtime, const lod::QuadTreeConfig& quadTreeConfig, uint32_t seed)
 {
     if (!_planetShader.LoadFromFiles(runtime.GetVertexShaderPath(), runtime.GetFragmentShaderPath()))
     {
@@ -73,7 +73,7 @@ bool Renderer::SetActiveBody(
     _scheduler.Initialize(body, seed);
 
     _quadTree.Initialize(quadTreeConfig, _scheduler, seed);
-    _oceanRenderer.Initialize(quadTreeConfig.planetRadius, seaLevel, OceanSubdivisions, body, seed);
+    _oceanRenderer.Initialize();
     _cloudRenderer.Initialize(quadTreeConfig.planetRadius);
     _atmosphereRenderer.Initialize();
     return true;
@@ -99,21 +99,36 @@ void Renderer::DrawScene(const RenderContext& ctx)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     DrawSpace(ctx, invView, invProjection);
+    _terrainTimer.Begin();
     DrawPlanet(ctx, viewProjection);
+    _terrainTimer.End();
 
+    _oceanTimer.Begin();
     if (ctx.body && ctx.seaLevel > 0.0f && ctx.ocean && ctx.scene)
     {
-        _oceanRenderer.Render(ctx.view,
-                              ctx.projection,
-                              ctx.cameraPos,
-                              ctx.scene->lightDir,
-                              ctx.scene->sunColor,
-                              ctx.scene->lighting.sunIntensity,
-                              ctx.scene->lighting.ambientLight,
-                              ctx.time,
-                              *ctx.ocean);
+        effects::OceanFrame frame;
+        frame.view = ctx.view;
+        frame.projection = ctx.projection;
+        frame.cameraPos = ctx.cameraPos;
+        frame.lightDir = ctx.scene->lightDir;
+        frame.sunColor = ctx.scene->sunColor;
+        frame.sunIntensity = ctx.scene->lighting.sunIntensity;
+        frame.ambientLight = ctx.scene->lighting.ambientLight;
+        frame.time = ctx.time;
+        frame.seaLevel = ctx.seaLevel;
+        frame.heightScale = ctx.body->GetHeightScale();
+        if (ctx.atmosphere)
+        {
+            frame.atmosphereOn = ctx.atmosphere->enabled;
+            frame.wavelengths = ctx.atmosphere->wavelengths;
+            frame.scatteringStrength = ctx.atmosphere->scatteringStrength;
+            frame.atmosphereIntensity = ctx.atmosphere->intensity;
+        }
+        _oceanRenderer.Render(frame, *ctx.ocean, _quadTree);
     }
+    _oceanTimer.End();
 
+    _effectsTimer.Begin();
     // Clouds draw into the scene (over the surface, before the atmosphere post-process) so the
     // limb + aerial perspective scatter over the cloud tops.
     if (ctx.clouds && ctx.scene)
@@ -135,6 +150,7 @@ void Renderer::DrawScene(const RenderContext& ctx)
     glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     DrawAtmosphereOrPassthrough(ctx, invView, invProjection);
+    _effectsTimer.End();
 }
 
 void Renderer::DrawSpace(const RenderContext& ctx, const glm::mat4& invView, const glm::mat4& invProjection)
@@ -227,7 +243,7 @@ void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
 {
     if (ctx.atmosphere && ctx.atmosphere->enabled && ctx.scene)
     {
-        const float oceanRadius = ctx.planetRadius * ctx.seaLevel;
+        const float oceanRadius = ctx.SeaLevelRadius();
         _atmosphereRenderer.Render(ctx.view,
                                    ctx.projection,
                                    invView,

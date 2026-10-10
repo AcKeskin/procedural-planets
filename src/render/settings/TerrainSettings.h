@@ -41,7 +41,9 @@ struct TerrainStats
     int visiblePatchCount = 0;
     int vertexCount = 0;
     float cpuTimeMs = 0.0f;
-    float gpuTimeMs = 0.0f;
+    float gpuTerrainMs = 0.0f;
+    float gpuOceanMs = 0.0f;
+    float gpuEffectsMs = 0.0f;
     bool gpuAvailable = false;
 };
 

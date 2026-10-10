@@ -12,6 +12,7 @@ add_library(render STATIC
     gui/CinematicPanel.cpp
     gui/CloudsPanel.cpp
     Renderer.cpp
+    GpuTimer.cpp
     Mesh.cpp
     GlFence.cpp
     GenerationScheduler.cpp

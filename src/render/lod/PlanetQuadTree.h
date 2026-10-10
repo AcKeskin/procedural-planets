@@ -67,6 +67,9 @@ private:
     void EnqueueGeneration(QuadTreeNode& node, GenerationType type);
     bool IsPending(const QuadTreeNode* node) const;
 
+    // Every node below `node` (not `node` itself).
+    static void CollectDescendants(const QuadTreeNode& node, std::unordered_set<const QuadTreeNode*>& out);
+
     // Collect nodes to render, falling back to parent when children lack patches
     void CollectRenderableNodes(const QuadTreeNode& node, std::vector<const QuadTreeNode*>& nodes) const;
 
