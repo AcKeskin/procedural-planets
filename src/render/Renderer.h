@@ -40,7 +40,9 @@ struct RenderContext
 
     const BodyRuntime* body = nullptr; // null when no body loaded; carries shading/AO via Config()
     float planetRadius = 1.0f;
-    float seaLevel = 0.0f;
+    float seaLevel = 0.0f; // radial multiplier: the one sea level terrain, ocean and atmosphere share
+
+    float SeaLevelRadius() const { return planetRadius * seaLevel; }
 };
 
 // GPU time of the scene passes, in milliseconds (smoothed, a few frames behind).

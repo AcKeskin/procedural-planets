@@ -12,7 +12,6 @@ struct OceanSettings
     glm::vec3 deepColor = glm::vec3(0.02f, 0.09f, 0.22f);
     glm::vec3 shallowColor = glm::vec3(0.08f, 0.42f, 0.55f);
     float fresnelPower = 2.0f;
-    float depthMultiplier = 10.0f;
     float waveStrength = 0.15f;
     float waveScale = 15.0f;
     float waveSpeed = 0.5f;

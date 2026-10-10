@@ -12,7 +12,6 @@ uniform float uAmbientLight;   // keeps water readable off the key light, matchi
 uniform vec3 uDeepColor;
 uniform vec3 uShallowColor;
 uniform float uFresnelPower;
-uniform float uDepthMultiplier;
 uniform float uWaveStrength;
 uniform float uWaveScale;
 uniform float uWaveSpeed;

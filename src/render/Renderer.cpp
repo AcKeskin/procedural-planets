@@ -233,7 +233,7 @@ void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
 {
     if (ctx.atmosphere && ctx.atmosphere->enabled && ctx.scene)
     {
-        const float oceanRadius = ctx.planetRadius * ctx.seaLevel;
+        const float oceanRadius = ctx.SeaLevelRadius();
         _atmosphereRenderer.Render(ctx.view,
                                    ctx.projection,
                                    invView,

@@ -197,7 +197,6 @@ const std::unordered_map<std::string, Entry>& Table()
         {"ocean.deepColor", {false, SET_VEC3(t.ocean->deepColor)}},
         {"ocean.shallowColor", {false, SET_VEC3(t.ocean->shallowColor)}},
         {"ocean.fresnelPower", {false, SET_FLOAT(t.ocean->fresnelPower)}},
-        {"ocean.depthMultiplier", {false, SET_FLOAT(t.ocean->depthMultiplier)}},
         {"ocean.waveStrength", {false, SET_FLOAT(t.ocean->waveStrength)}},
         {"ocean.waveScale", {false, SET_FLOAT(t.ocean->waveScale)}},
         {"ocean.waveSpeed", {false, SET_FLOAT(t.ocean->waveSpeed)}},
