@@ -13,6 +13,7 @@
 #include "gui/DebugPanel.h"
 #include "gui/CloudsPanel.h"
 #include "types/BodyRegistry.h"
+#include "types/BodyLook.h"
 #include "settings/SceneSettings.h"
 #include "settings/TerrainSettings.h"
 #include "settings/OceanSettings.h"
@@ -124,7 +125,8 @@ private:
     void ApplyCaptureExposure();
 
     // Load a BodyConfig from data/bodies/<name>.json and switch to it
-    void SwitchBody(planetgen::BodyConfig config);
+    // Makes this body active and applies its look (sky, clouds, ocean, star).
+    void SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look = {});
     // Switches to a planet type from the registry; false (and a log line) when the id is unknown.
     bool SwitchBodyById(const std::string& id);
 

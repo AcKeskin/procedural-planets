@@ -33,6 +33,7 @@ add_library(render STATIC
     cinematic/CinematicController.cpp
     cinematic/CaptureManager.cpp
     types/BodyRegistry.cpp
+    types/BodyLook.cpp
     # Model and backend sources compiled directly (DLL boundary: symbols not exported via PG_API)
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfig.cpp
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfigProjection.cpp
@@ -71,6 +72,7 @@ target_link_libraries(render PUBLIC
 # root so it can read data/.
 add_executable(render_tests
     tests/test_body_registry.cpp
+    tests/test_body_look.cpp
 )
 target_link_libraries(render_tests PRIVATE render Catch2::Catch2WithMain)
 catch_discover_tests(render_tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

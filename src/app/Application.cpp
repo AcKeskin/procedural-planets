@@ -701,7 +701,7 @@ void Application::RenderGui()
     _guiManager.EndFrame();
 }
 
-void Application::SwitchBody(planetgen::BodyConfig config)
+void Application::SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look)
 {
     _activeBody = std::make_unique<render::BodyRuntime>(std::move(config), _paletteRegistry);
 
@@ -721,7 +721,11 @@ void Application::SwitchBody(planetgen::BodyConfig config)
 
     _lodConfig.planetRadius = _activeBody->GetRadius();
     _seaLevel = _activeBody->GetSeaLevel();
-    _atmosphereSettings.enabled = _activeBody->HasAtmosphere();
+    // Each planet type brings its own sky, clouds, ocean and star; a switch replaces them.
+    render::types::ApplyBodyLook(look, _atmosphereSettings, _cloudSettings, _oceanSettings, _sceneSettings);
+    _atmosphereSettings.enabled = _activeBody->HasAtmosphere() && look.atmosphere.enabled;
+    if (_capture.enabled)
+        ApplyCaptureExposure();
 
     RegenerateLodSystem();
 
@@ -745,7 +749,7 @@ bool Application::SwitchBodyById(const std::string& id)
     }
     _selectedBodyType = index;
     _activeBodyId = id;
-    SwitchBody(LoadBodyConfig(_bodies[index].path));
+    SwitchBody(LoadBodyConfig(_bodies[index].path), render::types::LoadBodyLook(_bodies[index].path));
     return true;
 }
 

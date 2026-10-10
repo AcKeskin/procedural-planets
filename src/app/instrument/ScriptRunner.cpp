@@ -49,7 +49,7 @@ std::string ScriptRunner::Dispatch(const Command& cmd)
         const auto& c = std::get<SetBodyCommand>(cmd.payload);
         // By id through the registry; an explicit path loads that file directly.
         if (!c.path.empty())
-            _app.SwitchBody(_app.LoadBodyConfigPublic(c.path)); // self-regenerates + reseats camera
+            _app.SwitchBody(_app.LoadBodyConfigPublic(c.path), render::types::LoadBodyLook(c.path));
         else if (!_app.SwitchBodyById(c.body))
             return "error: unknown body '" + c.body + "'";
         _dirty = false;
