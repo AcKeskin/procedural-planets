@@ -19,6 +19,8 @@ set(SHADER_SOURCES
     "${SHADER_SOURCE_DIR}/compute/macro_erosion_flow.comp"
     "${SHADER_SOURCE_DIR}/compute/macro_erosion_sediment.comp"
     "${SHADER_SOURCE_DIR}/compute/macro_erosion_flux.comp"
+    "${SHADER_SOURCE_DIR}/compute/macro_fill.comp"
+    "${SHADER_SOURCE_DIR}/compute/macro_rivers.comp"
     "${SHADER_SOURCE_DIR}/includes/noise.glsl"
     "${SHADER_SOURCE_DIR}/includes/macro_grid.glsl"
     "${SHADER_SOURCE_DIR}/includes/macro_params.glsl"

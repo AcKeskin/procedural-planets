@@ -64,6 +64,10 @@ public:
     // rainfall -> flow -> sediment. Total height + sediment is conserved.
     bool Erode(int iterations);
 
+    // Stage 3. Depression-fills the eroded height, picks each cell's steepest
+    // downstream cell, accumulates upstream flux, and writes field R + G.
+    bool Rivers();
+
     // Run every stage. Returns false (and leaves no field) on a missing program.
     bool RunAll(GpuTextureHandle continentMask);
 
@@ -72,10 +76,19 @@ public:
 
     uint32_t Resolution() const { return _res; }
     GpuTextureHandle Geo() const { return _geo; }
+    // R = downstream cell id ((face * n + j) * n + i), G = 1 for ocean sinks.
+    GpuTextureHandle Drainage() const { return _drain; }
+    GpuTextureHandle Field() const { return _field; }
 
 private:
     GpuTextureHandle NewArray();
     void Dispatch(uint32_t program, uint32_t passIndex);
+
+    // Dispatches `program` with rising pass indices until a pass changes no cell
+    // (checked every few passes via the changed counter) or `maxPasses` is hit.
+    // `bindPass` rebinds images for a pass index. Returns the passes run.
+    template <typename BindFn>
+    uint32_t RunUntilStable(uint32_t program, uint32_t firstPass, uint32_t maxPasses, BindFn bindPass);
 
     IComputeBackend& _backend;
     const ShaderRegistry& _registry;
@@ -87,6 +100,9 @@ private:
     GpuTextureHandle _geo = 0;
     GpuTextureHandle _geoTmp = 0; // erosion ping-pong partner of _geo
     GpuTextureHandle _flux = 0;   // erosion outflow accumulator (R)
+    GpuTextureHandle _fill = 0;   // depression-filled height (R, m)
+    GpuTextureHandle _drain = 0;  // downstream cell ids
+    GpuBufferHandle _changed = 0; // changed-cell counter SSBO
     GpuTextureHandle _field = 0;
 };
 

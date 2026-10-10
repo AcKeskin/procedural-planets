@@ -10,6 +10,8 @@ namespace
 {
 constexpr uint32_t kMacroGroupSize = 8; // local_size_x/y in every macro_*.comp
 constexpr uint32_t kFaces = 6;
+constexpr uint32_t kChangedBinding = 0;   // SSBO binding of the changed counter
+constexpr uint32_t kStableCheckEvery = 16; // passes between convergence readbacks
 constexpr float kHalfPi = 1.57079632679f;
 
 uint64_t Fnv1a(uint64_t h, const void* data, size_t bytes)
@@ -91,9 +93,11 @@ MacroWorldBake::MacroWorldBake(IComputeBackend& backend, const ShaderRegistry& r
 
 MacroWorldBake::~MacroWorldBake()
 {
-    for (GpuTextureHandle t : { _geo, _geoTmp, _flux, _field })
+    for (GpuTextureHandle t : { _geo, _geoTmp, _flux, _fill, _drain, _field })
         if (t)
             _backend.DestroyTexture(t);
+    if (_changed)
+        _backend.DestroyBuffer(_changed);
     _backend.DestroyParamBuffer(_ubo);
 }
 
@@ -162,15 +166,83 @@ bool MacroWorldBake::Erode(int iterations)
     return true;
 }
 
-bool MacroWorldBake::RunAll(GpuTextureHandle continentMask)
+template <typename BindFn>
+uint32_t MacroWorldBake::RunUntilStable(uint32_t program, uint32_t firstPass, uint32_t maxPasses,
+                                        BindFn bindPass)
 {
-    if (!Plates(continentMask) || !Erode(_erosionIterations))
+    if (!_changed)
+        _changed = _backend.CreateBuffer(sizeof(uint32_t));
+
+    uint32_t pass = firstPass;
+    while (pass < maxPasses)
+    {
+        const uint32_t zero = 0;
+        _backend.UploadBuffer(_changed, &zero, sizeof(zero));
+        _backend.BindBuffer(_changed, kChangedBinding);
+
+        for (uint32_t k = 0; k < kStableCheckEvery && pass < maxPasses; ++k, ++pass)
+        {
+            bindPass(pass);
+            Dispatch(program, pass);
+        }
+
+        _backend.Barrier();
+        uint32_t changed = 0;
+        _backend.DownloadBuffer(_changed, &changed, sizeof(changed));
+        if (changed == 0)
+            break;
+    }
+    return pass;
+}
+
+bool MacroWorldBake::Rivers()
+{
+    const uint32_t fill = _registry.Resolve(BuiltinProgram::MacroFill);
+    const uint32_t rivers = _registry.Resolve(BuiltinProgram::MacroRivers);
+    const uint32_t flux = _registry.Resolve(BuiltinProgram::MacroErosionFlux);
+    if (!fill || !rivers || !flux || !_geo)
         return false;
 
-    // Until the later stages exist the geo texture is the field.
-    _field = _geo;
-    _geo = 0;
+    // Longest possible drainage path, in passes; convergence normally stops far sooner.
+    const uint32_t maxPasses = 8u * _res;
+
+    if (!_fill)
+        _fill = NewArray();
+    _backend.BindImage2DArray(_geo, 0);
+    _backend.BindImage2DArray(_fill, 1);
+    RunUntilStable(fill, 0, maxPasses, [](uint32_t) {});
+
+    if (!_drain)
+        _drain = NewArray();
+    _backend.BindImage2DArray(_fill, 0);
+    _backend.BindImage2DArray(_drain, 1);
+    Dispatch(rivers, 0);
+
+    // Flux ping-pongs between the two erosion scratch arrays, free by now.
+    if (!_flux)
+        _flux = NewArray();
+    if (!_geoTmp)
+        _geoTmp = NewArray();
+    const GpuTextureHandle ping[2] = { _flux, _geoTmp };
+    const uint32_t passes = RunUntilStable(flux, 0, maxPasses, [&](uint32_t pass) {
+        _backend.BindImage2DArray(_drain, 0);
+        _backend.BindImage2DArray(ping[pass % 2], 1);
+        _backend.BindImage2DArray(ping[(pass + 1) % 2], 2);
+    });
+    const GpuTextureHandle upstream = ping[passes % 2]; // output of the last pass
+
+    if (!_field)
+        _field = NewArray();
+    _backend.BindImage2DArray(_fill, 0);
+    _backend.BindImage2DArray(upstream, 1);
+    _backend.BindImage2DArray(_field, 2);
+    Dispatch(rivers, 1);
     return true;
+}
+
+bool MacroWorldBake::RunAll(GpuTextureHandle continentMask)
+{
+    return Plates(continentMask) && Erode(_erosionIterations) && Rivers();
 }
 
 GpuTextureHandle MacroWorldBake::TakeField()

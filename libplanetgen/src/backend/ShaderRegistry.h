@@ -21,6 +21,8 @@ enum class BuiltinProgram : int
     MacroErosionFlow = 7,
     MacroErosionSediment = 8,
     MacroErosionFlux = 9,
+    MacroFill = 10,
+    MacroRivers = 11,
 };
 
 // Converts a BuiltinProgram id to its canonical string key
@@ -38,6 +40,8 @@ inline std::string BuiltinKey(BuiltinProgram id)
     case BuiltinProgram::MacroErosionFlow:     return "__builtin_macro_erosion_flow";
     case BuiltinProgram::MacroErosionSediment: return "__builtin_macro_erosion_sediment";
     case BuiltinProgram::MacroErosionFlux:     return "__builtin_macro_erosion_flux";
+    case BuiltinProgram::MacroFill:            return "__builtin_macro_fill";
+    case BuiltinProgram::MacroRivers:          return "__builtin_macro_rivers";
     }
     return "";
 }

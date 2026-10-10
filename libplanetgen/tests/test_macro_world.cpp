@@ -486,3 +486,68 @@ TEST_CASE("macro_world erosion: lowers land and conserves height + sediment", "[
     }
     pg_context_destroy(ctx);
 }
+
+TEST_CASE("macro_world rivers: every land cell drains to the ocean without cycles", "[gpu][macro_world]")
+{
+    const int Res = 128;
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+    {
+        const auto cfg = MacroEarth(Res);
+        MaskHolder mask(ctx, cfg, 42u);
+
+        planetgen::MacroWorldBake bake(*ctx->backend, ctx->registry, cfg, 42u);
+        REQUIRE(bake.RunAll(mask.tex));
+        const auto drain = DownloadField(ctx, bake.Drainage(), Res);
+        const auto field = DownloadField(ctx, bake.Field(), Res);
+
+        const size_t cells = drain.size() / 4;
+        auto isOcean = [&](size_t c) { return drain[c * 4 + 1] != 0.0f; };
+
+        // 0 = unknown, 1 = on the current walk, 2 = reaches the ocean.
+        std::vector<uint8_t> state(cells, 0);
+        std::vector<size_t> walk;
+        size_t landCells = 0, badCells = 0, riverCells = 0;
+        float maxRiver = 0.0f;
+        for (size_t start = 0; start < cells; ++start)
+        {
+            if (isOcean(start))
+                continue;
+            ++landCells;
+            maxRiver = std::max(maxRiver, field[start * 4 + 1]);
+            if (field[start * 4 + 1] > 4.0f) // > ~15 000 km^2 upstream: a river
+                ++riverCells;
+
+            walk.clear();
+            size_t c = start;
+            bool ok = false;
+            for (size_t step = 0; step <= cells; ++step)
+            {
+                if (isOcean(c) || state[c] == 2)
+                {
+                    ok = true;
+                    break;
+                }
+                if (state[c] == 1)
+                    break; // cycle
+                state[c] = 1;
+                walk.push_back(c);
+                const auto next = static_cast<size_t>(drain[c * 4]);
+                if (next >= cells || next == c)
+                    break; // land sink
+                c = next;
+            }
+            for (size_t w : walk)
+                state[w] = ok ? 2 : 0;
+            if (!ok)
+                ++badCells;
+        }
+
+        INFO(landCells << " land cells, " << badCells << " fail to reach the ocean, "
+             << riverCells << " river cells, max river flux " << maxRiver);
+        CHECK(landCells > 0);
+        CHECK(badCells == 0);
+        CHECK(riverCells > 0);
+    }
+    pg_context_destroy(ctx);
+}

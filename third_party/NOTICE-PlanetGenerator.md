@@ -19,8 +19,10 @@ Changes made in the port:
 - Rainfall uses uniform precipitation and a latitude + elevation temperature.
 - The flow pass also carries suspended sediment with the water (upstream keeps it
   in place), so coarse cells can carve valleys; ocean cells keep what arrives.
-- Flux accumulation compares the neighbour's drain target cell instead of an
-  opposite direction index, and propagates without decay.
+- Flux accumulation reads each neighbour's drain target cell (precomputed by
+  the rivers pass) instead of an opposite direction index, propagates without
+  decay, and counts changed cells so the host can stop at convergence. It runs
+  in the rivers stage on the depression-filled surface.
 - Per-pass erosion cap is 12 m (the constant from upstream commit eef8912) instead
   of the resolution-scaled cap, so valleys show at the coarse macro cell size.
 
