@@ -65,7 +65,7 @@ uniform vec3 uHazeColor;
 
 // Biome palette SSBO (loaded from JSON)
 // Must match BiomePaletteBindingPoint in GpuConstants.h
-#define BIOME_PALETTE_BINDING 3
+#define BIOME_PALETTE_BINDING 4
 
 // Indices: 0-2 tropical (wet/mid/dry), 3-5 temperate, 6-8 boreal, 9 tundra, 10 ice
 #define BIOME_TROPICAL_WET  0

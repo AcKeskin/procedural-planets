@@ -14,6 +14,7 @@
 #include "clouds.glsl"
 #include "pbr.glsl"
 #include "ground_material.glsl"
+#include "biome_palette.glsl"
 
 in vec3 vNormal;
 in vec3 vWorldPos;
@@ -147,13 +148,10 @@ Material sandMaterial(float v)
     return Material(base, 0.9);
 }
 
-Material grassMaterial(float v, float moisture)
+// Flat ground: the palette biome colour with patchy lightness.
+Material flatGroundMaterial(vec3 biomeColor, float v)
 {
-    vec3 dry = vec3(0.34, 0.36, 0.18);
-    vec3 wet = vec3(0.12, 0.30, 0.10);
-    vec3 base = mix(dry, wet, clamp(moisture, 0.0, 1.0));
-    base *= mix(0.8, 1.15, v); // patchy lightness
-    return Material(base, 0.85);
+    return Material(biomeColor * mix(0.8, 1.15, v), 0.85);
 }
 
 Material snowMaterial(float v)
@@ -208,18 +206,19 @@ void main()
     float vFine   = fine.x;
     float vMedium = fbmFootprint(matPos, 0.9, 4, footprint, 0.5).x; // patch-scale variation
 
+    Biome biome = whittakerBiome(temperature, moisture);
+
     Material rock  = rockMaterial(matPos, footprint, vFine);
     Material sand  = sandMaterial(vFine);
-    Material grass = grassMaterial(vMedium, moisture);
     Material snow  = snowMaterial(vFine);
 
     // --- blend materials by slope / height / climate ---
-    // flats: sand on dry-warm-low, grass otherwise
+    // Flats: the biome colour; beaches (dry, warm, low) blend to sand.
     float aridity = (1.0 - moisture) * smoothstep(0.35, 0.7, temperature);
     float sandW = smoothstep(0.35, 0.65, aridity) * (1.0 - smoothstep(0.12, 0.25, h));
-    Material flatMat;
-    flatMat.albedo    = mix(grass.albedo, sand.albedo, sandW);
-    flatMat.roughness = mix(grass.roughness, sand.roughness, sandW);
+    Material flatMat = flatGroundMaterial(biome.color, vMedium);
+    flatMat.albedo    = mix(flatMat.albedo, sand.albedo, sandW);
+    flatMat.roughness = mix(flatMat.roughness, sand.roughness, sandW);
 
     // rock takes over on slope (with noisy threshold so the line isn't clean)
     float rockThresh = 0.35 + (vMedium - 0.5) * 0.25;
@@ -243,7 +242,9 @@ void main()
     // Texture detail: the same blend as above, spread over the five texture layers (dry flats get
     // the soil layer). Only layers with real weight are sampled.
     float flatW = (1.0 - rockW) * (1.0 - snowW);
-    float soilShare = smoothstep(0.6, 0.85, 1.0 - moisture) * 0.6; // only really dry ground
+    float desert = smoothstep(0.45, 0.75, aridity);
+    sandW = max(sandW, desert);
+    float soilShare = max(smoothstep(0.6, 0.85, 1.0 - moisture) * 0.6, biome.polar * 0.7);
     float layerW[5];
     layerW[GROUND_ROCK]  = rockW * (1.0 - snowW);
     layerW[GROUND_SNOW]  = snowW;

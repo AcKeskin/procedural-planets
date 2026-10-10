@@ -10,7 +10,8 @@ inline constexpr unsigned int ErosionWorkgroupSize = 256;
 inline constexpr int FullscreenTriangleVertices = 3;
 
 // SSBO binding points for fragment shader resources
-inline constexpr unsigned int BiomePaletteBindingPoint = 3;
+// 0-3 are the patch SSBOs (lod/PatchBindings.h); sharing 3 made patch draws overwrite the palette.
+inline constexpr unsigned int BiomePaletteBindingPoint = 4;
 
 // Surface fresnel rim — near/far strength + falloff.
 inline constexpr float FresnelStrengthNear = 0.5f;
