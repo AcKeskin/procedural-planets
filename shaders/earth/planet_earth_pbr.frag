@@ -328,7 +328,9 @@ void main()
                        * (1.0 - snowW);
     color += nightLights(normalize(vWorldPos), day, habitability, vec3(1.0, 0.8, 0.45));
 
-    // No roll-off here: the scene is HDR and tonemap.glsl rolls highlights off once, at the end.
+    // Mild gamma lift so shadows and midtones don't go muddy; no roll-off, the scene is HDR and
+    // tonemap.glsl rolls highlights off once, at the end.
+    color = pow(max(color, vec3(0.0)), vec3(0.9));
 
     FragColor = vec4(color, 1.0);
 }
