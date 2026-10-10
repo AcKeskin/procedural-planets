@@ -1,7 +1,7 @@
 
 # Procedural Planets
 
-A GPU-accelerated procedural planet renderer built with C++17 and OpenGL. Generates realistic celestial bodies — Earth-like planets, volcanic worlds, crystalline moons — with terrain, atmosphere, oceans, and biomes, all driven by compute shaders and procedural noise.
+A GPU-accelerated procedural planet renderer built with C++17 and OpenGL. Generates realistic celestial bodies — Earth-like planets, volcanic worlds, crystalline moons — with terrain, biomes, oceans, a scattering atmosphere and volumetric clouds, all driven by compute shaders and procedural noise. You can fly from orbit down to the ground without a loading step.
 
 <p align="center">
   <img src="docs/images/hero_earth.png" alt="Earth-like procedural planet from space" width="720">
@@ -12,6 +12,12 @@ Inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-S
 > **A note on the rendering code:** I'm not a graphics developer — I understand the rendering pipeline at a high level but not the low-level details. The rendering parts (shaders, GPU compute, the OpenGL pipeline) were built with AI assistance (Claude). The overall architecture, the library design, and the rest of the codebase are my own.
 
 ## Gallery
+
+From orbit down through the clouds, at planet radius 5000:
+
+<p align="center">
+  <img src="docs/images/flyover.gif" alt="Orbit around the planet, then a descent through the clouds to a low view over the land" width="480">
+</p>
 
 An Earth-like world turning in real time:
 
@@ -30,32 +36,39 @@ _(Planet-type showcase video)_
 
 ## Macro World Layer
 
-<p align="center">
-  <img src="docs/images/macro_world_flyover.gif" alt="Orbit to low flyover with the macro world layer on" width="480">
-</p>
-
 An optional once-per-body bake on a coarse cube-sphere grid. It adds tectonic plates (mountain belts on convergent boundaries, rifts on divergent ones), hydraulic erosion, rivers that always drain to the sea, and moisture carried by prevailing winds (wet coasts, dry interiors, rain shadows). The terrain samples it as its base height and the climate model reads its moisture. The bake takes about 0.25 s on a desktop GPU.
 
-Turn it on in the Terrain panel: **Generation > Macro World > Enable Macro World** (needs Use Tectonics). In a body JSON, set `"macroWorld": { "enabled": true }`. It is off by default, and off gives the same output as before.
+Turn it on in the Terrain panel: **Generation > Macro World > Enable Macro World** (needs Use Tectonics). In a body JSON, set `"macroWorld": { "enabled": true }`. It is off by default. Its river carving still shows as stair-stepped streaks up close, which is why it is not on for Earth yet.
 
 The erosion passes are ported from [Jujedie/PlanetGenerator](https://github.com/Jujedie/PlanetGenerator) (MIT, see `third_party/NOTICE-PlanetGenerator.md`).
 
 ## Features
 
-- **GPU Compute Terrain** — Height and shading generated in two compute shader passes, entirely on the GPU
+**Terrain and generation**
+- **GPU Compute Terrain** — Height and shading generated in compute shader passes, entirely on the GPU
 - **Async Generation** — Non-blocking terrain generation with a priority scheduler and GPU fence synchronization
-- **Icosahedron LOD** — Subdivided into patches with 4 detail levels, switching based on camera distance
-- **Multi-Body Types** — Earth-like planets, volcanic worlds, crystalline moons — each with type-specific shaders, palettes, and GUI
-- **libplanetgen** — Standalone shared library (DLL) with C API for terrain generation, usable from Unity, Unreal, or any C/C++ consumer
-- **Climate Model** — Whittaker biome classification from latitude, elevation, and Hadley circulation for Earth-like bodies
-- **Data-Driven Palettes** — JSON-defined color palettes per body type, blended by height in the fragment shader
-- **Atmospheric Scattering** — Rayleigh scattering with wavelength-dependent coloring and angle-based glow
-- **Ocean Rendering** — Depth-based shallow-to-deep color blending, animated procedural wave normals, and specular highlights
+- **Icosahedron LOD** — A quad-tree of spherical patches that split and merge with camera distance (max depth adjustable up to 12), with geomorphing so patches don't pop
 - **Tectonic Plates** — Voronoi-based plate boundaries with convergent mountains and divergent rifts
-- **Multi-Layer Noise** — Simplex and fractal noise with octaves, lacunarity, persistence, and ridge noise
+- **Multi-Layer Noise** — Simplex and fractal noise with octaves, lacunarity, persistence, and ridge noise, plus fine relief that only shows up close
+- **libplanetgen** — Standalone shared library (DLL) with C API for terrain generation, usable from Unity, Unreal, or any C/C++ consumer
+
+**Ground**
+- **Biomes** — Whittaker biome colours (tropical, temperate, boreal, tundra, ice) from temperature and moisture, read from a JSON palette per body
+- **Generated Material Textures** — Rock, grass, sand, snow and soil textures generated from the planet seed at load (no image files), sampled triplanar at two scales so no tiling shows
+- **Detail by Distance** — Colour and bump detail are added as you fly closer, based on how big a pixel is on the ground, so close-ups stay sharp and far views don't shimmer
+
+**Water, sky and clouds**
+- **Ocean** — Real water depth from the terrain, light absorption from shallow turquoise to deep blue, waves that keep their size at any planet radius, sun glitter, and a reflection of the actual sky
+- **Atmosphere** — Rayleigh and Mie scattering with phase functions, an earth shadow, blue daytime sky, red sunsets and a real-size sun disc
+- **Volumetric Clouds** — A raymarched cloud layer with a weather map, 3D noise, self-shadowing and a silver lining toward the sun; you can fly through it. The clouds cast shadows on the ground
+- **HDR Rendering** — The scene renders in HDR with an exposure control, a tonemap that keeps highlight colour, and bloom around the sun and glints
+
+**App**
+- **Multi-Body Types** — Earth-like planets, volcanic worlds, crystalline moons — each with type-specific shaders, palettes, and GUI
 - **Parameter Randomizer** — One-click randomization of all planet parameters within Earth-like constraints
 - **Cinematic System** — Turntable camera with keyframe animation and screenshot/GIF capture
-- **Live Tweaking** — Body-type-aware ImGui panels for all parameters
+- **Instrument Mode** — Script the camera and any setting from a JSON timeline (`--script`) or a live socket (`--live`), and capture frames; the README media is rendered this way
+- **Live Tweaking** — Grouped ImGui panels with tooltips for every setting
 
 <p align="center">
   <img src="docs/images/with_atmosphere_0.png" alt="Planet with atmospheric scattering" width="400">
@@ -104,7 +117,13 @@ Everything is handled through CMake FetchContent, so you don't need to install a
 | `F12` | Take screenshot (PNG) |
 | `Esc` | Stop cinematic / quit |
 
-All terrain, atmosphere, ocean, and scene parameters are exposed in ImGui panels. The Surface panel adapts to the active body type — Earth shows biome/climate controls, generic bodies show palette and noise parameters.
+All parameters are exposed in ImGui panels, grouped by topic with tooltips:
+
+- **Scene** — sun direction, size and colour, stars, camera exposure and bloom, lighting
+- **Terrain** — seed, height scale, continents, tectonics, the macro world layer, and the LOD quad-tree (mesh resolution, max depth, split threshold)
+- **Surface** — adapts to the body type: Earth shows biome and climate controls, generic bodies show palette and noise parameters; also the ocean (colours, clarity, waves)
+- **Atmosphere** — scattering colours and strength, haze (Mie), density, quality; the Earth Preset button restores the defaults
+- **Clouds** — coverage, density, cloud size, base altitude, thickness, drift speed, shadow strength and quality. Clouds are part of the atmosphere, so they hide when the atmosphere is off
 
 ## Project Structure
 
@@ -115,11 +134,11 @@ src/                    The showcase app — frame loop, LOD, rendering, GUI
 │   └── noise/          Simplex and fractal noise
 ├── render/             GPU rendering pipeline
 │   ├── lod/            Icosahedron patch quad-tree (PlanetQuadTree, SpherePatch, PatchPool)
-│   ├── effects/        Atmosphere and ocean renderers
+│   ├── effects/        Atmosphere, clouds, ocean, bloom and ground texture passes
 │   ├── settings/       Typed configuration structs
 │   ├── gui/            ImGui panels that edit the active body's config
 │   ├── cinematic/      Turntable controller + screenshot capture
-│   ├── Renderer             Multi-pass scene draw (space → planet → ocean → atmosphere)
+│   ├── Renderer             Multi-pass HDR scene draw (space → planet → ocean → clouds + atmosphere → tonemap)
 │   ├── BodyRuntime          Render-time view of the active body (no subclassing)
 │   └── GenerationScheduler  Async compute dispatch with GPU fence sync
 └── app/                Application entry, input handling, headless capture
@@ -128,17 +147,19 @@ libplanetgen/           Standalone terrain generation library (DLL)
 ├── include/planetgen/  Public C API + C++ RAII wrapper
 ├── src/api/            C API implementation
 ├── src/model/          BodyConfig (canonical typed body) + JSON + palette registry
-├── src/strategy/       GenerationPipeline + Height/Erosion/Shading/Palette strategies
+├── src/strategy/       GenerationPipeline + Height/Erosion/Shading/Palette strategies, macro world bake
+├── src/materials/      CPU generators for the ground textures and the cloud noise
 ├── src/backend/        Compute backend abstraction
 │   └── opengl/         OpenGL 4.5 compute implementation
 └── cmake/              Shader embedding build tools
 
 shaders/
 ├── compute/            GPU terrain generation (height, shading, erosion)
-├── includes/           Shared GLSL libraries (noise, math, lighting)
+├── includes/           Shared GLSL libraries (noise, lighting, sky scattering, cloud layer, ground materials, tonemap)
 ├── earth/              Earth-specific surface rendering
 ├── generic/            Palette-based surface rendering
-├── atmosphere.*        Atmospheric scattering
+├── atmosphere.*        Atmospheric scattering and the final composite
+├── clouds_march.frag   Volumetric cloud raymarch
 ├── ocean.*             Ocean surface
 └── space.*             Background rendering
 
@@ -175,14 +196,18 @@ The app drives terrain through the library's **per-patch** entry point (`pg_gene
 3. **Height Pass** — A compute shader generates terrain elevation from layered noise (continents, mountains, tectonic plates, ocean floor topology)
 4. **Shading Pass** — Another compute shader computes per-vertex climate data (temperature, moisture) or palette parameters
 5. **LOD Selection** — Each frame, patches pick their detail level based on distance and get culled if outside the view
-6. **Surface Rendering** — Body-type-specific fragment shaders apply biome colors (Earth) or palette gradients (generic) with lighting, fresnel, and haze
-7. **Effects** — Atmospheric scattering and ocean with depth coloring and wave animation are composited as post-processing passes
+6. **Surface Rendering** — Body-type-specific fragment shaders apply biome colours and generated material textures (Earth) or palette gradients (generic), with lighting and cloud shadows
+7. **Ocean** — Drawn on the terrain's own patches at sea level, coloured by real water depth and reflecting the sky
+8. **Clouds and Atmosphere** — The cloud layer is raymarched at half resolution, then the atmosphere pass composites it with the scene and adds scattering along each view ray. Both use the same sky model (`sky_radiance.glsl`), as does the ocean reflection
+9. **Tonemap** — The HDR image gets exposure, bloom and a tonemap before the UI is drawn
 
 ## References
 
 - [Sebastian Lague — Solar System](https://github.com/SebLague/Solar-System) — studied for compute-based terrain generation approach
 - [Inigo Quilez — Smooth Min/Max](https://iquilezles.org/articles/smin/) — polynomial smooth blending functions
 - [Ben Golus — Triplanar Shader](https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a) — triplanar mapping with reoriented normal blending
+- [Andrew Schneider — The Real-time Volumetric Cloudscapes of Horizon Zero Dawn](https://www.guerrilla-games.com/read/the-real-time-volumetric-cloudscapes-of-horizon-zero-dawn) — weather map, Perlin-Worley noise and the powder term for the clouds
+- [Sébastien Hillaire — Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite](https://www.ea.com/frostbite/news/physically-based-sky-atmosphere-and-cloud-rendering) — energy-conserving scattering integration and multiple-scattering approximation
 
 ## License
 
