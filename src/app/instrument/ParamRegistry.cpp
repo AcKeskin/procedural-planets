@@ -184,6 +184,8 @@ const std::unordered_map<std::string, Entry>& Table()
         {"scene.sunSize", {false, SET_FLOAT(t.scene->sunSize)}},
         {"scene.sunColor", {false, SET_VEC3(t.scene->sunColor)}},
         {"scene.starDensity", {false, SET_FLOAT(t.scene->starDensity)}},
+        {"scene.exposure", {false, SET_FLOAT(t.scene->exposure)}},
+        {"scene.bloomStrength", {false, SET_FLOAT(t.scene->bloomStrength)}},
         {"scene.lighting.sunIntensity", {false, SET_FLOAT(t.scene->lighting.sunIntensity)}},
         {"scene.lighting.ambientLight", {false, SET_FLOAT(t.scene->lighting.ambientLight)}},
         {"scene.lighting.specularStrength", {false, SET_FLOAT(t.scene->lighting.specularStrength)}},

@@ -45,6 +45,11 @@ bool Renderer::Initialize(int width, int height)
         std::cerr << "[Renderer] Failed to load space shader" << std::endl;
         return false;
     }
+    if (!_bloom.Initialize(width, height))
+    {
+        std::cerr << "[Renderer] Failed to initialize bloom" << std::endl;
+        return false;
+    }
     return true;
 }
 
@@ -55,6 +60,7 @@ void Renderer::ResizeFramebuffer(int width, int height)
     _fbWidth = width;
     _fbHeight = height;
     _sceneFbo.Create(width, height);
+    _bloom.Resize(width, height);
 }
 
 bool Renderer::SetActiveBody(PgBody body,
@@ -146,6 +152,7 @@ void Renderer::DrawScene(const RenderContext& ctx)
                               *ctx.clouds);
     }
 
+    _bloom.Render(_sceneFbo.GetColorTexture(), _postProcessor);
     _sceneFbo.Unbind();
     glViewport(0, 0, _fbWidth, _fbHeight);
 
@@ -259,6 +266,8 @@ void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
                                    ctx.nearPlane,
                                    ctx.farPlane,
                                    ctx.scene->exposure,
+                                   _bloom.Texture(),
+                                   ctx.scene->bloomStrength,
                                    *ctx.atmosphere,
                                    _sceneFbo.GetColorTexture(),
                                    _sceneFbo.GetDepthTexture());
@@ -274,6 +283,9 @@ void Renderer::DrawAtmosphereOrPassthrough(const RenderContext& ctx,
         _passthroughShader.Use();
         _passthroughShader.SetInt("uSceneTexture", 0);
         _passthroughShader.SetFloat("uExposure", ctx.scene ? ctx.scene->exposure : 1.0f);
+        _passthroughShader.SetFloat("uBloomStrength", ctx.scene ? ctx.scene->bloomStrength : 0.0f);
+        _passthroughShader.SetInt("uBloomTexture", 3);
+        glBindTextureUnit(3, _bloom.Texture());
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, _sceneFbo.GetColorTexture());
         _postProcessor.RenderQuad();

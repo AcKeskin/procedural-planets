@@ -21,7 +21,9 @@ void main()
     vec4 clipPos = vec4(x, y, 1.0, 1.0);
     vec4 viewPos = uInvProjection * clipPos;
     viewPos.xyz /= viewPos.w;
-    vViewRay = normalize((uInvView * vec4(viewPos.xyz, 0.0)).xyz);
+    // Not normalized: the fragment shader normalizes after interpolation. Normalizing the corners
+    // of the oversized triangle bends the directions in between and warps the sun disc.
+    vViewRay = (uInvView * vec4(viewPos.xyz, 0.0)).xyz;
 
     gl_Position = vec4(x, y, 0.9999, 1.0); // Depth near far plane
 }

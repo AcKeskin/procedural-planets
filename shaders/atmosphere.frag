@@ -2,6 +2,7 @@
 
 #include "tonemap.glsl"
 #include "sky_radiance.glsl"
+#include "bloom.glsl"
 
 in vec2 vUv;
 
@@ -67,7 +68,8 @@ float linearizeDepth(float depth)
 
 void main()
 {
-    vec3 originalColor = texture(uSceneTexture, vUv).rgb;
+    // Bloom joins the scene before the composite, so the sun glow is reddened with the disc.
+    vec3 originalColor = texture(uSceneTexture, vUv).rgb + bloom(vUv);
     float depthSample = texture(uDepthTexture, vUv).r;
 
     vec3 rayDir = getViewRay(vUv);

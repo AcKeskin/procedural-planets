@@ -36,6 +36,8 @@ public:
                 float nearPlane,
                 float farPlane,
                 float exposure,
+                uint32_t bloomTexture,
+                float bloomStrength,
                 const AtmosphereSettings& settings,
                 unsigned int sceneTexture,
                 unsigned int depthTexture);
