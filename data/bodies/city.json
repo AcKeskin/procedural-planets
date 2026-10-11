@@ -140,6 +140,19 @@
                 0.95
             ]
         ],
+        "surface": {
+            "skyAmbient": {
+                "fromSky": 1.0,
+                "strength": 0.5
+            },
+            "vegetation": {
+                "strength": 0.6
+            },
+            "wetness": {
+                "shoreWidth": 0.1,
+                "strength": 0.5
+            }
+        },
         "weather": "clear"
     },
     "shaderPaths": {
@@ -400,6 +413,12 @@
             "pick": [
                 "yellow",
                 "white"
+            ]
+        },
+        "render.surface.vegetation.strength": {
+            "range": [
+                0.3,
+                0.8
             ]
         },
         "terrainStyle.terraceSteps": {

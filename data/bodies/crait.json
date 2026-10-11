@@ -131,7 +131,43 @@
                 0.96,
                 0.96
             ]
-        ]
+        ],
+        "surface": {
+            "cover": {
+                "color": [
+                    0.95,
+                    0.94,
+                    0.93
+                ],
+                "patchiness": 0.3,
+                "slope": [
+                    0.12,
+                    0.3
+                ],
+                "strength": 0.9
+            },
+            "rock": {
+                "slope": 0.12
+            },
+            "skyAmbient": {
+                "fromSky": 1.0,
+                "strength": 0.5
+            },
+            "strata": {
+                "bands": 35,
+                "colorA": [
+                    0.75,
+                    0.2,
+                    0.15
+                ],
+                "colorB": [
+                    0.45,
+                    0.1,
+                    0.08
+                ],
+                "strength": 0.8
+            }
+        }
     },
     "shaderPaths": {
         "fragment": "shaders/earth/planet_earth_pbr.frag",
@@ -275,6 +311,18 @@
             "pick": [
                 "white",
                 "yellow"
+            ]
+        },
+        "render.surface.cover.strength": {
+            "range": [
+                0.7,
+                1.0
+            ]
+        },
+        "render.surface.strata.bands": {
+            "range": [
+                20,
+                50
             ]
         },
         "terrainStyle.canyons": {
