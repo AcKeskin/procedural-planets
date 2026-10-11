@@ -18,11 +18,12 @@ struct SurfaceBlock
     glm::vec4 seafloorShallow, seafloorDeep;
     glm::vec4 climate;
     glm::vec4 texture[SurfaceSettings::TextureCount];
+    glm::vec4 sed0, sed1, sed2;
     glm::vec4 wet0, wet1;
     glm::vec4 strata0, strata1, strata2;
 };
 
-static_assert(sizeof(SurfaceBlock) == 34 * 16, "SurfaceBlock must match the std140 GLSL block");
+static_assert(sizeof(SurfaceBlock) == 37 * 16, "SurfaceBlock must match the std140 GLSL block");
 
 // Uniform buffer binding point of SurfaceBlock (separate namespace from the SSBO bindings).
 inline constexpr unsigned int SurfaceBlockBindingPoint = 5;
@@ -65,6 +66,9 @@ inline SurfaceBlock PackSurfaceBlock(const SurfaceSettings& s)
     b.strata2 = glm::vec4(s.strata.warp, 0.0f, 0.0f, 0.0f);
     b.wet0 = glm::vec4(s.wetness.tint, s.wetness.strength);
     b.wet1 = glm::vec4(s.wetness.shoreWidth, s.wetness.moisture, s.wetness.darkening, s.wetness.roughness);
+    b.sed0 = glm::vec4(s.sediment.color, s.sediment.strength);
+    b.sed1 = glm::vec4(s.sediment.height, s.sediment.slope);
+    b.sed2 = glm::vec4(s.sediment.patchiness, 0.0f, 0.0f, 0.0f);
     return b;
 }
 

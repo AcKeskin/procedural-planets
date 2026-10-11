@@ -123,6 +123,16 @@ struct SurfaceSettings
         glm::vec3 tint = glm::vec3(1.0f, 1.0f, 1.0f); // colour cast of the wet ground (acid stains)
     };
 
+    // Fill on low, flat ground (crater floors, basins, the foot of slopes). Strength 0 = off.
+    struct Sediment
+    {
+        float strength = 0.0f; // how much fill covers the ground
+        glm::vec3 color = glm::vec3(0.55f, 0.48f, 0.38f); // colour of the fill
+        glm::vec2 height = glm::vec2(0.05f, 0.3f); // full below x, gone above y (land height 0-1)
+        glm::vec2 slope = glm::vec2(0.02f, 0.1f); // full below x steepness, gone above y
+        float patchiness = 0.5f; // 0 = even sheet, 1 = broken patches
+    };
+
     static constexpr int TextureCount = 5; // order matches GROUND_* in ground_material.glsl
 
     Rock rock;
@@ -135,6 +145,7 @@ struct SurfaceSettings
     Climate climate;
     Strata strata;
     Wetness wetness;
+    Sediment sediment;
 };
 
 } // namespace planets::render

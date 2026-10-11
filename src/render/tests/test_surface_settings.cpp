@@ -78,6 +78,15 @@ TEST_CASE("surface: wetness is off by default and read from render.surface.wetne
     CHECK(PackSurfaceBlock(look.surface).wet0.w == 0.6f);
 }
 
+TEST_CASE("surface: sediment is off by default and read from render.surface.sediment", "[surface]")
+{
+    CHECK(SurfaceSettings{}.sediment.strength == 0.0f);
+    const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({"render": {"surface": {
+        "sediment": {"strength": 0.7}}}})"));
+    CHECK(look.surface.sediment.strength == 0.7f);
+    CHECK(PackSurfaceBlock(look.surface).sed0.w == 0.7f);
+}
+
 TEST_CASE("surface: wrong types are ignored", "[surface]")
 {
     const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({"render": {"surface": {

@@ -251,6 +251,17 @@ void main()
     mat.albedo    = mix(flatMat.albedo, rock.albedo, rockW);
     mat.roughness = mix(flatMat.roughness, rock.roughness, rockW);
 
+    // Sediment: fill settles on low, flat ground, broken into patches by the medium noise.
+    if (sSed0.w > 0.0)
+    {
+        float flatness = 1.0 - smoothstep(sSed1.z, sSed1.w, steepness);
+        float low = 1.0 - smoothstep(sSed1.x, sSed1.y, h);
+        float patches = mix(1.0, smoothstep(0.35, 0.65, vMedium + (vFine - 0.5) * 0.3), sSed2.x);
+        float sed = flatness * low * patches * sSed0.w;
+        mat.albedo = mix(mat.albedo, sSed0.rgb * mix(0.85, 1.15, vFine), sed);
+        mat.roughness = mix(mat.roughness, 0.9, sed);
+    }
+
     // snow: altitude-driven, climate lowers the line; sheds on steep rock
     float snowLineEff = uSnowLine - (1.0 - temperature) * sSnowRule0.x;
     float snowW = smoothstep(snowLineEff - sSnowRule0.y, snowLineEff + sSnowRule0.z, h);

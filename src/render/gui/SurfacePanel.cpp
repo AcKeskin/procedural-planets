@@ -282,6 +282,15 @@ void SurfacePanel::DrawSurfaceRules(SurfaceSettings& s)
         color("Wet Tint", s.wetness.tint, "Colour cast of wet ground, for stains like acid or brine");
         ImGui::TreePop();
     }
+    if (ImGui::TreeNode("Sediment"))
+    {
+        value("Sediment", s.sediment.strength, 0.0f, 1.0f, "Fine fill on low, flat ground (crater floors, basins, slope feet): 0 = off");
+        color("Sediment Color", s.sediment.color, "Colour of the fill: sand, mud, salt, sulfur");
+        range("Height Range", s.sediment.height, 0.0f, 1.0f, "Full below the first value, gone above the second (land height 0-1)");
+        range("Slope Range", s.sediment.slope, 0.0f, 0.5f, "Only on flat ground: full below the first steepness, gone above the second");
+        value("Patchiness", s.sediment.patchiness, 0.0f, 1.0f, "0 = an even sheet, 1 = broken patches");
+        ImGui::TreePop();
+    }
     if (ImGui::TreeNode("Seafloor"))
     {
         color("Shallow Floor", s.seafloor.shallowColor, "Ground colour just below sea level");
