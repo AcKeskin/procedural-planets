@@ -312,24 +312,28 @@ void Application::ProcessInput(float deltaTime)
         }
         if (Pressed(_input, Action::Screenshot))
             _screenshotRequested = true;
-        if (Pressed(_input, Action::ToggleMode))
-            _cameraCtl.ToggleMode(CameraBodyNow(), _camera);
-        if (Pressed(_input, Action::AutoRotate))
+        // The turntable owns the camera, so camera shortcuts wait until it stops.
+        if (!_cinematicController.IsPlaying())
         {
-            core::CameraHud& hud = _camera.Hud();
-            hud.autoRotate = !hud.autoRotate;
-            // Auto-rotate turns the orbit, so leave Fly for it.
-            if (hud.autoRotate && _camera.GetMode() != core::CameraMode::Orbit)
+            if (Pressed(_input, Action::ToggleMode))
                 _cameraCtl.ToggleMode(CameraBodyNow(), _camera);
+            if (Pressed(_input, Action::AutoRotate))
+            {
+                core::CameraHud& hud = _camera.Hud();
+                hud.autoRotate = !hud.autoRotate;
+                // Auto-rotate turns the orbit, so leave Fly for it.
+                if (hud.autoRotate && _camera.GetMode() != core::CameraMode::Orbit)
+                    _cameraCtl.ToggleMode(CameraBodyNow(), _camera);
+            }
+            if (Pressed(_input, Action::FramePlanet))
+                _cameraCtl.FramePlanet(CameraBodyNow(), _camera);
+            if (Pressed(_input, Action::ResetView))
+                _cameraCtl.ResetView(CameraBodyNow(), _camera, /*eased=*/true);
+            if (const int slot = Keybinds::DigitPressed(_input, Action::SaveBookmark))
+                SaveBookmark(slot);
+            if (const int slot = Keybinds::DigitPressed(_input, Action::RecallBookmark))
+                RecallBookmark(slot);
         }
-        if (Pressed(_input, Action::FramePlanet))
-            _cameraCtl.FramePlanet(CameraBodyNow(), _camera);
-        if (Pressed(_input, Action::ResetView))
-            _cameraCtl.ResetView(CameraBodyNow(), _camera, /*eased=*/true);
-        if (const int slot = Keybinds::DigitPressed(_input, Action::SaveBookmark))
-            SaveBookmark(slot);
-        if (const int slot = Keybinds::DigitPressed(_input, Action::RecallBookmark))
-            RecallBookmark(slot);
         if (Pressed(_input, Action::Atmosphere))
             _atmosphereSettings.enabled = !_atmosphereSettings.enabled;
         if (Pressed(_input, Action::Reroll))
