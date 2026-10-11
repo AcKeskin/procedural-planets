@@ -4,6 +4,7 @@
 // PgBodyDesc/PgShadingDesc/PgErosionDesc are projections from this; they carry no
 // independent defaults. Pure data: no GPU, JSON, or strategy knowledge.
 
+#include "planetgen/planetgen.h"
 #include <string>
 #include <glm/glm.hpp>
 
@@ -271,7 +272,7 @@ struct BodyConfig
     ShaderPathsBlock shaderPaths;
 
     // Validate ranges and enable-consistency; returns empty string on success, reason on failure.
-    std::string Validate() const;
+    PG_API std::string Validate() const;
 };
 
 } // namespace planetgen

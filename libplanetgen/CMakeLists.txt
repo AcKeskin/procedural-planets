@@ -73,11 +73,11 @@ set(PLANETGEN_HEADERS
     src/backend/ShaderRegistry.h
     src/backend/opengl/GlDevice.h
     src/backend/opengl/GLBackend.h
-    src/model/BodyConfig.h
-    src/model/BodyConfigProjection.h
-    src/model/BodyConfigJson.h
-    src/model/BodyVariety.h
-    src/model/PaletteRegistry.h
+    include/planetgen/model/BodyConfig.h
+    include/planetgen/model/BodyConfigProjection.h
+    include/planetgen/model/BodyConfigJson.h
+    include/planetgen/model/BodyVariety.h
+    include/planetgen/model/PaletteRegistry.h
     src/strategy/IGenerationStrategy.h
     src/strategy/HeightStrategy.h
     src/strategy/ShadingStrategy.h
@@ -97,11 +97,14 @@ target_compile_definitions(planetgen PRIVATE PLANETGEN_EXPORTS)
 
 target_include_directories(planetgen
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src  # Expose model/ headers to consumers (BodyConfig, PaletteRegistry)
+        ${CMAKE_CURRENT_SOURCE_DIR}/include  # C API (planetgen.h) + C++ model API (planetgen/model/*)
     PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_BINARY_DIR}  # For generated EmbeddedShaders.h
 )
+
+# Only PG_API symbols leave the library, on every platform (as on Windows).
+set_target_properties(planetgen PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 
 # Map the generated header path so #include "EmbeddedShaders.h" resolves
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/shaders")
@@ -115,11 +118,12 @@ add_custom_target(planetgen_copy_shaders DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/sh
 add_dependencies(planetgen planetgen_copy_shaders)
 
 target_link_libraries(planetgen
+    PUBLIC
+        nlohmann_json::nlohmann_json  # in the model API (BodyVariety)
+        glm::glm                      # in the model API (BodyConfig, PaletteRegistry)
     PRIVATE
         glfw
         OpenGL::GL
-        nlohmann_json::nlohmann_json
-        glm::glm
 )
 
 target_include_directories(planetgen PRIVATE ${GL3W_INCLUDE_DIR})
@@ -151,8 +155,6 @@ set(PLANETGEN_TEST_SOURCES
     tests/test_public_api.cpp
     tests/test_macro_world.cpp
     tests/test_ocean_depth.cpp
-    tests/test_ground_materials.cpp
-    tests/test_cloud_noise.cpp
     tests/test_terrain_style.cpp
     tests/test_body_desc.cpp
     tests/test_standalone_calls.cpp
@@ -170,23 +172,17 @@ target_include_directories(planetgen_tests
 )
 
 # Link the shared planetgen library for the public C API (pg_*),
-# and compile internal sources directly for ShaderRegistry + model (not exported from the DLL).
+# and compile the internal sources it tests directly (not exported from the DLL). The model
+# comes from the DLL's exported C++ API.
 target_sources(planetgen_tests PRIVATE
     src/backend/ShaderRegistry.cpp
     src/backend/ParamMappers.cpp
-    src/model/BodyConfig.cpp
-    src/model/BodyConfigProjection.cpp
-    src/model/BodyConfigJson.cpp
-    src/model/BodyVariety.cpp
-    src/model/PaletteRegistry.cpp
     src/strategy/HeightStrategy.cpp
     src/strategy/ShadingStrategy.cpp
     src/strategy/ErosionStrategy.cpp
     src/strategy/ContinentMaskPass.cpp
     src/strategy/MacroWorldPass.cpp
     src/strategy/GenerationPipeline.cpp
-    src/materials/GroundMaterials.cpp
-    src/materials/CloudNoise.cpp
     ${GL3W_SRC}
 )
 

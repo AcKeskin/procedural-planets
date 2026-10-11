@@ -3,8 +3,8 @@
 #include "ParamRegistry.h"
 #include "../Application.h"
 
-#include <model/BodyConfig.h>
-#include <model/BodyConfigJson.h>
+#include "planetgen/model/BodyConfig.h"
+#include "planetgen/model/BodyConfigJson.h"
 
 #include <algorithm>
 #include <cstdio>

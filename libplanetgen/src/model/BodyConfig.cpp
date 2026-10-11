@@ -1,4 +1,4 @@
-#include "BodyConfig.h"
+#include "planetgen/model/BodyConfig.h"
 #include <sstream>
 
 namespace planetgen

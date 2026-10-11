@@ -1,6 +1,6 @@
 #include "ParamRegistry.h"
 
-#include <model/BodyConfig.h>
+#include "planetgen/model/BodyConfig.h"
 
 #include <functional>
 #include <unordered_map>

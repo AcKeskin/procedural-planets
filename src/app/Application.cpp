@@ -3,8 +3,8 @@
 #include "instrument/ScriptRunner.h"
 #include "instrument/TimelineParser.h"
 #include "instrument/LiveServer.h"
-#include <model/BodyConfigJson.h>
-#include <model/BodyVariety.h>
+#include "planetgen/model/BodyConfigJson.h"
+#include "planetgen/model/BodyVariety.h"
 #include <nlohmann/json.hpp>
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>

@@ -41,19 +41,19 @@ void CheckTiles(const std::vector<uint8_t>& v, int size)
 TEST_CASE("cloud_noise: volumes are deterministic per seed and tile", "[cloud_noise]")
 {
     const int n = 16;
-    auto a = planetgen::GenerateCloudShapeNoise(5u, n);
-    CHECK(a == planetgen::GenerateCloudShapeNoise(5u, n));
-    CHECK(a != planetgen::GenerateCloudShapeNoise(6u, n));
+    auto a = planets::render::GenerateCloudShapeNoise(5u, n);
+    CHECK(a == planets::render::GenerateCloudShapeNoise(5u, n));
+    CHECK(a != planets::render::GenerateCloudShapeNoise(6u, n));
     CheckTiles(a, n);
 
-    auto d = planetgen::GenerateCloudDetailNoise(5u, n);
-    CHECK(d == planetgen::GenerateCloudDetailNoise(5u, n));
+    auto d = planets::render::GenerateCloudDetailNoise(5u, n);
+    CHECK(d == planets::render::GenerateCloudDetailNoise(5u, n));
     CheckTiles(d, n);
 }
 
 TEST_CASE("cloud_noise: shape noise spans a usable range", "[cloud_noise]")
 {
-    auto a = planetgen::GenerateCloudShapeNoise(9u, 16);
+    auto a = planets::render::GenerateCloudShapeNoise(9u, 16);
     int lo = 255, hi = 0;
     for (uint8_t v : a)
     {
@@ -67,9 +67,9 @@ TEST_CASE("cloud_noise: shape noise spans a usable range", "[cloud_noise]")
 TEST_CASE("cloud_noise: weather is deterministic and its coverage is spread evenly", "[cloud_noise]")
 {
     const int f = 32;
-    auto w = planetgen::GenerateCloudWeather(3u, f);
+    auto w = planets::render::GenerateCloudWeather(3u, f);
     REQUIRE(w.size() == static_cast<size_t>(6) * f * f * 2);
-    CHECK(w == planetgen::GenerateCloudWeather(3u, f));
+    CHECK(w == planets::render::GenerateCloudWeather(3u, f));
 
     // Equalized coverage: about half the sphere is below the midpoint, a fifth in each fifth.
     size_t below = 0, low = 0, high = 0;
@@ -88,16 +88,16 @@ TEST_CASE("cloud_noise: weather is deterministic and its coverage is spread even
 TEST_CASE("cloud_noise: weather texel directions match the GL cube map faces", "[cloud_noise]")
 {
     float d[3];
-    planetgen::CloudWeatherTexelDir(0, 8, 8, 16, d); // centre of +X
+    planets::render::CloudWeatherTexelDir(0, 8, 8, 16, d); // centre of +X
     CHECK(d[0] > 0.99f);
-    planetgen::CloudWeatherTexelDir(3, 8, 8, 16, d); // centre of -Y
+    planets::render::CloudWeatherTexelDir(3, 8, 8, 16, d); // centre of -Y
     CHECK(d[1] < -0.99f);
-    planetgen::CloudWeatherTexelDir(5, 8, 8, 16, d); // centre of -Z
+    planets::render::CloudWeatherTexelDir(5, 8, 8, 16, d); // centre of -Z
     CHECK(d[2] < -0.99f);
 }
 
 TEST_CASE("cloud_noise: rejects sizes that are not powers of two", "[cloud_noise]")
 {
-    CHECK_THROWS_AS(planetgen::GenerateCloudShapeNoise(1u, 12), std::invalid_argument);
-    CHECK_THROWS_AS(planetgen::GenerateCloudWeather(1u, 8), std::invalid_argument);
+    CHECK_THROWS_AS(planets::render::GenerateCloudShapeNoise(1u, 12), std::invalid_argument);
+    CHECK_THROWS_AS(planets::render::GenerateCloudWeather(1u, 8), std::invalid_argument);
 }

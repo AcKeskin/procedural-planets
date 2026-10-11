@@ -29,7 +29,7 @@
 #include "gui/CinematicPanel.h"
 #include "math/Camera.h"
 #include "CaptureRequest.h"
-#include <model/PaletteRegistry.h>
+#include "planetgen/model/PaletteRegistry.h"
 
 namespace planets::app
 {

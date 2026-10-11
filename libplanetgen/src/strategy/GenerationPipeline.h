@@ -13,8 +13,8 @@
 #include "IGenerationStrategy.h"
 #include "ContinentMaskPass.h"
 #include "MacroWorldPass.h"
-#include "../model/BodyConfig.h"
-#include "../model/PaletteRegistry.h"
+#include "planetgen/model/BodyConfig.h"
+#include "planetgen/model/PaletteRegistry.h"
 
 #include <cstdint>
 #include <vector>

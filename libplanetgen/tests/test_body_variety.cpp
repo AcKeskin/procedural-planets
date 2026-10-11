@@ -2,8 +2,8 @@
 
 #include "planetgen/planetgen.h"
 #include "api/InternalTypes.h"
-#include "model/BodyConfigJson.h"
-#include "model/BodyVariety.h"
+#include "planetgen/model/BodyConfigJson.h"
+#include "planetgen/model/BodyVariety.h"
 
 #include <fstream>
 #include <string>

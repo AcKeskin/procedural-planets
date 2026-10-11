@@ -3,8 +3,8 @@
 #include "planetgen/planetgen.h"
 #include "api/InternalTypes.h"
 #include "strategy/GenerationPipeline.h"
-#include "model/BodyConfig.h"
-#include "model/BodyConfigJson.h"
+#include "planetgen/model/BodyConfig.h"
+#include "planetgen/model/BodyConfigJson.h"
 
 #include <cmath>
 #include <cstring>

@@ -1,4 +1,4 @@
-#include "PaletteRegistry.h"
+#include "planetgen/model/PaletteRegistry.h"
 
 namespace planetgen
 {

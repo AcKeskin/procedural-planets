@@ -2,7 +2,7 @@
 
 #include "settings/SceneSettings.h"
 #include "settings/AtmosphereSettings.h"
-#include <model/BodyConfig.h>
+#include "planetgen/model/BodyConfig.h"
 #include <random>
 #include <algorithm>
 #include <cmath>

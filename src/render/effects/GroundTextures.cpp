@@ -1,7 +1,7 @@
 #include "GroundTextures.h"
 
 #include <GL/gl3w.h>
-#include <materials/GroundMaterials.h>
+#include "materials/GroundMaterials.h"
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -57,13 +57,13 @@ void GroundTextures::Generate(uint32_t seed)
     Release();
 
     const auto start = std::chrono::steady_clock::now();
-    planetgen::GroundMaterialSet set = planetgen::GenerateGroundMaterials(seed, TextureSize);
+    GroundMaterialSet set = GenerateGroundMaterials(seed, TextureSize);
     _detail = CreateArray(set.detail, set.size);
     _normal = CreateArray(set.normal, set.size);
     _seed = seed;
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
-    std::cout << "[GroundTextures] Generated " << planetgen::GroundMaterialCount << " materials at " << TextureSize
-              << "^2 in " << ms << " ms" << std::endl;
+    std::cout << "[GroundTextures] Generated " << GroundMaterialCount << " materials at " << TextureSize << "^2 in "
+              << ms << " ms" << std::endl;
 }
 
 void GroundTextures::Bind() const

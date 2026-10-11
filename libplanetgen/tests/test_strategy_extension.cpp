@@ -15,7 +15,7 @@
 #include "api/InternalTypes.h"
 #include "strategy/IGenerationStrategy.h"
 #include "strategy/GenerationPipeline.h"
-#include "model/BodyConfig.h"
+#include "planetgen/model/BodyConfig.h"
 
 #include <cmath>
 

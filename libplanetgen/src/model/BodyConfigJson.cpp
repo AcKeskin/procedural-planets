@@ -1,4 +1,4 @@
-#include "BodyConfigJson.h"
+#include "planetgen/model/BodyConfigJson.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>

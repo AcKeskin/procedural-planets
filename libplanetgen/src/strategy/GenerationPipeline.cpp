@@ -3,7 +3,7 @@
 #include "HeightStrategy.h"
 #include "ErosionStrategy.h"
 #include "ShadingStrategy.h"
-#include "../model/BodyConfigProjection.h"
+#include "planetgen/model/BodyConfigProjection.h"
 
 namespace planetgen
 {

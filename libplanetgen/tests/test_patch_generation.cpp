@@ -6,9 +6,9 @@
 #include "strategy/HeightStrategy.h"
 #include "strategy/ShadingStrategy.h"
 #include "strategy/ContinentMaskPass.h"
-#include "model/BodyConfig.h"
-#include "model/BodyConfigProjection.h"
-#include "model/PaletteRegistry.h"
+#include "planetgen/model/BodyConfig.h"
+#include "planetgen/model/BodyConfigProjection.h"
+#include "planetgen/model/PaletteRegistry.h"
 #include <vector>
 #include <cstring>
 #include <cmath>

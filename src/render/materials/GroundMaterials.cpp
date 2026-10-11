@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <thread>
 
-namespace planetgen
+namespace planets::render
 {
 
 namespace
@@ -148,8 +148,7 @@ Texel Rock(float u, float v, uint32_t s)
     float wv = PeriodicFbm(u, v, 5, 3, s + 7u) - 0.5f;
     Cell crack = PeriodicCells(u + wu * 0.12f, v + wv * 0.12f, 5, s + 3u);
     float crackLine = (1.0f - SmoothStep(0.0f, 0.035f, crack.edge)) * SmoothStep(0.35f, 0.6f, crack.id + 0.3f * wu);
-    float height = Clamp01(0.55f * PeriodicFbm(u, v, 4, 6, s + 4u) + 0.25f * strata + 0.2f * grain
-                           - 0.35f * crackLine);
+    float height = Clamp01(0.55f * PeriodicFbm(u, v, 4, 6, s + 4u) + 0.25f * strata + 0.2f * grain - 0.35f * crackLine);
     // No large stains here: they would show the tile repeat; the shader paints large-scale colour.
     Rgb light{0.46f, 0.44f, 0.41f}, dark{0.27f, 0.26f, 0.25f};
     Rgb color = Mix(dark, light, Clamp01(height * 1.2f));
@@ -246,8 +245,8 @@ void BuildLayer(GroundMaterial m, uint32_t seed, int size, std::vector<uint8_t>&
     const float inv = 1.0f / static_cast<float>(size);
     for (int y = 0; y < size; ++y)
         for (int x = 0; x < size; ++x)
-            texels[static_cast<size_t>(y) * size + x]
-                = Sample(m, (static_cast<float>(x) + 0.5f) * inv, (static_cast<float>(y) + 0.5f) * inv, seed);
+            texels[static_cast<size_t>(y) * size + x] =
+                Sample(m, (static_cast<float>(x) + 0.5f) * inv, (static_cast<float>(y) + 0.5f) * inv, seed);
 
     double mr = 0.0, mg = 0.0, mb = 0.0;
     for (const Texel& t : texels)
@@ -275,7 +274,9 @@ void BuildLayer(GroundMaterial m, uint32_t seed, int size, std::vector<uint8_t>&
             detail[i * 4 + 3] = ToByte(t.height);
 
             auto h = [&](int xx, int yy)
-            { return texels[static_cast<size_t>(Wrap(yy, size)) * size + Wrap(xx, size)].height; };
+            {
+                return texels[static_cast<size_t>(Wrap(yy, size)) * size + Wrap(xx, size)].height;
+            };
             float dx = (h(x + 1, y) - h(x - 1, y)) * 0.5f * bumpDepth;
             float dy = (h(x, y + 1) - h(x, y - 1)) * 0.5f * bumpDepth;
             float len = std::sqrt(dx * dx + dy * dy + 1.0f);
@@ -304,12 +305,13 @@ GroundMaterialSet GenerateGroundMaterials(uint32_t seed, int size)
     std::vector<std::thread> workers;
     for (int layer = 0; layer < GroundMaterialCount; ++layer)
     {
-        workers.emplace_back([&set, seed, size, layer]()
-                             { BuildLayer(static_cast<GroundMaterial>(layer), seed, size, set.detail[layer], set.normal[layer]); });
+        workers.emplace_back(
+            [&set, seed, size, layer]()
+            { BuildLayer(static_cast<GroundMaterial>(layer), seed, size, set.detail[layer], set.normal[layer]); });
     }
     for (std::thread& w : workers)
         w.join();
     return set;
 }
 
-} // namespace planetgen
+} // namespace planets::render

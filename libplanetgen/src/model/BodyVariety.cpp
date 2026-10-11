@@ -1,4 +1,4 @@
-#include "BodyVariety.h"
+#include "planetgen/model/BodyVariety.h"
 
 #include <iostream>
 #include <random>

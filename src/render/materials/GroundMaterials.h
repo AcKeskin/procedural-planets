@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace planetgen
+namespace planets::render
 {
 
 enum class GroundMaterial : int
@@ -38,4 +38,4 @@ struct GroundMaterialSet
 // size must be a power of two >= 16. Same seed and size give byte-identical output.
 GroundMaterialSet GenerateGroundMaterials(uint32_t seed, int size);
 
-} // namespace planetgen
+} // namespace planets::render

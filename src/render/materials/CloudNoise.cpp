@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <thread>
 
-namespace planetgen
+namespace planets::render
 {
 
 namespace
@@ -45,18 +45,32 @@ float Remap(float v, float lo, float hi, float newLo, float newHi)
 // Gradient (Perlin) noise on a lattice that repeats every `period` cells. p in cells. ~[-1, 1].
 float PeriodicPerlin(float px, float py, float pz, int period, uint32_t salt)
 {
-    int ix = static_cast<int>(std::floor(px)), iy = static_cast<int>(std::floor(py)), iz = static_cast<int>(std::floor(pz));
+    int ix = static_cast<int>(std::floor(px)), iy = static_cast<int>(std::floor(py)),
+        iz = static_cast<int>(std::floor(pz));
     float fx = px - ix, fy = py - iy, fz = pz - iz;
     auto grad = [&](int dx, int dy, int dz)
     {
         uint32_t h = Hash(Wrap(ix + dx, period), Wrap(iy + dy, period), Wrap(iz + dz, period), salt);
         // 12 edge directions of a cube.
-        static const float g[12][3] = {{1, 1, 0}, {-1, 1, 0}, {1, -1, 0}, {-1, -1, 0}, {1, 0, 1}, {-1, 0, 1},
-                                       {1, 0, -1}, {-1, 0, -1}, {0, 1, 1}, {0, -1, 1}, {0, 1, -1}, {0, -1, -1}};
+        static const float g[12][3] = {{1, 1, 0},
+                                       {-1, 1, 0},
+                                       {1, -1, 0},
+                                       {-1, -1, 0},
+                                       {1, 0, 1},
+                                       {-1, 0, 1},
+                                       {1, 0, -1},
+                                       {-1, 0, -1},
+                                       {0, 1, 1},
+                                       {0, -1, 1},
+                                       {0, 1, -1},
+                                       {0, -1, -1}};
         const float* v = g[h % 12];
         return v[0] * (fx - dx) + v[1] * (fy - dy) + v[2] * (fz - dz);
     };
-    auto fade = [](float t) { return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f); };
+    auto fade = [](float t)
+    {
+        return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
+    };
     float u = fade(fx), v = fade(fy), w = fade(fz);
     float x00 = grad(0, 0, 0) + (grad(1, 0, 0) - grad(0, 0, 0)) * u;
     float x10 = grad(0, 1, 0) + (grad(1, 1, 0) - grad(0, 1, 0)) * u;
@@ -70,7 +84,8 @@ float PeriodicPerlin(float px, float py, float pz, int period, uint32_t salt)
 // Inverted Worley (1 at feature points, 0 between) on a periodic grid. p in cells.
 float PeriodicWorley(float px, float py, float pz, int period, uint32_t salt)
 {
-    int ix = static_cast<int>(std::floor(px)), iy = static_cast<int>(std::floor(py)), iz = static_cast<int>(std::floor(pz));
+    int ix = static_cast<int>(std::floor(px)), iy = static_cast<int>(std::floor(py)),
+        iz = static_cast<int>(std::floor(pz));
     float best = 1e9f;
     for (int dz = -1; dz <= 1; ++dz)
         for (int dy = -1; dy <= 1; ++dy)
@@ -131,8 +146,8 @@ template <typename Fn> std::vector<uint8_t> FillVolume(int size, Fn fn)
                         {
                             float u = (x + 0.5f) / size, v = (y + 0.5f) / size, w = (z + 0.5f) / size;
                             float value = Clamp01(fn(u, v, w));
-                            out[(static_cast<size_t>(z) * size + y) * size + x]
-                                = static_cast<uint8_t>(std::lround(value * 255.0f));
+                            out[(static_cast<size_t>(z) * size + y) * size + x] =
+                                static_cast<uint8_t>(std::lround(value * 255.0f));
                         }
             });
     }
@@ -156,14 +171,16 @@ std::vector<uint8_t> Normalize(std::vector<uint8_t> v)
 // Plain (non-tiling) 3D value noise for the weather map, which lives on the sphere directly.
 float ValueNoise(float x, float y, float z, uint32_t salt)
 {
-    int ix = static_cast<int>(std::floor(x)), iy = static_cast<int>(std::floor(y)), iz = static_cast<int>(std::floor(z));
+    int ix = static_cast<int>(std::floor(x)), iy = static_cast<int>(std::floor(y)),
+        iz = static_cast<int>(std::floor(z));
     float fx = x - ix, fy = y - iy, fz = z - iz;
     fx = fx * fx * (3 - 2 * fx);
     fy = fy * fy * (3 - 2 * fy);
     fz = fz * fz * (3 - 2 * fz);
     auto h = [&](int dx, int dy, int dz)
     {
-        return Hash01(static_cast<uint32_t>(ix + dx), static_cast<uint32_t>(iy + dy), static_cast<uint32_t>(iz + dz), salt);
+        return Hash01(
+            static_cast<uint32_t>(ix + dx), static_cast<uint32_t>(iy + dy), static_cast<uint32_t>(iz + dz), salt);
     };
     float x00 = h(0, 0, 0) + (h(1, 0, 0) - h(0, 0, 0)) * fx;
     float x10 = h(0, 1, 0) + (h(1, 1, 0) - h(0, 1, 0)) * fx;
@@ -224,12 +241,36 @@ void CloudWeatherTexelDir(int face, int x, int y, int faceSize, float out[3])
     float d[3];
     switch (face)
     {
-    case 0: d[0] = 1; d[1] = -tc; d[2] = -sc; break;
-    case 1: d[0] = -1; d[1] = -tc; d[2] = sc; break;
-    case 2: d[0] = sc; d[1] = 1; d[2] = tc; break;
-    case 3: d[0] = sc; d[1] = -1; d[2] = -tc; break;
-    case 4: d[0] = sc; d[1] = -tc; d[2] = 1; break;
-    default: d[0] = -sc; d[1] = -tc; d[2] = -1; break;
+    case 0:
+        d[0] = 1;
+        d[1] = -tc;
+        d[2] = -sc;
+        break;
+    case 1:
+        d[0] = -1;
+        d[1] = -tc;
+        d[2] = sc;
+        break;
+    case 2:
+        d[0] = sc;
+        d[1] = 1;
+        d[2] = tc;
+        break;
+    case 3:
+        d[0] = sc;
+        d[1] = -1;
+        d[2] = -tc;
+        break;
+    case 4:
+        d[0] = sc;
+        d[1] = -tc;
+        d[2] = 1;
+        break;
+    default:
+        d[0] = -sc;
+        d[1] = -tc;
+        d[2] = -1;
+        break;
     }
     float len = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
     out[0] = d[0] / len;
@@ -263,8 +304,8 @@ std::vector<uint8_t> GenerateCloudWeather(uint32_t seed, int faceSize)
                         float systems = ValueFbm(px * 2.2f, py * 2.2f, pz * 2.2f, 4, s + 10u);
                         float fields = ValueFbm(px * 9.0f, py * 9.0f, pz * 9.0f, 4, s + 20u);
                         float cells = ValueFbm(px * 40.0f, py * 40.0f, pz * 40.0f, 3, s + 25u);
-                        float coverage = Clamp01((systems - 0.3f) * 2.2f) * Clamp01(fields * 1.6f - 0.15f)
-                                       * (0.55f + 0.45f * cells);
+                        float coverage =
+                            Clamp01((systems - 0.3f) * 2.2f) * Clamp01(fields * 1.6f - 0.15f) * (0.55f + 0.45f * cells);
                         float type = Clamp01((ValueFbm(px * 3.0f, py * 3.0f, pz * 3.0f, 3, s + 30u) - 0.35f) * 3.0f);
                         size_t i = (static_cast<size_t>(face) * faceSize + y) * faceSize + x;
                         raw[i] = coverage;
@@ -287,4 +328,4 @@ std::vector<uint8_t> GenerateCloudWeather(uint32_t seed, int faceSize)
     return out;
 }
 
-} // namespace planetgen
+} // namespace planets::render
