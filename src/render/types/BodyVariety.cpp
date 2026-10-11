@@ -60,7 +60,10 @@ bool Roll(const json& rule, std::mt19937& rng, json& out)
         if (!m.is_array() || m.size() != 2)
             return false;
         const float t = unit(rng);
-        auto blend = [t](const json& a, const json& b) { return a.get<float>() + (b.get<float>() - a.get<float>()) * t; };
+        auto blend = [t](const json& a, const json& b)
+        {
+            return a.get<float>() + (b.get<float>() - a.get<float>()) * t;
+        };
         if (m[0].is_number() && m[1].is_number())
         {
             out = blend(m[0], m[1]);
@@ -95,7 +98,7 @@ json RollVariety(const json& body, uint32_t seed)
 
     // json objects iterate in key order, so the draws happen in the same order every time.
     // seed_seq spreads the seed out: neighbouring seeds would otherwise start alike.
-    std::seed_seq seq{ seed, 0x9E3779B9u };
+    std::seed_seq seq{seed, 0x9E3779B9u};
     std::mt19937 rng(seq);
     for (const auto& [key, rule] : body["variety"].items())
     {

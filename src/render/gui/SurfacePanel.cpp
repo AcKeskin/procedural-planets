@@ -8,8 +8,8 @@
 namespace planets::render
 {
 
-bool SurfacePanel::Draw(BodyRuntime* activeBody, SurfaceSettings& surface, effects::OceanSettings& ocean, float& seaLevel,
-                        bool& visible)
+bool SurfacePanel::Draw(
+    BodyRuntime* activeBody, SurfaceSettings& surface, effects::OceanSettings& ocean, float& seaLevel, bool& visible)
 {
     if (!visible)
         return false;

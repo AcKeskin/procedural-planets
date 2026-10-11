@@ -36,7 +36,8 @@ std::vector<BodyEntry> ScanBodies(const std::string& dir)
             continue;
         const std::string id = item.path().stem().string();
         // Forward slashes: these paths go into JSON scripts and logs.
-        bodies.push_back({id, ReadName(item.path(), id), (std::filesystem::path(dir) / item.path().filename()).generic_string()});
+        bodies.push_back(
+            {id, ReadName(item.path(), id), (std::filesystem::path(dir) / item.path().filename()).generic_string()});
     }
     if (ec)
         std::cerr << "[BodyRegistry] Cannot read " << dir << ": " << ec.message() << std::endl;

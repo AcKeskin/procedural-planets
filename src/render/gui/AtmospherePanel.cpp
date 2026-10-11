@@ -43,7 +43,8 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
         ImGui::Separator();
         ImGui::Text("Mie Scattering");
         ImGui::SetItemTooltip("Scattering by dust and droplets: haze and the glow around the sun");
-        ImGui::SliderFloat("Mie Coefficient", &settings.mieCoefficient, 0.0f, 15.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+        ImGui::SliderFloat(
+            "Mie Coefficient", &settings.mieCoefficient, 0.0f, 15.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Amount of haze: dims the far surface and brightens the glow around the sun");
         ImGui::SliderFloat("Mie Density Falloff", &settings.mieDensityFalloff, 1.0f, 20.0f);

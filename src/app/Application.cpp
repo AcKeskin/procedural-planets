@@ -671,7 +671,8 @@ void Application::RenderGui()
         if (needsRegen && _activeHasVariety && _genConfig.seed != _rolledSeed && RerollActiveBody())
             needsRegen = false;
 
-        needsRegen |= _surfacePanel.Draw(_activeBody.get(), _surfaceSettings, _oceanSettings, _seaLevel, visibility.surface);
+        needsRegen |=
+            _surfacePanel.Draw(_activeBody.get(), _surfaceSettings, _oceanSettings, _seaLevel, visibility.surface);
         _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
         _cloudsPanel.Draw(_cloudSettings, _atmosphereSettings.enabled, visibility.clouds);
         _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
@@ -709,8 +710,8 @@ void Application::SwitchBody(planetgen::BodyConfig config, const render::types::
     _lodConfig.planetRadius = _activeBody->GetRadius();
     _seaLevel = _activeBody->GetSeaLevel();
     // Each planet type brings its own sky, clouds, ocean and star; a switch replaces them.
-    render::types::ApplyBodyLook(look, _atmosphereSettings, _cloudSettings, _oceanSettings, _sceneSettings,
-                                 _surfaceSettings);
+    render::types::ApplyBodyLook(
+        look, _atmosphereSettings, _cloudSettings, _oceanSettings, _sceneSettings, _surfaceSettings);
     if (!look.palette.empty())
         _activeBody->OverridePalette(look.palette);
     _atmosphereSettings.enabled = _activeBody->HasAtmosphere() && look.atmosphere.enabled;
