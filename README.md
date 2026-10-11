@@ -17,26 +17,29 @@ Inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-S
   <img src="docs/images/flyover.gif" alt="Orbit around the planet, then a descent through the clouds to a low view over the land" width="480">
 </p>
 
-An Earth-like world turning in real time:
+Earth and the 12 planet types, plus a row of four seeds of the Lush type:
 
-https://github.com/user-attachments/assets/ebe561bd-8c4f-4574-84cc-a6a2f2054e71
+<p align="center">
+  <img src="docs/images/types_gallery.png" alt="Earth and the 12 planet types, with four seeds of the Lush type below" width="720">
+</p>
 
-_(Earth turntable video)_
+A random type and seed every two seconds while the planet turns:
 
-Different body types generated back to back — Earth, volcanic, and crystalline worlds, fully procedural:
+<p align="center">
+  <img src="docs/images/random_worlds.gif" alt="A turning planet that changes to a random type and seed every two seconds" width="480">
+</p>
 
+One type, rerolled to a new seed about every 1.5 seconds while it turns:
 
-
-https://github.com/user-attachments/assets/895fe468-6541-4f7e-b797-4cf7dd774165
-
-
-_(Planet-type showcase video)_
+<p align="center">
+  <img src="docs/images/lush_reroll.gif" alt="A turning Lush planet that gets a new seed about every 1.5 seconds" width="480">
+</p>
 
 ## Macro World Layer
 
 An optional once-per-body bake on a coarse cube-sphere grid. It adds tectonic plates (mountain belts on convergent boundaries, rifts on divergent ones), hydraulic erosion, rivers that always drain to the sea, and moisture carried by prevailing winds (wet coasts, dry interiors, rain shadows). The terrain samples it as its base height and the climate model reads its moisture. The bake takes about 0.25 s on a desktop GPU.
 
-Turn it on in the Terrain panel: **Generation > Macro World > Enable Macro World** (needs Use Tectonics). In a body JSON, set `"macroWorld": { "enabled": true }`. It is off by default. Its river carving still shows as stair-stepped streaks up close, which is why it is not on for Earth yet.
+Turn it on in the Planet window: **Terrain > Erosion Sim (slow) > Erosion Sim** (needs Tectonic Plates). In a body JSON, set `"macroWorld": { "enabled": true }`. It is off by default. Its river carving still shows as stair-stepped streaks up close, which is why it is not on for Earth yet.
 
 ## Features
 
@@ -62,10 +65,10 @@ Turn it on in the Terrain panel: **Generation > Macro World > Enable Macro World
 **App**
 - **Planet Types** — Earth plus dune, ice, ocean, toxic, barren, salt flats, alien lush, swamp, lava, eye (tidally locked), city and crystal. A type is one JSON file in `data/bodies`: palette, sky, weather, star colour, fluid (water, ice, lava, acid), terrain style (dunes, craters, terraces, canyons, spires) and climate traits
 - **Surface Rules** — Every rule of the surface shader is a field in the type's `render.surface` block: material colours, where rock, sand, snow and soil take over, detail, per-material texture tiling and bump, plus realism layers (rock strata, wet ground, sediment, vegetation by slope and treeline, an ash/frost/dust cover, sky-tinted shadows), all editable under Surface > Surface Rules. Earth and every planet type use them
-- **Parameter Randomizer** — One click gives a new world: a planet type rolls palette, sky, weather and terrain style from its `variety` block and the seed; Earth shuffles its parameters within Earth-like constraints
+- **Reroll** — One click gives a new seed: a planet type rolls palette, sky, weather and terrain style from its `variety` block and the seed; Earth keeps its settings and gets new continents
 - **Cinematic System** — Turntable camera (F5) and headless capture: single screenshots, turntable frame sequences, and a showcase that cycles through random worlds
 - **Instrument Mode** — Script the camera and any setting from a JSON timeline (`--script`) or a live socket (`--live`), and capture frames; the README media is rendered this way
-- **Live Tweaking** — Grouped ImGui panels with tooltips for every setting
+- **Live Tweaking** — One Planet window with seven tabs and a tooltip on every setting
 
 <p align="center">
   <img src="docs/images/with_atmosphere_0.png" alt="Planet with atmospheric scattering" width="400">
@@ -107,27 +110,58 @@ Everything is handled through CMake FetchContent, so you don't need to install a
 
 ## Controls
 
-| Input | Action |
-|-------|--------|
-| `W A S D` | Move camera |
-| `E / Q` | Move up / down |
-| `Right Mouse` + drag | Look around |
-| `Shift` | Speed boost (5x) |
-| `G` | Toggle orbit / free-fly camera |
-| `H` | Toggle atmosphere |
-| `R` | Randomize planet |
-| `Tab` | Toggle GUI visibility |
-| `F5` | Play / stop cinematic turntable |
-| `F12` | Take screenshot (PNG) |
-| `Esc` | Stop cinematic / quit |
+Press `F1` in the app for the same key list. It opens once on first launch.
 
-All parameters are exposed in ImGui panels, grouped by topic with tooltips:
+| Group | Input | Action |
+|-------|-------|--------|
+| Camera | `LMB` drag | Orbit the planet (carries on over the poles) |
+| | `Wheel` | Zoom in steps scaled to the altitude (Orbit), or set the fly speed (Fly) |
+| | `W A S D` | Fly forward, left, back, right. In Orbit this switches to Fly |
+| | `Q / E` | Fly down / up |
+| | `RMB` drag | Look around. In Orbit this switches to Fly |
+| | `Shift` / `Ctrl` | Faster x4 / slower x0.25 |
+| | `G` | Switch Orbit / Fly (Orbit is the default) |
+| | `O` | Auto-rotate |
+| | `F` | Frame the planet |
+| | `Home` | Reset the view |
+| | Double-click | Fly to that point |
+| | `Ctrl + 1 .. 9` | Save a bookmark (camera and sun direction) |
+| | `1 .. 9` | Go to a bookmark |
+| Planet | `R` | Reroll: new seed |
+| | `H` | Atmosphere on / off |
+| View | `Tab` | Hide / show the Planet window |
+| | `F1` | Help |
+| | `F5` | Play / stop the turntable. By default it turns until you press `F5` or `Esc` |
+| | `F12` | Screenshot (PNG) |
+| | `Esc` | Close help, then stop the turntable. Hold 1 s to quit |
 
-- **Scene** — sun direction, size and colour, stars, camera exposure and bloom, lighting
-- **Terrain** — seed, height scale, continents, tectonics, the macro world layer, and the LOD quad-tree (mesh resolution, max depth, split threshold)
-- **Surface** — biome and climate controls, Surface Rules (every material and realism layer), planet type traits (material tints, vegetation, polar caps, tidal lock, city lights, terrain styles) and the ocean (colours, clarity, waves, fluid)
-- **Atmosphere** — scattering colours and strength, haze (Mie) and its colour, density, quality; the Earth Preset button restores the defaults
-- **Clouds** — coverage, density, cloud size, base altitude, thickness, drift speed, shadow strength, colour and quality. Clouds are part of the atmosphere, so they hide when the atmosphere is off
+### Planet window
+
+All settings live in one docked Planet window with seven tabs. Every control has a tooltip.
+
+<p align="center">
+  <img src="docs/images/gui.png" alt="The Planet window next to the planet, with the top bar above" width="720">
+</p>
+
+- **Terrain** - shape, continents, mountains, tectonic plates, sea floor, terrain style and the erosion sim
+- **Surface** - materials, climate, surface rules and textures
+- **Ocean** - sea level, water, waves, fluid and seabed colour
+- **Sky** - atmosphere, haze and clouds
+- **Light** - sun, shadows and night lights, camera exposure
+- **Camera** - view, orbit motion and the turntable
+- **System** - frame stats and mesh detail (LOD)
+
+The top bar shows the planet type, the seed, a Reroll button, the camera mode, altitude and speed, and the frame time.
+
+The five look tabs (Terrain, Surface, Ocean, Sky, Light) each have Lock, Randomize, Reset and an "N edited" count:
+
+- **Lock** keeps the tab's values on Reroll. A locked Terrain tab still takes its land shape from the seed.
+- **Randomize** gives new values to this tab only. The seed stays.
+- **Reset** sets the tab back to the type's values at the current seed.
+- Edited values show in amber. Right-click a value for Reset value, Copy and Paste.
+- An amber `*` after the seed means the seed alone no longer gives this planet: a tab is locked, edited or randomized.
+- Reroll gives every unlocked tab the type's values at a new seed.
+- A type switch keeps only a locked Light tab. The other tabs take the new type's values.
 
 ### Command line
 
@@ -153,7 +187,7 @@ src/                    The showcase app — frame loop, LOD, rendering, GUI
 │   ├── effects/        Atmosphere, clouds, ocean, bloom and ground texture passes
 │   ├── materials/      CPU generators for the ground textures and the cloud noise
 │   ├── settings/       Typed configuration structs
-│   ├── gui/            ImGui panels that edit the active body's config
+│   ├── gui/            The Planet window and its tabs, which edit the active body's config
 │   ├── cinematic/      Turntable controller + screenshot capture
 │   ├── Renderer             Multi-pass HDR scene draw (space → planet → ocean → clouds + atmosphere → tonemap)
 │   ├── BodyRuntime          Render-time view of the active body (no subclassing)
@@ -191,7 +225,7 @@ data/
 
 A body is **data, not a subclass**. The canonical definition is `BodyConfig` (in `libplanetgen/src/model/`) — a typed struct of blocks (shape, tectonics, ocean floor, shading, palette, shader paths) loaded from `data/bodies/*.json`. It is the single source of truth for what a body is.
 
-The app wraps the active config in a `BodyRuntime` — a render-time *adapter* (no inheritance) that exposes metadata, shader paths, and render-uniform binding. The ImGui panels edit the config in place; any edit rebuilds the body so its continent mask re-bakes.
+The app wraps the active config in a `BodyRuntime` — a render-time *adapter* (no inheritance) that exposes metadata, shader paths, and render-uniform binding. The Planet window edits the config in place; any edit rebuilds the body so its continent mask re-bakes.
 
 New planet types are added by creating a JSON file in `data/bodies` (its palette, sky, fluid, terrain style and variety live in it). No code changes required.
 
