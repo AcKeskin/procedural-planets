@@ -14,12 +14,8 @@ constexpr float PlayButtonHeight = 40.0f;
 constexpr const char* DurationModeItems = "Rotations\0Seconds\0Loop\0";
 } // namespace
 
-void CinematicPanel::Draw(CinematicSettings& settings, float planetRadius, bool& playRequested, bool& visible)
+void CinematicPanel::DrawContent(CinematicSettings& settings, float planetRadius, bool& playRequested)
 {
-    if (!visible)
-        return;
-
-    ImGui::Begin("Cinematic", &visible);
     PushLabelColumn();
 
     if (ImGui::CollapsingHeader("Turntable", ImGuiTreeNodeFlags_DefaultOpen))
@@ -77,7 +73,6 @@ void CinematicPanel::Draw(CinematicSettings& settings, float planetRadius, bool&
     }
 
     ImGui::PopItemWidth();
-    ImGui::End();
 }
 
 void CinematicPanel::DrawTurntableContent(TurntableSettings& settings, float planetRadius)

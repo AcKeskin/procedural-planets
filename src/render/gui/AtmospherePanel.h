@@ -11,7 +11,7 @@ namespace planets::render
 class AtmospherePanel
 {
 public:
-    void Draw(effects::AtmosphereSettings& settings, bool& visible);
+    void DrawContent(effects::AtmosphereSettings& settings);
 };
 
 } // namespace planets::render

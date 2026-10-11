@@ -53,8 +53,6 @@ void GuiManager::BeginFrame()
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-
-    SetupDockspace();
 }
 
 void GuiManager::EndFrame()
@@ -63,14 +61,14 @@ void GuiManager::EndFrame()
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-void GuiManager::SetupDockspace()
+void GuiManager::DrawDockspace()
 {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
     ImGui::SetNextWindowViewport(viewport->ID);
 
-    ImGuiWindowFlags flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
                              ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                              ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
                              ImGuiWindowFlags_NoBackground;
@@ -81,29 +79,8 @@ void GuiManager::SetupDockspace()
     ImGui::Begin("##Dockspace", nullptr, flags);
     ImGui::PopStyleVar(3);
 
-    if (ImGui::BeginMenuBar())
-    {
-        if (ImGui::BeginMenu("View"))
-        {
-            ImGui::MenuItem("Scene", nullptr, &_visibility.scene);
-            ImGui::MenuItem("Terrain", nullptr, &_visibility.terrain);
-            ImGui::MenuItem("Surface", nullptr, &_visibility.surface);
-            ImGui::MenuItem("Atmosphere", nullptr, &_visibility.atmosphere);
-            ImGui::MenuItem("Clouds", nullptr, &_visibility.clouds);
-            ImGui::MenuItem("Cinematic", nullptr, &_visibility.cinematic);
-            ImGui::MenuItem("Debug", nullptr, &_visibility.debug);
-            ImGui::Separator();
-            if (ImGui::MenuItem("Reset Layout"))
-            {
-                _resetLayout = true;
-            }
-            ImGui::EndMenu();
-        }
-        ImGui::EndMenuBar();
-    }
-
     // Renamed when the default layout changes, so saved imgui.ini layouts pick up the new one.
-    ImGuiID dockspaceId = ImGui::GetID("MainDockspaceV2");
+    ImGuiID dockspaceId = ImGui::GetID("MainDockspaceV3");
 
     bool needsBuild = (ImGui::DockBuilderGetNode(dockspaceId) == nullptr) || _resetLayout;
     _resetLayout = false;
@@ -114,20 +91,11 @@ void GuiManager::SetupDockspace()
         ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
         ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
 
+        // One Planet window on the left, about 440 px at 1920 wide; the viewport gets the rest.
         ImGuiID dockMain = dockspaceId;
-        ImGuiID dockRight = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.28f, nullptr, &dockMain);
-        ImGuiID dockLeft = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Left, 0.30f, nullptr, &dockMain);
-        ImGuiID dockBottom = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Down, 0.15f, nullptr, &dockMain);
-        ImGuiID dockLeftTop = ImGui::DockBuilderSplitNode(dockLeft, ImGuiDir_Up, 0.07f, nullptr, &dockLeft);
-
-        ImGui::DockBuilderDockWindow("Body Type", dockLeftTop);
-        ImGui::DockBuilderDockWindow("Scene", dockLeft);
-        ImGui::DockBuilderDockWindow("Terrain", dockLeft);
-        ImGui::DockBuilderDockWindow("Surface", dockRight);
-        ImGui::DockBuilderDockWindow("Atmosphere", dockRight);
-        ImGui::DockBuilderDockWindow("Clouds", dockRight);
-        ImGui::DockBuilderDockWindow("Debug", dockBottom);
-        ImGui::DockBuilderDockWindow("Cinematic", dockBottom);
+        const float leftShare = viewport->WorkSize.x > 0.0f ? 440.0f / viewport->WorkSize.x : 0.25f;
+        ImGuiID dockLeft = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Left, leftShare, nullptr, &dockMain);
+        ImGui::DockBuilderDockWindow("Planet", dockLeft);
 
         ImGui::DockBuilderFinish(dockspaceId);
     }

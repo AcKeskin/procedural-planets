@@ -8,14 +8,10 @@
 namespace planets::render
 {
 
-bool SurfacePanel::Draw(
-    BodyRuntime* activeBody, SurfaceSettings& surface, effects::OceanSettings& ocean, float& seaLevel, bool& visible)
+bool SurfacePanel::DrawContent(
+    BodyRuntime* activeBody, SurfaceSettings& surface, effects::OceanSettings& ocean, float& seaLevel)
 {
-    if (!visible)
-        return false;
-
     bool regen = false;
-    ImGui::Begin("Surface", &visible);
     PushLabelColumn();
 
     if (activeBody)
@@ -25,14 +21,7 @@ bool SurfacePanel::Draw(
         DrawSurfaceRules(surface);
     }
 
-    if (activeBody && activeBody->HasSolidSurface())
-    {
-        if (ImGui::CollapsingHeader("Ocean"))
-            DrawOceanContent(ocean, seaLevel);
-    }
-
     ImGui::PopItemWidth();
-    ImGui::End();
     return regen;
 }
 

@@ -7,12 +7,8 @@
 namespace planets::render
 {
 
-void ScenePanel::Draw(SceneSettings& settings, bool atmosphereOwnsHaze, bool& visible)
+void ScenePanel::DrawContent(SceneSettings& settings, bool atmosphereOwnsHaze)
 {
-    if (!visible)
-        return;
-
-    ImGui::Begin("Scene", &visible);
     PushLabelColumn();
 
     if (ImGui::CollapsingHeader("Space & Sun", ImGuiTreeNodeFlags_DefaultOpen))
@@ -22,7 +18,6 @@ void ScenePanel::Draw(SceneSettings& settings, bool atmosphereOwnsHaze, bool& vi
         DrawLightingContent(settings.lighting, atmosphereOwnsHaze);
 
     ImGui::PopItemWidth();
-    ImGui::End();
 }
 
 void ScenePanel::DrawSpaceContent(SceneSettings& settings)

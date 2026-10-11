@@ -15,11 +15,10 @@ class BodyRuntime;
 class TerrainPanel
 {
 public:
-    bool Draw(BodyRuntime* activeBody,
+    bool DrawContent(BodyRuntime* activeBody,
               GenerationConfig& config,
               LodConfig& lod,
               const TerrainStats& stats,
-              bool& visible,
               bool& randomizeRequested);
 
 private:

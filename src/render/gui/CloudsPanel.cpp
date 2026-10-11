@@ -6,12 +6,8 @@
 namespace planets::render
 {
 
-void CloudsPanel::Draw(effects::CloudSettings& settings, bool atmosphereOn, bool& visible)
+void CloudsPanel::DrawContent(effects::CloudSettings& settings, bool atmosphereOn)
 {
-    if (!visible)
-        return;
-
-    ImGui::Begin("Clouds", &visible);
     PushLabelColumn();
 
     ImGui::BeginDisabled(!atmosphereOn);
@@ -43,7 +39,6 @@ void CloudsPanel::Draw(effects::CloudSettings& settings, bool atmosphereOn, bool
     ImGui::EndDisabled();
 
     ImGui::PopItemWidth();
-    ImGui::End();
 }
 
 } // namespace planets::render

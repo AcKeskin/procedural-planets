@@ -9,7 +9,7 @@ class ScenePanel
 {
 public:
     // atmosphereOwnsHaze: the atmosphere pass is on, so the renderer zeroes the surface haze.
-    void Draw(SceneSettings& settings, bool atmosphereOwnsHaze, bool& visible);
+    void DrawContent(SceneSettings& settings, bool atmosphereOwnsHaze);
 
 private:
     void DrawSpaceContent(SceneSettings& settings);

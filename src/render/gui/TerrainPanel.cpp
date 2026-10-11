@@ -8,18 +8,13 @@
 namespace planets::render
 {
 
-bool TerrainPanel::Draw(BodyRuntime* activeBody,
+bool TerrainPanel::DrawContent(BodyRuntime* activeBody,
                         GenerationConfig& config,
                         LodConfig& lod,
                         const TerrainStats& stats,
-                        bool& visible,
                         bool& randomizeRequested)
 {
-    if (!visible)
-        return false;
-
     bool regen = false;
-    ImGui::Begin("Terrain", &visible);
     PushLabelColumn();
 
     if (activeBody && ImGui::CollapsingHeader("Generation", ImGuiTreeNodeFlags_DefaultOpen))
@@ -29,7 +24,6 @@ bool TerrainPanel::Draw(BodyRuntime* activeBody,
         regen |= DrawLodContent(activeBody, lod, stats);
 
     ImGui::PopItemWidth();
-    ImGui::End();
     return regen;
 }
 

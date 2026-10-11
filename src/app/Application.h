@@ -5,12 +5,7 @@
 #include "Renderer.h"
 #include "lod/PlanetQuadTree.h"
 #include "gui/GuiManager.h"
-#include "gui/ScenePanel.h"
-#include "gui/TerrainPanel.h"
-#include "gui/SurfacePanel.h"
-#include "gui/AtmospherePanel.h"
-#include "gui/DebugPanel.h"
-#include "gui/CloudsPanel.h"
+#include "gui/PlanetWindow.h"
 #include "types/BodyRegistry.h"
 #include "types/BodyLook.h"
 #include "settings/SceneSettings.h"
@@ -25,7 +20,6 @@
 #include <memory>
 #include "cinematic/CinematicController.h"
 #include "cinematic/CaptureManager.h"
-#include "gui/CinematicPanel.h"
 #include "math/Camera.h"
 #include "CaptureRequest.h"
 #include "planetgen/model/PaletteRegistry.h"
@@ -108,6 +102,9 @@ private:
     void ProcessInput(float deltaTime);
     void Render();
     void RenderGui();
+    // Main menu bar: View menu, type, seed, reroll, frame time. Visible even when Tab hides the
+    // Planet window.
+    void DrawBar();
 
     void RegenerateLodSystem();
     // New world: a planet type with a variety block rolls a new seed; others (Earth) shuffle
@@ -140,12 +137,8 @@ private:
 
     // GUI
     render::GuiManager _guiManager;
-    render::ScenePanel _scenePanel;
-    render::TerrainPanel _terrainPanel;
-    render::SurfacePanel _surfacePanel;
-    render::AtmospherePanel _atmospherePanel;
-    render::DebugPanel _debugPanel;
-    render::CloudsPanel _cloudsPanel;
+    render::PlanetWindow _planetWindow;
+    float _frameMs = 16.0f; // smoothed frame time for the bar
 
     // App-visual settings (generation params live in the active body's BodyConfig).
     render::SceneSettings _sceneSettings;
@@ -166,7 +159,6 @@ private:
 
     // Cinematic
     render::CinematicController _cinematicController;
-    render::CinematicPanel _cinematicPanel;
     render::CinematicSettings _cinematicSettings;
     render::CaptureManager _captureManager;
     bool _guiVisible = true;

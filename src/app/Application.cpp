@@ -7,6 +7,7 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <imgui.h>
+#include <cstdio>
 #include <iostream>
 #include <fstream>
 #include <random>
@@ -133,6 +134,7 @@ void Application::BeginInteractiveFrame()
     const float now = static_cast<float>(glfwGetTime());
     const float deltaTime = now - _lastTime;
     _lastTime = now;
+    _frameMs += (deltaTime * 1000.0f - _frameMs) * 0.1f;
 
     _window.PollEvents();
     _input.Update();
@@ -371,32 +373,13 @@ void Application::RenderGui()
 {
     _guiManager.BeginFrame();
 
+    // The bar stays when Tab hides the Planet window; a playing turntable hides everything.
+    if (!_cinematicController.IsPlaying())
+        DrawBar();
+    _guiManager.DrawDockspace();
+
     if (_guiVisible)
     {
-        auto& visibility = _guiManager.GetVisibility();
-
-        // Body type selector
-        if (ImGui::Begin("Body Type", nullptr, ImGuiWindowFlags_NoCollapse))
-        {
-            const char* preview = _bodies.empty() ? "" : _bodies[_selectedBodyType].name.c_str();
-            if (ImGui::BeginCombo("Type", preview))
-            {
-                for (int i = 0; i < static_cast<int>(_bodies.size()); ++i)
-                {
-                    if (ImGui::Selectable(_bodies[i].name.c_str(), i == _selectedBodyType) && i != _selectedBodyType)
-                        SwitchBodyById(_bodies[i].id);
-                }
-                ImGui::EndCombo();
-            }
-            ImGui::SetItemTooltip("Planet types are the JSON files in data/bodies");
-
-            if (_activeBody)
-                ImGui::Text("Active: %s", _activeBody->GetTypeName().c_str());
-        }
-        ImGui::End();
-
-        _scenePanel.Draw(_sceneSettings, _atmosphereSettings.enabled, visibility.scene);
-
         _terrainStats.patchCount = _renderer.QuadTree().GetActiveLeafCount();
         _terrainStats.visiblePatchCount = _renderer.QuadTree().GetVisiblePatchCount();
         const render::GpuTimings gpu = _renderer.Timings();
@@ -404,32 +387,96 @@ void Application::RenderGui()
         _terrainStats.gpuOceanMs = gpu.oceanMs;
         _terrainStats.gpuEffectsMs = gpu.effectsMs;
 
-        bool randomize = false;
-        bool needsRegen =
-            _terrainPanel.Draw(_activeBody.get(), _genConfig, _lodConfig, _terrainStats, visibility.terrain, randomize);
+        render::PlanetUi ui;
+        ui.body = _activeBody.get();
+        ui.gen = &_genConfig;
+        ui.lod = &_lodConfig;
+        ui.stats = &_terrainStats;
+        ui.surface = &_surfaceSettings;
+        ui.ocean = &_oceanSettings;
+        ui.seaLevel = &_seaLevel;
+        ui.atmosphere = &_atmosphereSettings;
+        ui.clouds = &_cloudSettings;
+        ui.scene = &_sceneSettings;
+        ui.camera = &_camera;
+        ui.moveSpeed = &_moveSpeed;
+        ui.autoOrbit = _autoOrbit;
+        ui.autoOrbitSpeed = &_autoOrbitSpeed;
+        ui.cinematic = &_cinematicSettings;
+        ui.planetRadius = PlanetRadius();
 
-        if (randomize && _activeBody)
+        const render::PlanetActions actions = _planetWindow.Draw(ui);
+        bool needsRegen = actions.regenerate;
+        if (actions.randomize && _activeBody)
             ShuffleTerrain();
         // A seed typed into the panel is a new world for a planet type: roll its traits too.
         if (needsRegen && _activeHasVariety && _genConfig.seed != _rolledSeed && RerollActiveBody())
             needsRegen = false;
-
-        needsRegen |=
-            _surfacePanel.Draw(_activeBody.get(), _surfaceSettings, _oceanSettings, _seaLevel, visibility.surface);
-        _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
-        _cloudsPanel.Draw(_cloudSettings, _atmosphereSettings.enabled, visibility.clouds);
-        _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
-
-        bool playRequested = false;
-        _cinematicPanel.Draw(_cinematicSettings, PlanetRadius(), playRequested, visibility.cinematic);
-        if (playRequested)
+        if (actions.playCinematic)
             StartCinematic();
-
         if (needsRegen)
             RegenerateLodSystem();
     }
 
     _guiManager.EndFrame();
+}
+
+void Application::DrawBar()
+{
+    if (!ImGui::BeginMainMenuBar())
+        return;
+
+    if (ImGui::BeginMenu("View"))
+    {
+        ImGui::MenuItem("Planet window", "Tab", &_guiVisible);
+        if (ImGui::MenuItem("Reset Layout"))
+            _guiManager.RequestResetLayout();
+        ImGui::EndMenu();
+    }
+    ImGui::Separator();
+
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9.0f);
+    const char* preview = _bodies.empty() ? "" : _bodies[_selectedBodyType].name.c_str();
+    if (ImGui::BeginCombo("Type", preview))
+    {
+        for (int i = 0; i < static_cast<int>(_bodies.size()); ++i)
+        {
+            if (ImGui::Selectable(_bodies[i].name.c_str(), i == _selectedBodyType) && i != _selectedBodyType)
+                SwitchBodyById(_bodies[i].id);
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("Planet type. Each type sets its own terrain, surface, sky and star.");
+
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 7.0f);
+    uint32_t seed = _genConfig.seed;
+    if (ImGui::InputScalar("Seed", ImGuiDataType_U32, &seed, nullptr, nullptr, "%u",
+                           ImGuiInputTextFlags_EnterReturnsTrue) &&
+        seed != _genConfig.seed)
+    {
+        _genConfig.seed = seed;
+        if (!RerollActiveBody())
+            RegenerateLodSystem();
+    }
+    ImGui::SetItemTooltip("Same seed + same type = same planet. Enter to apply.");
+
+    if (ImGui::Button("Reroll"))
+        ShuffleTerrain();
+    ImGui::SetItemTooltip("New random seed. Key: R.");
+
+    // Frame time on the right; the GPU split on hover.
+    char frame[48];
+    std::snprintf(frame, sizeof(frame), "%.1f ms  %.0f fps", _frameMs, _frameMs > 0.0f ? 1000.0f / _frameMs : 0.0f);
+    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize(frame).x - ImGui::GetStyle().ItemSpacing.x * 2.0f);
+    ImGui::TextUnformatted(frame);
+    if (ImGui::IsItemHovered())
+    {
+        const render::GpuTimings gpu = _renderer.Timings();
+        ImGui::SetTooltip("GPU terrain %.2f / ocean %.2f / effects %.2f ms", gpu.terrainMs, gpu.oceanMs,
+                          gpu.effectsMs);
+    }
+
+    ImGui::EndMainMenuBar();
 }
 
 void Application::SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look, bool resetCamera)

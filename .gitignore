@@ -36,3 +36,6 @@ Makefile
 
 # Worktrees
 .worktrees/
+
+# ImGui window layout, written next to the exe at runtime; the default layout comes from code
+imgui.ini

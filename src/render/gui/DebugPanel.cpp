@@ -6,13 +6,9 @@
 namespace planets::render
 {
 
-void DebugPanel::Draw(
-    const planets::core::Camera& camera, float& moveSpeed, bool autoOrbit, float& autoOrbitSpeed, bool& visible)
+void DebugPanel::DrawContent(
+    const planets::core::Camera& camera, float& moveSpeed, bool autoOrbit, float& autoOrbitSpeed)
 {
-    if (!visible)
-        return;
-
-    ImGui::Begin("Debug", &visible);
     PushLabelColumn();
 
     const auto& pos = camera.GetPosition();
@@ -42,7 +38,6 @@ void DebugPanel::Draw(
     ImGui::BulletText("ESC - Exit");
 
     ImGui::PopItemWidth();
-    ImGui::End();
 }
 
 } // namespace planets::render

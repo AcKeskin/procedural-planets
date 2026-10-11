@@ -7,12 +7,8 @@
 namespace planets::render
 {
 
-void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
+void AtmospherePanel::DrawContent(effects::AtmosphereSettings& settings)
 {
-    if (!visible)
-        return;
-
-    ImGui::Begin("Atmosphere", &visible);
     PushLabelColumn();
 
     ImGui::Checkbox("Enable Atmosphere", &settings.enabled);
@@ -102,7 +98,6 @@ void AtmospherePanel::Draw(effects::AtmosphereSettings& settings, bool& visible)
     }
 
     ImGui::PopItemWidth();
-    ImGui::End();
 }
 
 } // namespace planets::render

@@ -10,6 +10,7 @@ add_library(render STATIC
     gui/DebugPanel.cpp
     gui/CinematicPanel.cpp
     gui/CloudsPanel.cpp
+    gui/PlanetWindow.cpp
     Renderer.cpp
     GpuTimer.cpp
     Mesh.cpp

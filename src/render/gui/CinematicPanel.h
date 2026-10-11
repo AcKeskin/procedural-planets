@@ -9,7 +9,7 @@ struct TurntableSettings;
 class CinematicPanel
 {
 public:
-    void Draw(CinematicSettings& settings, float planetRadius, bool& playRequested, bool& visible);
+    void DrawContent(CinematicSettings& settings, float planetRadius, bool& playRequested);
 
 private:
     void DrawTurntableContent(TurntableSettings& settings, float planetRadius);

@@ -16,11 +16,13 @@ struct OceanSettings;
 class SurfacePanel
 {
 public:
-    bool Draw(BodyRuntime* activeBody,
+    bool DrawContent(BodyRuntime* activeBody,
               SurfaceSettings& surface,
               effects::OceanSettings& ocean,
-              float& seaLevel,
-              bool& visible);
+              float& seaLevel);
+
+    // Water: its own tab in the Planet window.
+    void DrawOceanContent(effects::OceanSettings& settings, float& seaLevel);
 
 private:
     bool DrawShadingBlock(BodyRuntime& body);
@@ -28,7 +30,6 @@ private:
     bool DrawPlanetType(BodyRuntime& body, SurfaceSettings& surface);
     // Every rule of the surface shader, grouped by material (live, no regenerate).
     void DrawSurfaceRules(SurfaceSettings& surface);
-    void DrawOceanContent(effects::OceanSettings& settings, float& seaLevel);
 };
 
 } // namespace planets::render

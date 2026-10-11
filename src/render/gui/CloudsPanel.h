@@ -12,7 +12,7 @@ class CloudsPanel
 {
 public:
     // atmosphereOn false greys the panel out: clouds are part of the atmosphere and hide with it.
-    void Draw(effects::CloudSettings& settings, bool atmosphereOn, bool& visible);
+    void DrawContent(effects::CloudSettings& settings, bool atmosphereOn);
 };
 
 } // namespace planets::render
