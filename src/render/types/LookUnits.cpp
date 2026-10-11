@@ -25,7 +25,11 @@ void CopyUnits(uint32_t mask, const LookState& from, LookState& to)
 {
     if (Has(mask, LookUnit::Terrain))
     {
+        // A variety key can hit any metadata field except the name, type and sea level (Ocean).
         to.config.metadata.radius = from.config.metadata.radius;
+        to.config.metadata.atmosphereHeight = from.config.metadata.atmosphereHeight;
+        to.config.metadata.hasSolidSurface = from.config.metadata.hasSolidSurface;
+        to.config.metadata.hasAtmosphere = from.config.metadata.hasAtmosphere;
         to.config.shape = from.config.shape;
         to.config.tectonics = from.config.tectonics;
         to.config.oceanFloor = from.config.oceanFloor;

@@ -2,7 +2,12 @@
 
 #include "types/LookUnits.h"
 
+#include "planetgen/model/BodyConfigJson.h"
+
+#include <cstring>
+#include <filesystem>
 #include <fstream>
+#include <type_traits>
 #include <nlohmann/json.hpp>
 
 using namespace planets::render;
@@ -166,4 +171,156 @@ TEST_CASE("look_units: a roll over the default scene drops edited exposure unles
     CHECK(locked.baseline.scene.exposure == defaults.exposure);
     // Other units still take the roll.
     CHECK(locked.next.clouds.coverage == fromDefault.clouds.coverage);
+}
+
+namespace
+{
+template <typename T>
+bool SameBytes(const T& a, const T& b)
+{
+    static_assert(std::is_trivially_copyable_v<T>);
+    return std::memcmp(&a, &b, sizeof(T)) == 0;
+}
+
+// Compares the fields a unit owns, written out here and not taken from CopyUnits.
+bool UnitEqual(LookUnit unit, const LookState& x, const LookState& y)
+{
+    const auto &cx = x.config, &cy = y.config;
+    switch (unit)
+    {
+    case LookUnit::Terrain:
+        return cx.metadata.radius == cy.metadata.radius && cx.metadata.atmosphereHeight == cy.metadata.atmosphereHeight &&
+               cx.metadata.hasSolidSurface == cy.metadata.hasSolidSurface &&
+               cx.metadata.hasAtmosphere == cy.metadata.hasAtmosphere && SameBytes(cx.shape, cy.shape) &&
+               SameBytes(cx.tectonics, cy.tectonics) && SameBytes(cx.oceanFloor, cy.oceanFloor) &&
+               SameBytes(cx.heightDetail, cy.heightDetail) && SameBytes(cx.erosion, cy.erosion) &&
+               SameBytes(cx.macroWorld, cy.macroWorld) && SameBytes(cx.terrainStyle, cy.terrainStyle);
+    case LookUnit::Surface:
+    {
+        // Seabed and shadow fill belong to Ocean and Light.
+        SurfaceSettings sx = x.surface;
+        sx.seafloor = y.surface.seafloor;
+        sx.skyAmbient = y.surface.skyAmbient;
+        return SameBytes(sx, y.surface) && SameBytes(cx.shading, cy.shading) && x.palette == y.palette;
+    }
+    case LookUnit::Ocean:
+        return cx.metadata.seaLevel == cy.metadata.seaLevel && SameBytes(x.ocean, y.ocean) &&
+               SameBytes(x.surface.seafloor, y.surface.seafloor);
+    case LookUnit::Sky:
+        return SameBytes(x.atmosphere, y.atmosphere) && SameBytes(x.clouds, y.clouds) &&
+               x.scene.lighting.hazeStrength == y.scene.lighting.hazeStrength &&
+               x.scene.lighting.hazeColor == y.scene.lighting.hazeColor;
+    case LookUnit::Light:
+    {
+        SceneSettings sx = x.scene;
+        sx.lighting.hazeStrength = y.scene.lighting.hazeStrength;
+        sx.lighting.hazeColor = y.scene.lighting.hazeColor;
+        return SameBytes(sx, y.scene) && SameBytes(x.surface.skyAmbient, y.surface.skyAmbient);
+    }
+    default:
+        return false;
+    }
+}
+
+std::vector<std::filesystem::path> ShippedBodies()
+{
+    std::vector<std::filesystem::path> out;
+    for (const auto& e : std::filesystem::directory_iterator("data/bodies"))
+        if (e.path().extension() == ".json")
+            out.push_back(e.path());
+    return out;
+}
+
+// "render.ocean.crust" -> the nested value in a config JSON; null when absent.
+nlohmann::json ValueAt(const nlohmann::json& root, const std::string& key)
+{
+    const nlohmann::json* node = &root;
+    size_t start = 0;
+    while (start <= key.size())
+    {
+        const size_t dot = key.find('.', start);
+        const std::string part = key.substr(start, dot == std::string::npos ? std::string::npos : dot - start);
+        if (!node->is_object() || !node->contains(part))
+            return nullptr;
+        node = &(*node)[part];
+        if (dot == std::string::npos)
+            break;
+        start = dot + 1;
+    }
+    return *node;
+}
+} // namespace
+
+TEST_CASE("look_units: copying one unit gives that unit of the source, for every shipped body", "[look_units]")
+{
+    const auto bodies = ShippedBodies();
+    REQUIRE(!bodies.empty());
+    for (const auto& path : bodies)
+    {
+        const auto body = LoadBody(path.string().c_str());
+        const LookState a = Roll(body, 11);
+        const LookState b = Roll(body, 22);
+        for (uint32_t u = 0; u < static_cast<uint32_t>(LookUnit::Count); ++u)
+        {
+            const auto unit = static_cast<LookUnit>(u);
+            LookState next = b;
+            CopyUnits(UnitBit(unit), a, next);
+            INFO(path.string() << " unit " << u);
+            CHECK(UnitEqual(unit, next, a));
+        }
+    }
+}
+
+TEST_CASE("look_units: every config variety key survives a lock on its unit", "[look_units]")
+{
+    for (const auto& path : ShippedBodies())
+    {
+        const auto body = LoadBody(path.string().c_str());
+        if (!body.contains("variety"))
+            continue;
+        const LookState a = Roll(body, 11);
+        const LookState b = Roll(body, 22);
+        const nlohmann::json ja = nlohmann::json::parse(planetgen::BodyConfigToJson(a.config));
+        for (const auto& item : body["variety"].items())
+        {
+            const std::string& key = item.key();
+            // Look keys (render.*) are covered by the unit comparison above.
+            if (key.rfind("render.", 0) == 0)
+                continue;
+            LookState next = b;
+            CopyUnits(UnitBit(UnitOfKey(key)), a, next);
+            const nlohmann::json jn = nlohmann::json::parse(planetgen::BodyConfigToJson(next.config));
+            INFO(path.string() << " " << key);
+            CHECK(ValueAt(jn, key) == ValueAt(ja, key));
+        }
+    }
+}
+
+TEST_CASE("look_units: Terrain copies the metadata a variety key can hit", "[look_units]")
+{
+    CHECK(UnitOfKey("metadata.atmosphereHeight") == LookUnit::Terrain);
+    LookState from;
+    from.config.metadata.atmosphereHeight = 0.2f;
+    from.config.metadata.seaLevel = 1.05f;
+    LookState to;
+    CopyUnits(UnitBit(LookUnit::Terrain), from, to);
+    CHECK(to.config.metadata.atmosphereHeight == 0.2f);
+    CHECK(to.config.metadata.seaLevel == planetgen::MetadataBlock{}.seaLevel);
+}
+
+TEST_CASE("look_units: a merged roll keeps the kept units live and their default old", "[look_units]")
+{
+    const TwoWorlds w;
+    LookState live = w.a;
+    live.ocean.crust = 0.77f;           // edited
+    LookState oldBaseline = w.a;
+    const MergedRoll m = MergeRoll(w.b, live, oldBaseline, UnitBit(LookUnit::Ocean));
+    CHECK(m.next.ocean.crust == 0.77f);
+    CHECK(m.baseline.ocean.crust == w.a.ocean.crust);
+    CHECK(m.next.clouds.coverage == w.b.clouds.coverage);
+    CHECK(m.baseline.clouds.coverage == w.b.clouds.coverage);
+    // No kept unit: the roll is both the world and its baseline.
+    const MergedRoll fresh = MergeRoll(w.b, live, oldBaseline, 0);
+    CHECK(fresh.next.ocean.crust == w.b.ocean.crust);
+    CHECK(fresh.baseline.ocean.crust == w.b.ocean.crust);
 }
