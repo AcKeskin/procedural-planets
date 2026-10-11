@@ -65,7 +65,7 @@ Turn it on in the Planet window: **Terrain > Erosion Sim (slow) > Erosion Sim** 
 **App**
 - **Planet Types** — Earth plus dune, ice, ocean, toxic, barren, salt flats, alien lush, swamp, lava, eye (tidally locked), city and crystal. A type is one JSON file in `data/bodies`: palette, sky, weather, star colour, fluid (water, ice, lava, acid), terrain style (dunes, craters, terraces, canyons, spires) and climate traits
 - **Surface Rules** — Every rule of the surface shader is a field in the type's `render.surface` block: material colours, where rock, sand, snow and soil take over, detail, per-material texture tiling and bump, plus realism layers (rock strata, wet ground, sediment, vegetation by slope and treeline, an ash/frost/dust cover, sky-tinted shadows), all editable under Surface > Surface Rules. Earth and every planet type use them
-- **Reroll** — One click gives a new seed: a planet type rolls palette, sky, weather and terrain style from its `variety` block and the seed; Earth keeps its settings and gets new continents
+- **Reroll** — One click gives a new seed: a planet type rolls palette, sky, weather and terrain style from its `variety` block and the seed; Earth gets new continents. Locked tabs keep their values
 - **Cinematic System** — Turntable camera (F5) and headless capture: single screenshots, turntable frame sequences, and a showcase that cycles through random worlds
 - **Instrument Mode** — Script the camera and any setting from a JSON timeline (`--script`) or a live socket (`--live`), and capture frames; the README media is rendered this way
 - **Live Tweaking** — One Planet window with seven tabs and a tooltip on every setting
