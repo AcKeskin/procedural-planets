@@ -1,0 +1,20 @@
+flowchart TB
+    subgraph sg_exe["procedural-planets app"]
+        direction LR
+        n_modes["src/app/modes<br/>run modes"] --> n_app["src/app<br/>frame loop, input, camera"]
+        n_app --> n_gui["src/render/gui<br/>Planet window"]
+        n_app --> n_render["src/render<br/>renderer, LOD, effects"]
+    end
+    subgraph sg_lib["libplanetgen DLL"]
+        direction LR
+        n_api["C API<br/>planetgen.h"] --> n_strategy["strategy<br/>height, erosion, shading"]
+        n_strategy --> n_backend["backend<br/>GL compute shaders"]
+        n_api --> n_model["model<br/>BodyConfig, JSON, variety"]
+    end
+    n_data[("data/bodies<br/>*.json")]
+    n_shaders[("shaders/")]
+    n_app -- reads --> n_data
+    n_app -- rolls --> n_model
+    n_gui -- edits --> n_model
+    n_render -- pg_generate_patch --> n_api
+    n_render -- loads --> n_shaders
