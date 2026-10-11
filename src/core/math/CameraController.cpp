@@ -125,6 +125,15 @@ void CameraController::Update(float dt, const CameraBody& body, const CameraCont
     if (_move.active && userActs)
         EndMove(camera, /*snapToTarget=*/false);
 
+    // WASD/QE or a right-drag in Orbit means "fly": switch at once instead of ignoring the keys.
+    const bool wantsFly = input.move != glm::vec3(0.0f) || input.look != glm::vec2(0.0f);
+    if (wantsFly && !_move.active && camera.GetMode() == CameraMode::Orbit)
+    {
+        camera.SetMode(CameraMode::FreeFly);
+        camera.Relevel(LocalUp(camera.GetPosition(), body.radius));
+        camera.Hud().autoRotate = false;
+    }
+
     if (_move.active)
         StepMove(dt, camera);
     else if (camera.GetMode() == CameraMode::Orbit)

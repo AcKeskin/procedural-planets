@@ -73,12 +73,12 @@ inline constexpr float SlowerFactor = 0.25f;
 inline constexpr float QuitHoldSeconds = 1.0f;
 
 inline constexpr std::array<KeyBind, 20> Table{{
-    {Action::Fly, Key::None, Modifier::None, "W A S D", "Fly forward, left, back, right", KeyGroup::Camera},
+    {Action::Fly, Key::None, Modifier::None, "W A S D", "Fly forward, left, back, right (from Orbit too)", KeyGroup::Camera},
     {Action::Vertical, Key::None, Modifier::None, "Q / E", "Fly down / up", KeyGroup::Camera},
     {Action::Speed, Key::None, Modifier::None, "Shift / Ctrl", "Faster x4 / slower x0.25", KeyGroup::Camera},
     {Action::Zoom, Key::None, Modifier::None, "Wheel", "Zoom (Orbit) or fly speed (Fly)", KeyGroup::Camera},
     {Action::OrbitDrag, Key::None, Modifier::None, "LMB drag", "Orbit the planet", KeyGroup::Camera},
-    {Action::Look, Key::None, Modifier::None, "RMB drag", "Look around (Fly)", KeyGroup::Camera},
+    {Action::Look, Key::None, Modifier::None, "RMB drag", "Look around (switches to Fly)", KeyGroup::Camera},
     {Action::ToggleMode, Key::G, Modifier::None, "G", "Switch Orbit / Fly", KeyGroup::Camera},
     {Action::AutoRotate, Key::O, Modifier::None, "O", "Auto-rotate", KeyGroup::Camera},
     {Action::FramePlanet, Key::F, Modifier::None, "F", "Frame the planet", KeyGroup::Camera},

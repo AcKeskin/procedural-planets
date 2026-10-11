@@ -190,3 +190,52 @@ TEST_CASE("A long vertical orbit drag carries on over the pole without a flip", 
     REQUIRE(topY > distance * 0.999f);
     REQUIRE_THAT(glm::length(cam.GetPosition()), WithinAbs(distance, 1e-2));
 }
+
+TEST_CASE("Fly moves the camera with WASD/QE and turns with look", "[camera]")
+{
+    Camera cam;
+    CameraController ctl;
+    ctl.ResetView(TestBody(), cam, false);
+    Run(ctl, cam, CameraControl{}, 0.5f);
+    ctl.ToggleMode(TestBody(), cam);
+    REQUIRE(cam.GetMode() == CameraMode::FreeFly);
+    Run(ctl, cam, CameraControl{}, 0.2f);
+    REQUIRE(cam.GetMode() == CameraMode::FreeFly);
+
+    const glm::vec3 start = cam.GetPosition();
+    CameraControl strafe;
+    strafe.move = glm::vec3(1.0f, 0.0f, 0.0f); // D
+    Run(ctl, cam, strafe, 1.0f);
+    REQUIRE(glm::distance(cam.GetPosition(), start) > 1.0f);
+
+    // Pitch up: looking straight down at the planet, yaw only spins the view, pitch must turn it.
+    const glm::vec3 forward = cam.GetForward();
+    CameraControl look;
+    look.look = glm::vec2(0.0f, 20.0f);
+    Run(ctl, cam, look, 0.2f);
+    REQUIRE(glm::dot(cam.GetForward(), forward) < 0.95f);
+}
+
+TEST_CASE("WASD or a right-drag in Orbit switches to Fly and moves", "[camera]")
+{
+    Camera cam;
+    CameraController ctl;
+    ctl.ResetView(TestBody(), cam, false);
+    Run(ctl, cam, CameraControl{}, 0.2f);
+    REQUIRE(cam.GetMode() == CameraMode::Orbit);
+
+    const glm::vec3 start = cam.GetPosition();
+    CameraControl forward;
+    forward.move = glm::vec3(0.0f, 0.0f, 1.0f); // W
+    Run(ctl, cam, forward, 0.5f);
+    REQUIRE(cam.GetMode() == CameraMode::FreeFly);
+    REQUIRE(glm::length(cam.GetPosition()) < glm::length(start) - 0.5f);
+
+    Camera cam2;
+    CameraController ctl2;
+    ctl2.ResetView(TestBody(), cam2, false);
+    CameraControl look;
+    look.look = glm::vec2(0.0f, -5.0f); // right-drag
+    Run(ctl2, cam2, look, 0.1f);
+    REQUIRE(cam2.GetMode() == CameraMode::FreeFly);
+}

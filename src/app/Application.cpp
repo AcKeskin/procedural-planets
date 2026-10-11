@@ -364,7 +364,6 @@ core::CameraBody Application::CameraBodyNow() const
 void Application::UpdateCamera(float deltaTime, bool keysBlocked)
 {
     const ImGuiIO& io = ImGui::GetIO();
-    const bool flying = _camera.GetMode() == core::CameraMode::FreeFly;
     core::CameraControl control;
 
     // A drag belongs to whoever got the press: a drag that starts on a panel never moves the camera.
@@ -382,11 +381,11 @@ void Application::UpdateCamera(float deltaTime, bool keysBlocked)
     const glm::vec2 mouseDelta(_input.GetMouseDeltaX(), _input.GetMouseDeltaY());
     if (_orbitDragging)
         control.orbitDrag = mouseDelta;
-    if (_lookDragging && flying)
-        control.look = mouseDelta;
+    if (_lookDragging)
+        control.look = mouseDelta; // in Orbit this switches to Fly
 
     // Hide the cursor while looking, so the drag is not bounded by the window edge.
-    const bool wantHidden = _lookDragging && flying;
+    const bool wantHidden = _lookDragging;
     if (wantHidden == _input.IsCursorEnabled())
         _input.SetCursorEnabled(!wantHidden);
 
