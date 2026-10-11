@@ -753,9 +753,12 @@ bool Application::SwitchBodyById(const std::string& id, bool keepLiveScene)
         std::cerr << "[SwitchBody] Unknown planet type '" << id << "'" << std::endl;
         return false;
     }
+    // The combo and id change only once the switch worked.
+    if (!SwitchBodyByPath(_bodies[index].path, /*resetCamera=*/true, keepLiveScene))
+        return false;
     _selectedBodyType = index;
     _activeBodyId = id;
-    return SwitchBodyByPath(_bodies[index].path, /*resetCamera=*/true, keepLiveScene);
+    return true;
 }
 
 bool Application::SwitchBodyByPath(const std::string& path, bool resetCamera, bool keepLiveScene)
@@ -764,13 +767,14 @@ bool Application::SwitchBodyByPath(const std::string& path, bool resetCamera, bo
     const std::string previous = _activeBodyPath;
     _activeBodyPath = path;
     // A new type keeps only a locked Light tab: the star and exposure are the user's, the rest is the type's.
-    _lockMask &= UnitBit(LookUnit::Light);
-    _offSeedMask &= UnitBit(LookUnit::Light);
-    if (!RollWorld(_genConfig.seed, AllUnits & ~_lockMask, resetCamera, keepLiveScene))
+    const uint32_t lockMask = _lockMask & UnitBit(LookUnit::Light);
+    if (!RollWorld(_genConfig.seed, AllUnits & ~lockMask, resetCamera, keepLiveScene))
     {
         _activeBodyPath = previous;
         return false;
     }
+    _lockMask = lockMask;
+    _offSeedMask &= UnitBit(LookUnit::Light);
     _rolledSeed = _genConfig.seed;
     return true;
 }
