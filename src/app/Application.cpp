@@ -21,7 +21,7 @@ namespace
 {
 constexpr float HoldHintDelaySeconds = 0.2f; // short taps do not flash the hint
 constexpr const char* BookmarksPath = "bookmarks.json";
-}
+} // namespace
 
 Application::Application()
     : _seaLevel(AppDefaults::SeaLevel)
@@ -400,7 +400,8 @@ void Application::UpdateCamera(float deltaTime, bool keysBlocked)
     if (!keysBlocked)
     {
         using namespace Keybinds;
-        const auto axis = [this](Key plus, Key minus) {
+        const auto axis = [this](Key plus, Key minus)
+        {
             return (_input.IsKeyDown(plus) ? 1.0f : 0.0f) - (_input.IsKeyDown(minus) ? 1.0f : 0.0f);
         };
         control.move = glm::vec3(axis(MoveRight, MoveLeft), axis(MoveUp, MoveDown), axis(MoveForward, MoveBack));
@@ -601,8 +602,8 @@ void Application::DrawBar()
 
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * 7.0f);
     uint32_t seed = _genConfig.seed;
-    if (ImGui::InputScalar("Seed", ImGuiDataType_U32, &seed, nullptr, nullptr, "%u",
-                           ImGuiInputTextFlags_EnterReturnsTrue) &&
+    if (ImGui::InputScalar(
+            "Seed", ImGuiDataType_U32, &seed, nullptr, nullptr, "%u", ImGuiInputTextFlags_EnterReturnsTrue) &&
         seed != _genConfig.seed)
     {
         _genConfig.seed = seed;
@@ -629,8 +630,11 @@ void Application::DrawBar()
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
     const float frameX = ImGui::GetWindowWidth() - ImGui::CalcTextSize(frame).x - spacing * 2.0f;
     char hint[96];
-    std::snprintf(hint, sizeof(hint), "%s  alt %.2f  speed %.2f   F1 help",
-                  _camera.GetMode() == core::CameraMode::Orbit ? "Orbit" : "Fly", _camera.Hud().altitude,
+    std::snprintf(hint,
+                  sizeof(hint),
+                  "%s  alt %.2f  speed %.2f   F1 help",
+                  _camera.GetMode() == core::CameraMode::Orbit ? "Orbit" : "Fly",
+                  _camera.Hud().altitude,
                   _camera.Hud().speed);
     const float hintX = frameX - ImGui::CalcTextSize(hint).x - spacing * 4.0f;
     if (hintX > ImGui::GetCursorPosX())
@@ -643,8 +647,7 @@ void Application::DrawBar()
     if (ImGui::IsItemHovered())
     {
         const render::GpuTimings gpu = _renderer.Timings();
-        ImGui::SetTooltip("GPU terrain %.2f / ocean %.2f / effects %.2f ms", gpu.terrainMs, gpu.oceanMs,
-                          gpu.effectsMs);
+        ImGui::SetTooltip("GPU terrain %.2f / ocean %.2f / effects %.2f ms", gpu.terrainMs, gpu.oceanMs, gpu.effectsMs);
     }
 
     ImGui::EndMainMenuBar();
@@ -745,8 +748,8 @@ bool Application::RollWorld(uint32_t seed, uint32_t units, bool resetCamera, boo
     const bool rebuild = !_activeBody || (units & bodyUnits) != 0;
     ApplyLook(next, rebuild, resetCamera);
     if (rebuild)
-        std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << PlanetRadius()
-                  << ")" << std::endl;
+        std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << PlanetRadius() << ")"
+                  << std::endl;
     return true;
 }
 

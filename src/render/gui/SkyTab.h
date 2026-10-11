@@ -14,7 +14,9 @@ struct CloudSettings;
 class SkyTab
 {
 public:
-    void Draw(effects::AtmosphereSettings& atmosphere, effects::CloudSettings& clouds, LightingSettings& lighting,
+    void Draw(effects::AtmosphereSettings& atmosphere,
+              effects::CloudSettings& clouds,
+              LightingSettings& lighting,
               bool bodyHasAir);
 };
 

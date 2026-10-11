@@ -18,7 +18,11 @@ bool OceanTab::Draw(BodyRuntime& body, effects::OceanSettings& o, float& seaLeve
     if (ImGui::CollapsingHeader("Sea Level", ImGuiTreeNodeFlags_DefaultOpen))
     {
         // The body config holds it too, so a regenerate and a saved config use the same level.
-        if (Slider("Sea Level##value", seaLevel, 0.9f, 1.1f, "%.3f",
+        if (Slider("Sea Level##value",
+                   seaLevel,
+                   0.9f,
+                   1.1f,
+                   "%.3f",
                    "Water surface as a multiple of radius. 1.0 = base radius. 0.9 to 1.1."))
             body.Config().metadata.seaLevel = seaLevel;
         regen |= Committed();
@@ -33,9 +37,19 @@ bool OceanTab::Draw(BodyRuntime& body, effects::OceanSettings& o, float& seaLeve
     }
     if (ImGui::CollapsingHeader("Waves"))
     {
-        Slider("Wave Strength", o.waveStrength, 0.0f, 0.5f, "%.2f", "Steepness of the waves: rougher water, wider glitter.");
-        Slider("Wave Frequency", o.waveScale, 0.25f, 4.0f, "%.2f",
-               "Wave size relative to the planet. Higher = smaller waves.", ImGuiSliderFlags_Logarithmic);
+        Slider("Wave Strength",
+               o.waveStrength,
+               0.0f,
+               0.5f,
+               "%.2f",
+               "Steepness of the waves: rougher water, wider glitter.");
+        Slider("Wave Frequency",
+               o.waveScale,
+               0.25f,
+               4.0f,
+               "%.2f",
+               "Wave size relative to the planet. Higher = smaller waves.",
+               ImGuiSliderFlags_Logarithmic);
         Slider("Wave Speed", o.waveSpeed, 0.1f, 2.0f, "%.1f", "How fast the waves move.");
     }
     if (ImGui::CollapsingHeader("Fluid"))
@@ -44,7 +58,8 @@ bool OceanTab::Draw(BodyRuntime& body, effects::OceanSettings& o, float& seaLeve
         Slider("Crust", o.crust, 0.0f, 1.0f, "%.2f", "Share of the surface under dark floating crust.");
         Color("Crust Colour", o.crustColor, "Colour of the floating crust.");
         Slider("Frozen", o.frozen, 0.0f, 1.0f, "%.2f", "Ice sheet over the fluid. 1 = fully frozen.");
-        Slider("Reflectivity", o.reflectivity, 0.0f, 2.0f, "%.2f", "Sky reflection and sun glint. Lava barely reflects.");
+        Slider(
+            "Reflectivity", o.reflectivity, 0.0f, 2.0f, "%.2f", "Sky reflection and sun glint. Lava barely reflects.");
         Color("Foam Colour", o.foamColor, "Surf along the shore.");
     }
     ImGui::EndDisabled();

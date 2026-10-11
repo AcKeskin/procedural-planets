@@ -53,8 +53,7 @@ inline const void* Base(const void* value, size_t size)
     return nullptr;
 }
 
-template <class T>
-bool IsEdited(const T& v)
+template <class T> bool IsEdited(const T& v)
 {
     const void* base = Base(&v, sizeof(T));
     return base && std::memcmp(&v, base, sizeof(T)) != 0;
@@ -64,11 +63,10 @@ bool IsEdited(const T& v)
 inline const ImVec4 EditedColor{1.0f, 0.72f, 0.25f, 1.0f};
 
 // Values inside `live` are measured against the same offset in `base` (the same struct type).
-template <class T>
-void Track(const T& live, const T& base)
+template <class T> void Track(const T& live, const T& base)
 {
-    detail::State().regions.push_back({reinterpret_cast<const unsigned char*>(&live),
-                                       reinterpret_cast<const unsigned char*>(&base), sizeof(T)});
+    detail::State().regions.push_back(
+        {reinterpret_cast<const unsigned char*>(&live), reinterpret_cast<const unsigned char*>(&base), sizeof(T)});
 }
 
 // Stops tracking; `edits` (may be null) collects the edited values the next controls draw.
@@ -84,8 +82,7 @@ inline void SetEditSet(std::set<const void*>* edits)
 }
 
 // Before a control: amber text when the value is edited. Pass the result to EndValue.
-template <class T>
-bool BeginValue(const T& v)
+template <class T> bool BeginValue(const T& v)
 {
     detail::State().menuChanged = false;
     const bool edited = detail::IsEdited(v);
@@ -95,8 +92,7 @@ bool BeginValue(const T& v)
 }
 
 // After a control: tooltip, right-click menu and the edit record. True when the menu changed v.
-template <class T>
-bool EndValue(T& v, bool pushed, const char* tip)
+template <class T> bool EndValue(T& v, bool pushed, const char* tip)
 {
     auto& state = detail::State();
     if (pushed)
@@ -147,8 +143,8 @@ inline bool Committed()
 }
 
 // Live slider: returns true on any change.
-inline bool Slider(const char* label, float& v, float lo, float hi, const char* fmt, const char* tip,
-                   ImGuiSliderFlags flags = 0)
+inline bool
+Slider(const char* label, float& v, float lo, float hi, const char* fmt, const char* tip, ImGuiSliderFlags flags = 0)
 {
     const bool edited = BeginValue(v);
     bool changed = ImGui::SliderFloat(label, &v, lo, hi, fmt, flags);
@@ -165,8 +161,8 @@ inline bool Slider(const char* label, int& v, int lo, int hi, const char* tip)
 }
 
 // Slider whose change regenerates the terrain: true only when the edit is committed.
-inline bool SliderRegen(const char* label, float& v, float lo, float hi, const char* fmt, const char* tip,
-                        ImGuiSliderFlags flags = 0)
+inline bool SliderRegen(
+    const char* label, float& v, float lo, float hi, const char* fmt, const char* tip, ImGuiSliderFlags flags = 0)
 {
     const bool edited = BeginValue(v);
     ImGui::SliderFloat(label, &v, lo, hi, fmt, flags);

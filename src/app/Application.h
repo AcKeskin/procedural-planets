@@ -194,8 +194,8 @@ private:
 
     HelpOverlay _help;
     Toasts _toasts;
-    float _escHeld = 0.0f;       // seconds Esc has been held toward quit
-    bool _escConsumed = false;   // this press already closed help / stopped the turntable
+    float _escHeld = 0.0f;     // seconds Esc has been held toward quit
+    bool _escConsumed = false; // this press already closed help / stopped the turntable
 
     // Active body — typed config + runtime shim
     planetgen::PaletteRegistry _paletteRegistry;

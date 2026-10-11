@@ -45,7 +45,7 @@ struct TurntableSettings
     float zoomEndMultiplier = CinematicLimits::DefaultZoomMultiplier;   // radius multiplier
     bool zoomEasing = true;
     CinematicDurationMode durationMode = CinematicDurationMode::Loop; // runs until F5 / Esc
-    float durationValue = 1.0f; // rotations or seconds depending on mode
+    float durationValue = 1.0f;                                       // rotations or seconds depending on mode
 
     // Orbit start angle. Defaults match the camera's resting yaw/pitch so default
     // behaviour (begin wherever the camera is) is unchanged.

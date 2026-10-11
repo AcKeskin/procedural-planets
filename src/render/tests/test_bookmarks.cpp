@@ -8,8 +8,10 @@ using namespace planets::app;
 namespace
 {
 // One bookmark entry for slot 1; each argument is raw JSON text.
-std::string Entry(const std::string& position = "[1,2,3]", const std::string& forward = "[0,0,-1]",
-                  const std::string& up = "[0,1,0]", const std::string& mode = "\"fly\"",
+std::string Entry(const std::string& position = "[1,2,3]",
+                  const std::string& forward = "[0,0,-1]",
+                  const std::string& up = "[0,1,0]",
+                  const std::string& mode = "\"fly\"",
                   const std::string& sunDir = "[0,1,0]")
 {
     return R"({"bookmarks":[{"slot":1,"mode":)" + mode + R"(,"position":)" + position + R"(,"forward":)" + forward +

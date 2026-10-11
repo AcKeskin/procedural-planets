@@ -90,7 +90,7 @@ void Bookmarks::LoadFromJson(const std::string& text)
         if (mode != entry.end() && !mode->is_string())
             continue;
         b.pose.mode = mode != entry.end() && mode->get<std::string>() == "fly" ? core::CameraMode::FreeFly
-                                                                                : core::CameraMode::Orbit;
+                                                                               : core::CameraMode::Orbit;
         b.used = true;
         Set(entry["slot"].get<int>(), b);
     }

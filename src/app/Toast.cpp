@@ -59,9 +59,9 @@ void Toasts::Draw()
 void Toasts::DrawHoldHint(const char* text, float fraction)
 {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(
-        ImVec2(viewport->GetCenter().x, viewport->WorkPos.y + viewport->WorkSize.y * 0.8f), ImGuiCond_Always,
-        ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowPos(ImVec2(viewport->GetCenter().x, viewport->WorkPos.y + viewport->WorkSize.y * 0.8f),
+                            ImGuiCond_Always,
+                            ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowBgAlpha(0.85f);
     if (ImGui::Begin("##holdhint", nullptr, OverlayFlags))
     {

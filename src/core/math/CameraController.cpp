@@ -8,13 +8,13 @@ namespace planets::core
 
 namespace
 {
-constexpr float ClearanceRadii = 0.01f;     // margin above the floor, in planet radii
-constexpr float MaxDistanceRadii = 30.0f;   // orbit zoom-out limit
-constexpr float FrameFill = 0.8f;           // F: the planet and its glow use this share of the view height
-constexpr float FrameGlowRadii = 1.08f;     // the atmosphere glow reaches about this far
-constexpr float LevelFullRadii = 1.5f;      // fully level below this distance from the centre
-constexpr float LevelNoneRadii = 4.0f;      // not levelled beyond this
-constexpr float ZoomNotchFraction = 0.85f;  // each notch keeps this share of the altitude
+constexpr float ClearanceRadii = 0.01f;    // margin above the floor, in planet radii
+constexpr float MaxDistanceRadii = 30.0f;  // orbit zoom-out limit
+constexpr float FrameFill = 0.8f;          // F: the planet and its glow use this share of the view height
+constexpr float FrameGlowRadii = 1.08f;    // the atmosphere glow reaches about this far
+constexpr float LevelFullRadii = 1.5f;     // fully level below this distance from the centre
+constexpr float LevelNoneRadii = 4.0f;     // not levelled beyond this
+constexpr float ZoomNotchFraction = 0.85f; // each notch keeps this share of the altitude
 constexpr float ZoomEaseRate = 10.0f;
 constexpr float VelocityEaseRate = 8.0f;
 constexpr float OrbitDegreesPerPixel = 0.3f;
@@ -50,7 +50,8 @@ bool IsFinite(const glm::vec3& v)
 glm::vec3 LocalUp(const glm::vec3& position, float radius)
 {
     const float dist = glm::length(position);
-    const float t = std::clamp((dist - LevelFullRadii * radius) / ((LevelNoneRadii - LevelFullRadii) * radius), 0.0f, 1.0f);
+    const float t =
+        std::clamp((dist - LevelFullRadii * radius) / ((LevelNoneRadii - LevelFullRadii) * radius), 0.0f, 1.0f);
     const float blend = 1.0f - t * t * (3.0f - 2.0f * t);
     return SafeNormalize(glm::mix(WorldUp, SafeNormalize(position, WorldUp), blend), WorldUp);
 }
@@ -168,13 +169,12 @@ void CameraController::UpdateOrbit(float dt, const CameraBody& body, const Camer
     if (input.zoomNotches != 0.0f)
     {
         const float altitude = (std::max)(_zoomTarget - body.floorRadius, 1e-4f * body.radius);
-        _zoomTarget = std::clamp(body.floorRadius + altitude * std::pow(ZoomNotchFraction, input.zoomNotches),
-                                 minDistance, maxDistance);
+        _zoomTarget = std::clamp(
+            body.floorRadius + altitude * std::pow(ZoomNotchFraction, input.zoomNotches), minDistance, maxDistance);
     }
 
     // Finer drag near the ground: the same pixels cover less surface.
-    const float dragScale =
-        OrbitDegreesPerPixel * std::clamp((distance - body.floorRadius) / body.radius, 0.05f, 1.0f);
+    const float dragScale = OrbitDegreesPerPixel * std::clamp((distance - body.floorRadius) / body.radius, 0.05f, 1.0f);
     float yaw = -input.orbitDrag.x * dragScale;
     const float pitch = -input.orbitDrag.y * dragScale;
     if (camera.Hud().autoRotate)
@@ -194,14 +194,15 @@ float CameraController::FlySpeedAt(const CameraBody& body, const glm::vec3& posi
     // Proportional to altitude, so the ground passes at a readable pace from any height.
     const float altitude = glm::length(position) - body.seaRadius;
     return std::clamp((std::max)(altitude, body.radius * MinAltitudeRadii) * _speedMultiplier,
-                      body.radius * MinSpeedRadii, body.radius * MaxSpeedRadii);
+                      body.radius * MinSpeedRadii,
+                      body.radius * MaxSpeedRadii);
 }
 
 void CameraController::UpdateFly(float dt, const CameraBody& body, const CameraControl& input, Camera& camera)
 {
     if (input.zoomNotches != 0.0f)
-        _speedMultiplier = std::clamp(_speedMultiplier * std::pow(SpeedNotchFactor, input.zoomNotches),
-                                      MinSpeedMultiplier, MaxSpeedMultiplier);
+        _speedMultiplier = std::clamp(
+            _speedMultiplier * std::pow(SpeedNotchFactor, input.zoomNotches), MinSpeedMultiplier, MaxSpeedMultiplier);
 
     glm::vec3 position = camera.GetPosition();
     const float flySpeed = FlySpeedAt(body, position);
@@ -267,8 +268,8 @@ void CameraController::StepMove(float dt, Camera& camera)
     const glm::vec3 dir = glm::angleAxis(angle * e, axis) * da;
     const float radius = std::exp(glm::mix(std::log(ra), std::log(rb), e));
 
-    const glm::quat q = glm::slerp(BasisToQuat(_move.from.forward, _move.from.up),
-                                   BasisToQuat(_move.to.forward, _move.to.up), e);
+    const glm::quat q =
+        glm::slerp(BasisToQuat(_move.from.forward, _move.from.up), BasisToQuat(_move.to.forward, _move.to.up), e);
     const glm::mat3 basis = glm::mat3_cast(q);
 
     camera.SetPosition(dir * radius);

@@ -36,8 +36,8 @@ const char* LockTip(LookUnit unit)
 
 size_t PlanetWindow::EditCount() const
 {
-    return std::accumulate(_edits.begin(), _edits.end(), size_t{0},
-                           [](size_t n, const std::set<const void*>& e) { return n + e.size(); });
+    return std::accumulate(
+        _edits.begin(), _edits.end(), size_t{0}, [](size_t n, const std::set<const void*>& e) { return n + e.size(); });
 }
 
 void PlanetWindow::ForgetEdits(uint32_t units)
@@ -61,8 +61,9 @@ void PlanetWindow::Toolbar(LookUnit unit, const PlanetUi& ui, PlanetActions& act
     ImGui::BeginDisabled(locked || (ui.varietyUnits & bit) == 0);
     if (ImGui::Button("Randomize"))
         actions.randomizeUnit = static_cast<int>(unit);
-    ImGui::SetItemTooltip("%s", (ui.varietyUnits & bit) == 0 ? "This type has no random values in this tab."
-                                                             : "New values for this tab only. The seed stays.");
+    ImGui::SetItemTooltip("%s",
+                          (ui.varietyUnits & bit) == 0 ? "This type has no random values in this tab."
+                                                       : "New values for this tab only. The seed stays.");
     ImGui::EndDisabled();
     ImGui::SameLine();
     // Reset works without variety; only a lock blocks it.

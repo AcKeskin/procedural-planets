@@ -74,7 +74,12 @@ inline constexpr float SlowerFactor = 0.25f;
 inline constexpr float QuitHoldSeconds = 1.0f;
 
 inline constexpr std::array<KeyBind, 20> Table{{
-    {Action::Fly, Key::None, Modifier::None, "W A S D", "Fly forward, left, back, right (from Orbit too)", KeyGroup::Camera},
+    {Action::Fly,
+     Key::None,
+     Modifier::None,
+     "W A S D",
+     "Fly forward, left, back, right (from Orbit too)",
+     KeyGroup::Camera},
     {Action::Vertical, Key::None, Modifier::None, "Q / E", "Fly down / up", KeyGroup::Camera},
     {Action::Speed, Key::None, Modifier::None, "Shift / Ctrl", "Faster x4 / slower x0.25", KeyGroup::Camera},
     {Action::Zoom, Key::None, Modifier::None, "Wheel", "Zoom (Orbit) or fly speed (Fly)", KeyGroup::Camera},
@@ -93,7 +98,11 @@ inline constexpr std::array<KeyBind, 20> Table{{
     {Action::Help, Key::F1, Modifier::None, "F1", "This help", KeyGroup::View},
     {Action::Turntable, Key::F5, Modifier::None, "F5", "Play / stop the turntable", KeyGroup::View},
     {Action::Screenshot, Key::F12, Modifier::None, "F12", "Screenshot (PNG)", KeyGroup::View},
-    {Action::Escape, Key::Escape, Modifier::None, "Esc", "Close help, stop turntable, hold 1 s to quit",
+    {Action::Escape,
+     Key::Escape,
+     Modifier::None,
+     "Esc",
+     "Close help, stop turntable, hold 1 s to quit",
      KeyGroup::View},
 }};
 

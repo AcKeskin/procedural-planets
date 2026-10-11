@@ -17,8 +17,7 @@ bool Has(uint32_t mask, LookUnit u)
     return (mask & UnitBit(u)) != 0;
 }
 
-template <typename T>
-bool SameBytes(const T& a, const T& b)
+template <typename T> bool SameBytes(const T& a, const T& b)
 {
     static_assert(std::is_trivially_copyable_v<T>);
     return std::memcmp(&a, &b, sizeof(T)) == 0;
@@ -88,7 +87,8 @@ bool UnitsEqual(LookUnit unit, const LookState& x, const LookState& y)
     switch (unit)
     {
     case LookUnit::Terrain:
-        return cx.metadata.radius == cy.metadata.radius && cx.metadata.atmosphereHeight == cy.metadata.atmosphereHeight &&
+        return cx.metadata.radius == cy.metadata.radius &&
+               cx.metadata.atmosphereHeight == cy.metadata.atmosphereHeight &&
                cx.metadata.hasSolidSurface == cy.metadata.hasSolidSurface &&
                cx.metadata.hasAtmosphere == cy.metadata.hasAtmosphere && SameBytes(cx.shape, cy.shape) &&
                SameBytes(cx.tectonics, cy.tectonics) && SameBytes(cx.oceanFloor, cy.oceanFloor) &&

@@ -263,7 +263,7 @@ TEST_CASE("look_units: a merged roll keeps the kept units live and their default
 {
     const TwoWorlds w;
     LookState live = w.a;
-    live.ocean.crust = 0.77f;           // edited
+    live.ocean.crust = 0.77f; // edited
     LookState oldBaseline = w.a;
     const MergedRoll m = MergeRoll(w.b, live, oldBaseline, UnitBit(LookUnit::Ocean));
     CHECK(m.next.ocean.crust == 0.77f);

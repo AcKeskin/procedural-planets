@@ -18,8 +18,8 @@ struct CameraBody
 // One frame of user input, already filtered by the GUI. All zero = no input.
 struct CameraControl
 {
-    glm::vec3 move{0.0f};   // x right, y up, z forward, each -1..1
-    float boost = 1.0f;     // fly speed factor (Shift / Ctrl)
+    glm::vec3 move{0.0f}; // x right, y up, z forward, each -1..1
+    float boost = 1.0f;   // fly speed factor (Shift / Ctrl)
     float zoomNotches = 0.0f;
     glm::vec2 orbitDrag{0.0f}; // pixels, y up
     glm::vec2 look{0.0f};      // pixels, y up

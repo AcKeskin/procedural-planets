@@ -27,7 +27,6 @@ public:
     void RequestResetLayout() { _resetLayout = true; }
 
 private:
-
     bool _initialized;
     bool _resetLayout;
 };
