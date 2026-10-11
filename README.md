@@ -215,60 +215,25 @@ data/
 
 ## How it works
 
+<!-- Diagram sources: docs/diagrams/*.mmd, rendered to docs/images/how_*.svg with mermaid-cli (default and dark themes). -->
+
 How a planet is made, from the type's JSON to a frame:
 
-```mermaid
-flowchart TD
-    subgraph regen["On regenerate: new type, seed or terrain edit"]
-        json["Body JSON<br/>data/bodies"] --> roll["Variety roll<br/>the seed picks the traits"]
-        seed["Seed"] --> roll
-        roll --> config["BodyConfig"]
-        roll --> look["Render look<br/>sky, clouds, ocean, star"]
-        config --> mask["Continent mask bake"]
-        config --> macro["Macro world bake<br/>optional erosion sim"]
-    end
-    subgraph frame["Every frame"]
-        lod["Quad-tree LOD<br/>split, merge and cull patches"] --> patch["pg_generate_patch<br/>height and climate for new patches"]
-        patch --> surface["Surface shading<br/>surface rules and biomes"]
-        surface --> ocean["Ocean and fluid"]
-        ocean --> clouds["Volumetric clouds"]
-        clouds --> sky["Atmosphere"]
-        sky --> tone["Bloom and tonemap"]
-    end
-    mask --> patch
-    macro --> patch
-    look --> surface
-```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/how_planet_dark.svg">
+    <img src="docs/images/how_planet_light.svg" alt="How a planet is made: regenerate steps, then the per-frame passes" width="720">
+  </picture>
+</p>
 
 Code layout, and who calls whom:
 
-```mermaid
-flowchart LR
-    subgraph lib["libplanetgen (DLL)"]
-        api["C API<br/>planetgen.h"]
-        model["model<br/>BodyConfig, JSON, variety, palettes"]
-        strategy["strategy<br/>height, erosion, shading, macro world"]
-        backend["backend<br/>GL compute, embedded shaders"]
-        api --> strategy --> backend
-        api --> model
-    end
-    subgraph app["procedural-planets.exe"]
-        modes["src/app/modes<br/>interactive, script, live, capture, showcase"]
-        application["src/app<br/>Application: frame loop, input, camera"]
-        gui["src/render/gui<br/>Planet window"]
-        render["src/render<br/>Renderer, LOD, effects"]
-        modes --> application
-        application --> gui
-        application --> render
-    end
-    data["data/bodies/*.json"]
-    shaders["shaders/"]
-    application -->|reads| data
-    application -->|rolls and loads| model
-    gui -->|edits| model
-    render -->|pg_generate_patch| api
-    render -->|loads| shaders
-```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/how_code_layout_dark.svg">
+    <img src="docs/images/how_code_layout_light.svg" alt="Code layout: the app and the libplanetgen library" width="680">
+  </picture>
+</p>
 
 ## Architecture
 

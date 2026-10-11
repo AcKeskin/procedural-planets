@@ -1,0 +1,20 @@
+flowchart TB
+    subgraph sg_regen["On regenerate: new type, seed or terrain edit"]
+        direction LR
+        n_json["Body JSON<br/>+ seed"] --> n_roll["Variety roll<br/>picks the traits"]
+        n_roll --> n_config["BodyConfig<br/>+ render look"]
+        n_config --> n_bakes["Bakes<br/>continent mask, macro world"]
+    end
+    subgraph sg_frame["Every frame"]
+        direction LR
+        n_lod["Quad-tree LOD<br/>split, merge, cull"] --> n_patch["pg_generate_patch<br/>new patches only"]
+        n_patch --> n_surface["Surface shading<br/>surface rules, biomes"]
+        n_surface --> n_water["Ocean and fluid"]
+    end
+    subgraph sg_post["Every frame, after the surface"]
+        direction LR
+        n_clouds["Volumetric clouds"] --> n_atmo["Atmosphere"]
+        n_atmo --> n_tone["Bloom and tonemap"]
+    end
+    sg_regen --> sg_frame
+    sg_frame --> sg_post
