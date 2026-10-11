@@ -4,6 +4,8 @@
 #include "instrument/TimelineParser.h"
 #include "instrument/LiveServer.h"
 #include <model/BodyConfigJson.h>
+#include <types/BodyVariety.h>
+#include <nlohmann/json.hpp>
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -21,18 +23,6 @@ namespace
 {
 
 // Load a BodyConfig from a JSON file; crash-safe fallback returns default
-planetgen::BodyConfig LoadBodyConfig(const std::string& path)
-{
-    planetgen::BodyConfig cfg;
-    std::string err = planetgen::BodyConfigLoadFile(path, cfg);
-    if (!err.empty())
-        std::cerr << "[Application] Failed to load " << path << ": " << err << std::endl;
-    return cfg;
-}
-
-// Sync application-owned Earth GUI settings into the body's BodyConfig.
-// Earth is identified by typeName == "earth".
-
 } // namespace
 
 Application::Application()
@@ -96,9 +86,10 @@ bool Application::Initialize()
         ApplyCaptureExposure();
     }
 
-    // Load earth body from JSON and initialize
-    auto earthCfg = LoadBodyConfig("data/bodies/earth.json");
-    SwitchBody(std::move(earthCfg));
+    // Planet types are the JSON files in data/bodies; start on the requested one (Earth by default).
+    _bodies = render::types::ScanBodies("data/bodies");
+    if (!SwitchBodyById(_capture.body) && !SwitchBodyById("earth") && !_bodies.empty())
+        SwitchBodyById(_bodies.front().id);
 
     // Initial generation (LOD-only; GPU is a hard requirement)
     RegenerateLodSystem();
@@ -329,26 +320,23 @@ bool Application::RunGenerationShowcase(const CaptureRequest& request)
     const int planets = (std::max)(1, _capture.planets);
     const int hold = (std::max)(1, _capture.holdFrames);
 
-    // Cycle the three body types for visual contrast (blue earth / red volcanic /
-    // crystalline), randomizing earth segments for extra variety.
-    static const char* bodyPaths[] = {
-        "data/bodies/earth.json", "data/bodies/volcanic.json", "data/bodies/crystalline.json"};
+    // Cycle through every planet type for visual contrast.
+    const int typeCount = (std::max)(1, static_cast<int>(_bodies.size()));
 
     char path[512];
     int written = 0;
     int frameIndex = 0;
     for (int p = 0; p < planets; ++p)
     {
-        // Each segment: switch to the next body type. Earth segments get randomized for
-        // variety; volcanic/crystalline keep their authored identity. SwitchBody resets
-        // the camera + radius, so re-seat the orbit afterwards.
-        const int type = p % 3;
+        // Each segment: switch to the next body type. SwitchBody resets the camera + radius,
+        // so re-seat the orbit afterwards.
+        const int type = p % typeCount;
         // Earth segments use the authored earth.json with a stepped seed (reliably
-        // land-facing, like the hero still). Volcanic/crystalline keep their identity.
+        // land-facing, like the hero still). Other types roll their variety from the seed.
         // Random earths placed their land on the back/poles too often to use here.
         if (type == 0)
             _genConfig.seed = _capture.seed + static_cast<uint32_t>(p);
-        SwitchBody(LoadBodyConfig(bodyPaths[type]));
+        SwitchBodyById(_bodies.empty() ? "earth" : _bodies[type].id);
 
         ApplyCaptureExposure();
         StartCinematic(); // re-seat orbit target/distance for the new radius
@@ -381,11 +369,6 @@ bool Application::RunGenerationShowcase(const CaptureRequest& request)
               << std::endl;
     Shutdown();
     return written == total;
-}
-
-planetgen::BodyConfig Application::LoadBodyConfigPublic(const std::string& path)
-{
-    return LoadBodyConfig(path);
 }
 
 bool Application::RunScript(const CaptureRequest& request)
@@ -424,8 +407,8 @@ bool Application::RunScript(const CaptureRequest& request)
         return false;
     }
 
-    if (timeline->hasBody && _capture.body != "earth")
-        SwitchBody(LoadBodyConfig("data/bodies/" + _capture.body + ".json"));
+    if (timeline->hasBody && _capture.body != _activeBodyId)
+        SwitchBodyById(_capture.body);
 
     // Initial settle so the first command runs against a fully-generated planet.
     if (!DrainGeneration(_capture.frames, AppDefaults::CaptureDrainMaxFrames))
@@ -611,6 +594,7 @@ void Application::Render()
     ctx.time = _lastTime;
     ctx.scene = &_sceneSettings;
     ctx.ocean = &_oceanSettings;
+    ctx.surface = &_surfaceSettings;
     ctx.atmosphere = &_atmosphereSettings;
     ctx.clouds = &_cloudSettings;
     ctx.body = _activeBody.get();
@@ -651,27 +635,17 @@ void Application::RenderGui()
         // Body type selector
         if (ImGui::Begin("Body Type", nullptr, ImGuiWindowFlags_NoCollapse))
         {
-            const char* bodyTypes[] = {"Earth", "Volcanic World", "Crystalline World"};
-            int prevSelected = _selectedBodyType;
-            ImGui::Combo("Type", &_selectedBodyType, bodyTypes, IM_ARRAYSIZE(bodyTypes));
-
-            if (_selectedBodyType != prevSelected)
+            const char* preview = _bodies.empty() ? "" : _bodies[_selectedBodyType].name.c_str();
+            if (ImGui::BeginCombo("Type", preview))
             {
-                planetgen::BodyConfig newCfg;
-                switch (_selectedBodyType)
+                for (int i = 0; i < static_cast<int>(_bodies.size()); ++i)
                 {
-                case 0:
-                    newCfg = LoadBodyConfig("data/bodies/earth.json");
-                    break;
-                case 1:
-                    newCfg = LoadBodyConfig("data/bodies/volcanic.json");
-                    break;
-                case 2:
-                    newCfg = LoadBodyConfig("data/bodies/crystalline.json");
-                    break;
+                    if (ImGui::Selectable(_bodies[i].name.c_str(), i == _selectedBodyType) && i != _selectedBodyType)
+                        SwitchBodyById(_bodies[i].id);
                 }
-                SwitchBody(std::move(newCfg));
+                ImGui::EndCombo();
             }
+            ImGui::SetItemTooltip("Planet types are the JSON files in data/bodies");
 
             if (_activeBody)
                 ImGui::Text("Active: %s", _activeBody->GetTypeName().c_str());
@@ -692,13 +666,12 @@ void Application::RenderGui()
             _terrainPanel.Draw(_activeBody.get(), _genConfig, _lodConfig, _terrainStats, visibility.terrain, randomize);
 
         if (randomize && _activeBody)
-        {
-            render::RandomizeBodyParameters(
-                _activeBody->Config(), _sceneSettings, _atmosphereSettings, _genConfig.seed);
-            needsRegen = true;
-        }
+            ShuffleTerrain();
+        // A seed typed into the panel is a new world for a planet type: roll its traits too.
+        if (needsRegen && _activeHasVariety && _genConfig.seed != _rolledSeed && RerollActiveBody())
+            needsRegen = false;
 
-        needsRegen |= _surfacePanel.Draw(_activeBody.get(), _oceanSettings, _seaLevel, visibility.surface);
+        needsRegen |= _surfacePanel.Draw(_activeBody.get(), _surfaceSettings, _oceanSettings, _seaLevel, visibility.surface);
         _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
         _cloudsPanel.Draw(_cloudSettings, _atmosphereSettings.enabled, visibility.clouds);
         _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
@@ -715,7 +688,7 @@ void Application::RenderGui()
     _guiManager.EndFrame();
 }
 
-void Application::SwitchBody(planetgen::BodyConfig config)
+void Application::SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look, bool resetCamera)
 {
     _activeBody = std::make_unique<render::BodyRuntime>(std::move(config), _paletteRegistry);
 
@@ -735,22 +708,82 @@ void Application::SwitchBody(planetgen::BodyConfig config)
 
     _lodConfig.planetRadius = _activeBody->GetRadius();
     _seaLevel = _activeBody->GetSeaLevel();
-    _atmosphereSettings.enabled = _activeBody->HasAtmosphere();
+    // Each planet type brings its own sky, clouds, ocean and star; a switch replaces them.
+    render::types::ApplyBodyLook(look, _atmosphereSettings, _cloudSettings, _oceanSettings, _sceneSettings,
+                                 _surfaceSettings);
+    if (!look.palette.empty())
+        _activeBody->OverridePalette(look.palette);
+    _atmosphereSettings.enabled = _activeBody->HasAtmosphere() && look.atmosphere.enabled;
+    if (_capture.enabled)
+        ApplyCaptureExposure();
 
     RegenerateLodSystem();
 
-    float camDist = _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier;
-    _camera.SetPosition(glm::vec3(0.0f, 0.0f, camDist));
-    float farPlane =
-        (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
-    _camera.SetFarPlane(farPlane);
+    if (resetCamera)
+    {
+        float camDist = _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier;
+        _camera.SetPosition(glm::vec3(0.0f, 0.0f, camDist));
+        float farPlane =
+            (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
+        _camera.SetFarPlane(farPlane);
+    }
 
     std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << _lodConfig.planetRadius
               << ")" << std::endl;
 }
 
+bool Application::SwitchBodyById(const std::string& id)
+{
+    const int index = render::types::FindBody(_bodies, id);
+    if (index < 0)
+    {
+        std::cerr << "[SwitchBody] Unknown planet type '" << id << "'" << std::endl;
+        return false;
+    }
+    _selectedBodyType = index;
+    _activeBodyId = id;
+    return SwitchBodyByPath(_bodies[index].path);
+}
+
+bool Application::SwitchBodyByPath(const std::string& path, bool resetCamera)
+{
+    std::ifstream in(path);
+    const nlohmann::json body = nlohmann::json::parse(in, nullptr, false);
+    if (body.is_discarded())
+    {
+        std::cerr << "[SwitchBody] Cannot read " << path << std::endl;
+        return false;
+    }
+    const nlohmann::json world = render::types::RollVariety(body, _genConfig.seed);
+    planetgen::BodyConfig config;
+    const std::string err = planetgen::BodyConfigFromJson(world.dump(), config);
+    if (!err.empty())
+    {
+        std::cerr << "[SwitchBody] Bad body config in " << path << ": " << err << std::endl;
+        return false;
+    }
+    _activeBodyPath = path;
+    _activeHasVariety = render::types::HasVariety(body);
+    _rolledSeed = _genConfig.seed;
+    SwitchBody(std::move(config), render::types::ParseBodyLook(world), resetCamera);
+    return true;
+}
+
+bool Application::RerollActiveBody()
+{
+    if (!_activeHasVariety)
+        return false;
+    return SwitchBodyByPath(_activeBodyPath, /*resetCamera=*/false);
+}
+
 void Application::ShuffleTerrain()
 {
+    if (_activeHasVariety)
+    {
+        _genConfig.seed = std::random_device{}();
+        RerollActiveBody();
+        return;
+    }
     if (_activeBody)
         render::RandomizeBodyParameters(_activeBody->Config(), _sceneSettings, _atmosphereSettings, _genConfig.seed);
     RegenerateLodSystem();

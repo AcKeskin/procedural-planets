@@ -369,7 +369,110 @@ layout(std140, binding = 3) uniform HeightParamsBlock
     float abyssalStrength;
     int   continentMaskAvailable; // 1 = a continent mask is bound for sampling
     float _pad4;
+    // Row 18 — terrain styles (strength 0 = off)
+    float styleDunes;
+    float styleDuneScale;
+    float styleCraters;
+    float styleCraterScale;
+    // Row 19
+    float styleTerraces;
+    float styleTerraceSteps;
+    float styleCanyons;
+    float styleSpires;
 };
+
+#ifdef TERRAIN_STYLE
+// ============================================================================
+// Terrain styles (planet types), only in the TERRAIN_STYLE variant. Each changes the elevation
+// before heightScale; all are pure functions of direction, so LOD patches stay seam-free.
+// ============================================================================
+
+float styleHash(vec3 c, uint salt)
+{
+    uvec3 u = uvec3(ivec3(c) + 4096);
+    return float(hash(u.x * 73856093u ^ u.y * 19349663u ^ u.z * 83492791u, seed + salt) & 0xFFFFu) / 65535.0;
+}
+
+// Craters on one scale: nearest jittered cell centre, a random radius, a bowl with a raised rim.
+float craterField(vec3 dir, float cellsPerUnit, uint salt)
+{
+    vec3 p = dir * cellsPerUnit;
+    vec3 base = floor(p);
+    float result = 0.0;
+    for (int z = -1; z <= 1; ++z)
+        for (int y = -1; y <= 1; ++y)
+            for (int x = -1; x <= 1; ++x)
+            {
+                vec3 c = base + vec3(x, y, z);
+                if (styleHash(c, salt + 7u) < 0.45)
+                    continue; // not every cell has a crater
+                vec3 centre = c + vec3(styleHash(c, salt), styleHash(c, salt + 1u), styleHash(c, salt + 2u));
+                float radius = mix(0.18, 0.48, styleHash(c, salt + 3u));
+                float d = length(p - centre) / radius;
+                if (d > 1.6)
+                    continue;
+                float bowl = d < 1.0 ? (d * d - 1.0) : 0.0;
+                float k = (d - 1.0) * 3.5;
+                float rim = exp(-k * k) * 0.35;
+                result = min(result + (bowl + rim) * radius, max(result, rim * radius));
+            }
+    return result;
+}
+
+float applyTerrainStyle(vec3 dir, float elevation, float landMask)
+{
+    float e = elevation;
+
+    if (styleTerraces > 0.0)
+    {
+        // Mesas: flat steps joined by short steep risers.
+        float steps = max(styleTerraceSteps, 1.0);
+        float t = max(e, 0.0) * steps;
+        float riser = smoothstep(0.82, 1.0, fract(t));
+        float stepped = (floor(t) + riser) / steps;
+        e = mix(e, stepped, styleTerraces * landMask);
+    }
+
+    if (styleCanyons > 0.0)
+    {
+        // Ridged noise inverted: narrow winding channels, plus round sinkholes where it pools.
+        float n = fbm(dir, vec3(8111.0), 4, 6.0 * globalFrequency, 0.5, 2.1, 1.0, seed + 81u);
+        float channel = pow(max(1.0 - abs(n), 0.0), 10.0); // fbm can exceed 1; pow needs a base >= 0
+        float sink = smoothstep(0.62, 0.8, fbm(dir, vec3(8222.0), 2, 30.0 * globalFrequency, 0.5, 2.0, 1.0, seed + 82u));
+        e -= styleCanyons * (channel * 0.35 + sink * 0.2) * landMask;
+    }
+
+    if (styleDunes > 0.0)
+    {
+        // Wind-aligned crests, bent by noise; sharper on the lee side. Dune seas, not everywhere.
+        float scale = styleDuneScale > 0.0 ? styleDuneScale : 1.0;
+        vec3 wind = normalize(vec3(0.8, 0.15, 0.58));
+        float warp = fbm(dir, vec3(8333.0), 3, 8.0 * globalFrequency, 0.5, 2.0, 1.0, seed + 83u);
+        float phase = dot(dir, wind) * 170.0 * scale * globalFrequency + warp * 5.0;
+        float crest = pow(0.5 + 0.5 * sin(phase + 0.6 * sin(phase)), 2.5);
+        float field = smoothstep(-0.4, 0.1, fbm(dir, vec3(8444.0), 2, 3.0 * globalFrequency, 0.5, 2.0, 1.0, seed + 84u));
+        e += styleDunes * 0.18 * crest * field * landMask;
+    }
+
+    if (styleCraters > 0.0)
+    {
+        float scale = styleCraterScale > 0.0 ? styleCraterScale : 1.0;
+        float c = craterField(dir, 9.0 * scale, 91u) + 0.5 * craterField(dir, 31.0 * scale, 92u)
+                + 0.25 * craterField(dir, 97.0 * scale, 93u);
+        e += styleCraters * 1.0 * c;
+    }
+
+    if (styleSpires > 0.0)
+    {
+        float n = snoise(dir * 60.0 * globalFrequency, seed + 95u);
+        float field = smoothstep(-0.3, 0.2, fbm(dir, vec3(8555.0), 2, 4.0 * globalFrequency, 0.5, 2.0, 1.0, seed + 96u));
+        e += styleSpires * 1.4 * pow(max(n - 0.55, 0.0) / 0.45, 2.0) * field * landMask;
+    }
+
+    return e;
+}
+
+#endif
 
 // ============================================================================
 // Height evaluation
@@ -669,7 +772,12 @@ float evaluateHeight(vec3 dir)
     tectonicUplift *= riverDamp;
 #endif
 
+#ifdef TERRAIN_STYLE
+    float elevation = applyTerrainStyle(dir, continentShape + tectonicUplift + landRelief, landMask);
+    float terrainHeight = elevation * heightScale;
+#else
     float terrainHeight = (continentShape + tectonicUplift + landRelief) * heightScale;
+#endif
 
     return 1.0 + terrainHeight;
 }

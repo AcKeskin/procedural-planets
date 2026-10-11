@@ -202,6 +202,12 @@ const std::unordered_map<std::string, Entry>& Table()
         {"ocean.waveStrength", {false, SET_FLOAT(t.ocean->waveStrength)}},
         {"ocean.waveScale", {false, SET_FLOAT(t.ocean->waveScale)}},
         {"ocean.waveSpeed", {false, SET_FLOAT(t.ocean->waveSpeed)}},
+        {"ocean.emissive", {false, SET_FLOAT(t.ocean->emissive)}},
+        {"ocean.crust", {false, SET_FLOAT(t.ocean->crust)}},
+        {"ocean.frozen", {false, SET_FLOAT(t.ocean->frozen)}},
+        {"ocean.reflectivity", {false, SET_FLOAT(t.ocean->reflectivity)}},
+        {"ocean.foamColor", {false, SET_VEC3(t.ocean->foamColor)}},
+        {"ocean.crustColor", {false, SET_VEC3(t.ocean->crustColor)}},
 
         // ---- atmosphere (real-time) ----
         {"atmosphere.enabled", {false, SET_BOOL(t.atmosphere->enabled)}},
@@ -211,6 +217,7 @@ const std::unordered_map<std::string, Entry>& Table()
         {"atmosphere.densityFalloff", {false, SET_FLOAT(t.atmosphere->densityFalloff)}},
         {"atmosphere.mieCoefficient", {false, SET_FLOAT(t.atmosphere->mieCoefficient)}},
         {"atmosphere.mieDensityFalloff", {false, SET_FLOAT(t.atmosphere->mieDensityFalloff)}},
+        {"atmosphere.hazeColor", {false, SET_VEC3(t.atmosphere->hazeColor)}},
         {"atmosphere.numInScatteringPoints", {false, SET_INT(t.atmosphere->numInScatteringPoints)}},
         {"atmosphere.numOpticalDepthPoints", {false, SET_INT(t.atmosphere->numOpticalDepthPoints)}},
         {"atmosphere.intensity", {false, SET_FLOAT(t.atmosphere->intensity)}},
@@ -227,6 +234,7 @@ const std::unordered_map<std::string, Entry>& Table()
         {"clouds.thickness", {false, SET_FLOAT(t.clouds->thickness)}},
         {"clouds.viewSteps", {false, SET_INT(t.clouds->viewSteps)}},
         {"clouds.shadowStrength", {false, SET_FLOAT(t.clouds->shadowStrength)}},
+        {"clouds.color", {false, SET_VEC3(t.clouds->color)}},
 
         // ---- sea level (real-time) ----
         {"seaLevel",
@@ -300,6 +308,15 @@ const std::unordered_map<std::string, Entry>& Table()
         {"body.erosion.iterations", {true, BODY_INT(t.body->erosion.iterations)}},
 
         // ---- body.macroWorld.* (needs regen; re-bakes the macro field) ----
+        // ---- body.terrainStyle.* (needs regen) ----
+        {"body.terrainStyle.dunes", {true, BODY_FLOAT(t.body->terrainStyle.dunes)}},
+        {"body.terrainStyle.duneScale", {true, BODY_FLOAT(t.body->terrainStyle.duneScale)}},
+        {"body.terrainStyle.craters", {true, BODY_FLOAT(t.body->terrainStyle.craters)}},
+        {"body.terrainStyle.craterScale", {true, BODY_FLOAT(t.body->terrainStyle.craterScale)}},
+        {"body.terrainStyle.terraces", {true, BODY_FLOAT(t.body->terrainStyle.terraces)}},
+        {"body.terrainStyle.terraceSteps", {true, BODY_FLOAT(t.body->terrainStyle.terraceSteps)}},
+        {"body.terrainStyle.canyons", {true, BODY_FLOAT(t.body->terrainStyle.canyons)}},
+        {"body.terrainStyle.spires", {true, BODY_FLOAT(t.body->terrainStyle.spires)}},
         {"body.macroWorld.enabled", {true, BODY_BOOL(t.body->macroWorld.enabled)}},
         {"body.macroWorld.resolution", {true, BODY_INT(t.body->macroWorld.resolution)}},
         {"body.macroWorld.convergentThreshold", {true, BODY_FLOAT(t.body->macroWorld.convergentThreshold)}},

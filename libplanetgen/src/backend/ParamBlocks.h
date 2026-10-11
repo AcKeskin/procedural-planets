@@ -129,9 +129,21 @@ struct alignas(16) HeightParams
     float abyssalStrength;
     int32_t continentMaskAvailable; // 1 = a continent mask is bound for sampling
     float _pad4;
+
+    // Row 18 — terrain styles
+    float styleDunes;
+    float styleDuneScale;
+    float styleCraters;
+    float styleCraterScale;
+
+    // Row 19
+    float styleTerraces;
+    float styleTerraceSteps;
+    float styleCanyons;
+    float styleSpires;
 };
 
-static_assert(sizeof(HeightParams) == 18 * 16, "HeightParams std140 layout mismatch");
+static_assert(sizeof(HeightParams) == 20 * 16, "HeightParams std140 layout mismatch");
 static_assert(offsetof(HeightParams, continentOffsetX) == 9 * 16,
               "HeightParams continentOffset must start at row 9");
 static_assert(offsetof(HeightParams, mountainOffsetX) == 10 * 16,

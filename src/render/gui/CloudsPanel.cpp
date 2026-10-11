@@ -35,6 +35,8 @@ void CloudsPanel::Draw(effects::CloudSettings& settings, bool atmosphereOn, bool
         ImGui::SetItemTooltip("How fast the weather moves around the planet");
         ImGui::SliderFloat("Shadow Strength", &settings.shadowStrength, 0.0f, 1.0f, "%.2f");
         ImGui::SetItemTooltip("How much clouds darken the ground below");
+        ImGui::ColorEdit3("Cloud Color", &settings.color.x);
+        ImGui::SetItemTooltip("Tint of the clouds: grey storms, yellow sulfur, dark ash");
         ImGui::SliderInt("Quality", &settings.viewSteps, 16, 128);
         ImGui::SetItemTooltip("March steps per pixel: higher = smoother clouds, slower");
     }

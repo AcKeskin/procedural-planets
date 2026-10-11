@@ -50,6 +50,8 @@ public:
 
     // Palette
     BiomePalette LoadBiomePalette() const;
+    // Replaces the registry palette with these colours (a planet type's own palette).
+    void OverridePalette(const std::vector<glm::vec3>& colors);
 
 private:
     planetgen::BodyConfig _config;

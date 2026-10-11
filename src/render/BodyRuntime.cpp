@@ -69,6 +69,16 @@ void BodyRuntime::EnsurePalette() const
     _biomePalette.GetEntries() = std::move(entries);
 }
 
+void BodyRuntime::OverridePalette(const std::vector<glm::vec3>& colors)
+{
+    std::vector<BiomeEntry> entries;
+    entries.reserve(colors.size());
+    for (const auto& c : colors)
+        entries.push_back({c, 0.0f});
+    _biomePalette.GetEntries() = std::move(entries);
+    _paletteLoaded = true;
+}
+
 BiomePalette BodyRuntime::LoadBiomePalette() const
 {
     EnsurePalette();

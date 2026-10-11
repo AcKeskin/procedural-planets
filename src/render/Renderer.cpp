@@ -208,6 +208,7 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
     _planetShader.SetMat4("uProjection", ctx.projection);
     _planetShader.SetVec3("uCameraPos", ctx.cameraPos);
     _planetShader.SetFloat("uSeaLevel", ctx.seaLevel);
+    _planetShader.SetInt("uHasSea", ctx.ocean && !ctx.ocean->enabled ? 0 : 1);
 
     if (ctx.scene)
     {
@@ -221,6 +222,15 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
         if (ctx.clouds)
             _clouds.SetLayerUniforms(_planetShader, *ctx.clouds, CloudLayer(ctx));
         _planetShader.SetFloat("uCloudShadowStrength", cloudsOn ? ctx.clouds->shadowStrength : 0.0f);
+        const SurfaceSettings surface = ctx.surface ? *ctx.surface : SurfaceSettings{};
+        _planetShader.SetVec3("uRockTint", surface.rockTint);
+        _planetShader.SetVec3("uSandTint", surface.sandTint);
+        _planetShader.SetVec3("uSnowTint", surface.snowTint);
+        _planetShader.SetFloat("uVegetation", surface.vegetation);
+        _planetShader.SetFloat("uSandCover", surface.sandCover);
+        _planetShader.SetFloat("uPolarCaps", surface.polarCaps);
+        _planetShader.SetFloat("uSubstellar", surface.substellar);
+        _planetShader.SetFloat("uCityCoverage", surface.cityCoverage);
         _planetShader.SetFloat("uSunIntensity", ctx.scene->lighting.sunIntensity);
         _planetShader.SetFloat("uAmbientLight", ctx.scene->lighting.ambientLight);
         _planetShader.SetFloat("uSpecularStrength", ctx.scene->lighting.specularStrength);
@@ -239,8 +249,10 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
         ctx.body->SetRenderUniforms(_planetShader);
 
     _planetShader.SetFloat("uPlanetScale", ctx.planetRadius);
-    _planetShader.SetFloat("uFresnelStrengthNear", FresnelStrengthNear);
-    _planetShader.SetFloat("uFresnelStrengthFar", FresnelStrengthFar);
+    // The fresnel rim stands in for air at the limb; airless bodies get none.
+    const float rim = ctx.atmosphere && !ctx.atmosphere->enabled ? 0.0f : 1.0f;
+    _planetShader.SetFloat("uFresnelStrengthNear", FresnelStrengthNear * rim);
+    _planetShader.SetFloat("uFresnelStrengthFar", FresnelStrengthFar * rim);
     _planetShader.SetFloat("uFresnelPow", FresnelPower);
 
     if (ctx.body)

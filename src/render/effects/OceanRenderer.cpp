@@ -49,6 +49,12 @@ void OceanRenderer::Render(const OceanFrame& frame, const OceanSettings& setting
     _oceanShader.SetFloat("uWaveStrength", settings.waveStrength);
     _oceanShader.SetFloat("uWaveScale", settings.waveScale);
     _oceanShader.SetFloat("uWaveSpeed", settings.waveSpeed);
+    _oceanShader.SetFloat("uFluidEmissive", settings.emissive);
+    _oceanShader.SetFloat("uFluidCrust", settings.crust);
+    _oceanShader.SetFloat("uFluidFrozen", settings.frozen);
+    _oceanShader.SetFloat("uFluidReflectivity", settings.reflectivity);
+    _oceanShader.SetVec3("uFoamColor", settings.foamColor);
+    _oceanShader.SetVec3("uCrustColor", settings.crustColor);
 
     // Same visible patches, same per-patch uniforms (resolution, radius, morph) as the planet pass.
     patches.Render(_oceanShader);

@@ -31,8 +31,20 @@ uniform float uNightLightStrength; // emissive city lights on the night side (0 
 // Cloud shadow: sample the shared coverage field along the sun so shadows track the visible clouds.
 uniform float uCloudShadowStrength;
 
+// Planet type material tints (1 = Earth).
+uniform vec3 uRockTint;
+uniform vec3 uSandTint;
+uniform vec3 uSnowTint;
+uniform float uVegetation; // 1 = Earth grass texture on the flats, 0 = bare soil
+uniform float uSandCover;  // 1 = sand on every flat
+// Planet type climate traits (0 = Earth).
+uniform float uPolarCaps;
+uniform float uSubstellar;
+uniform float uCityCoverage;
+
 uniform vec3  uCameraPos;
 uniform float uSeaLevel;
+uniform int   uHasSea;          // 0 = dry world: ground below sea level is land (basins, salt flats)
 uniform vec2  uHeightMinMax;
 uniform float uSnowLine;
 
@@ -131,15 +143,15 @@ struct Material { vec3 albedo; float roughness; };
 Material rockMaterial(vec3 wp, float footprint, float v)
 {
     // grey granite with iron/ochre streaks
-    vec3 base = mix(vec3(0.30, 0.29, 0.27), vec3(0.42, 0.40, 0.37), v);
+    vec3 base = mix(vec3(0.30, 0.29, 0.27), vec3(0.42, 0.40, 0.37), v) * uRockTint;
     float ochre = smoothstep(0.55, 0.8, fbmFootprint(wp, 0.6, 4, footprint, 0.5).x);
-    base = mix(base, vec3(0.34, 0.26, 0.18), ochre * 0.5);
+    base = mix(base, vec3(0.34, 0.26, 0.18) * uRockTint, ochre * 0.5);
     return Material(base, mix(0.95, 0.7, v));
 }
 
 Material sandMaterial(float v)
 {
-    vec3 base = mix(vec3(0.62, 0.52, 0.36), vec3(0.74, 0.66, 0.46), v);
+    vec3 base = mix(vec3(0.62, 0.52, 0.36), vec3(0.74, 0.66, 0.46), v) * uSandTint;
     return Material(base, 0.9);
 }
 
@@ -151,7 +163,7 @@ Material flatGroundMaterial(vec3 biomeColor, float v)
 
 Material snowMaterial(float v)
 {
-    return Material(mix(vec3(0.86, 0.88, 0.93), vec3(0.97, 0.98, 1.0), v), 0.4);
+    return Material(mix(vec3(0.86, 0.88, 0.93), vec3(0.97, 0.98, 1.0), v) * uSnowTint, 0.4);
 }
 
 void main()
@@ -165,7 +177,7 @@ void main()
     float camDist = length(uCameraPos - vWorldPos);
 
     // ---- ocean: simple PBR water, fresnel-tinted ----
-    if (vHeight < uSeaLevel)
+    if (uHasSea != 0 && vHeight < uSeaLevel)
     {
         float depth = clamp((uSeaLevel - vHeight) / 0.08, 0.0, 1.0);
         vec3 waterAlbedo = mix(COASTAL, DEEP_OCEAN, depth);
@@ -203,7 +215,21 @@ void main()
     // detail channels (.z warped, .w small-scale) roughen biome borders so they never trace the
     // mesh triangles.
     float temperature = clamp(vShadingData.x + (vShadingData.w - 0.5) * 0.06, 0.0, 1.0);
+    if (uSubstellar > 0.0)
+    {
+        // Tidally locked: temperature follows the sun height, not the latitude. The terrain stays
+        // in the same place under the sun, so the hot eye and the frozen back never move.
+        float sunHeight = dot(sphereNormal, -normalize(uLightDir));
+        float eyeTemp = clamp(0.12 + 0.88 * sunHeight + (vShadingData.w - 0.5) * 0.12 - h * 0.25, 0.0, 1.0);
+        temperature = mix(temperature, eyeTemp, uSubstellar);
+    }
     float moisture    = clamp(vShadingData.y + (vMedium - 0.5) * 0.18 + (vShadingData.z - 0.5) * 0.12, 0.0, 1.0);
+    if (uSubstellar > 0.0)
+    {
+        // The eye under the sun is baked dry.
+        float sunHeight = dot(sphereNormal, -normalize(uLightDir));
+        moisture *= 1.0 - smoothstep(0.55, 0.95, sunHeight) * uSubstellar;
+    }
 
     Biome biome = whittakerBiome(temperature, moisture);
 
@@ -215,6 +241,7 @@ void main()
     // Flats: the biome colour; beaches (dry, warm, low) blend to sand.
     float aridity = (1.0 - moisture) * smoothstep(0.35, 0.7, temperature);
     float sandW = smoothstep(0.35, 0.65, aridity) * (1.0 - smoothstep(0.12, 0.25, h));
+    sandW = max(sandW, uSandCover);
     Material flatMat = flatGroundMaterial(biome.color, vMedium);
     flatMat.albedo    = mix(flatMat.albedo, sand.albedo, sandW);
     flatMat.roughness = mix(flatMat.roughness, sand.roughness, sandW);
@@ -231,6 +258,12 @@ void main()
     float snowLineEff = uSnowLine - (1.0 - temperature) * 0.04;
     float snowW = smoothstep(snowLineEff - 0.20, snowLineEff + 0.05, h);
     snowW = max(snowW, smoothstep(0.04, 0.0, temperature) * 0.5);   // polar cap
+    if (uPolarCaps > 0.0)
+    {
+        // Ice caps as a trait, also on hot worlds: by latitude, with a ragged edge.
+        float capEdge = 1.0 - uPolarCaps + (vShadingData.z - 0.5) * 0.08 + (vMedium - 0.5) * 0.04;
+        snowW = max(snowW, smoothstep(capEdge - 0.015, capEdge + 0.015, abs(sphereNormal.y)));
+    }
     snowW *= 1.0 - smoothstep(0.55, 0.85, steepness) * 0.7;
     mat.albedo    = mix(mat.albedo, snow.albedo, snowW);
     mat.roughness = mix(mat.roughness, snow.roughness, snowW);
@@ -248,8 +281,9 @@ void main()
     layerW[GROUND_ROCK]  = rockW * (1.0 - snowW);
     layerW[GROUND_SNOW]  = snowW;
     layerW[GROUND_SAND]  = flatW * sandW;
-    layerW[GROUND_SOIL]  = flatW * (1.0 - sandW) * soilShare;
-    layerW[GROUND_GRASS] = flatW * (1.0 - sandW) * (1.0 - soilShare);
+    float grassShare = (1.0 - soilShare) * uVegetation;
+    layerW[GROUND_SOIL]  = flatW * (1.0 - sandW) * (1.0 - grassShare);
+    layerW[GROUND_GRASS] = flatW * (1.0 - sandW) * grassShare;
 
     vec3 tw = groundTriplanarWeights(geoN);
     vec3 texAlbedo = vec3(0.0);
@@ -323,6 +357,14 @@ void main()
                        * (1.0 - smoothstep(0.3, 0.6, h))   // low elevation
                        * (1.0 - snowW);
     color += nightLights(normalize(vWorldPos), day, habitability, vec3(1.0, 0.8, 0.45));
+    if (uCityCoverage > 0.0)
+    {
+        // Cities favour lowlands and avoid steep rock and ice.
+        float buildable = (1.0 - smoothstep(0.35, 0.7, h)) * (1.0 - rockW) * (1.0 - snowW);
+        float density = cityDensity(normalize(vWorldPos), uCityCoverage) * buildable;
+        color += cityLights(normalize(vWorldPos), dot(sphereNormal, lightDir), uNightLightStrength, density,
+                            vec3(1.0, 0.8, 0.45));
+    }
 
     // Mild gamma lift so shadows and midtones don't go muddy; no roll-off, the scene is HDR and
     // tonemap.glsl rolls highlights off once, at the end.

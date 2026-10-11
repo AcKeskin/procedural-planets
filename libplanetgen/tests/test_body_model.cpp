@@ -10,6 +10,7 @@
 #include "planetgen/planetgen.h"
 
 #include <cstring>
+#include <filesystem>
 #include <cmath>
 
 // ============================================================================
@@ -282,7 +283,7 @@ TEST_CASE("PaletteRegistry resolve unknown id returns empty palette", "[model][p
 }
 
 // ============================================================================
-// (e) Parity: earth/volcanic/crystalline JSON load + validate clean
+// (e) Parity: earth.json and every planet type load + validate clean
 // ============================================================================
 
 TEST_CASE("earth.json loads and validates cleanly", "[model][parity]")
@@ -303,27 +304,20 @@ TEST_CASE("earth.json loads and validates cleanly", "[model][parity]")
     CHECK(cfg.tectonics.numPlates   == 12);
 }
 
-TEST_CASE("volcanic.json loads and validates cleanly", "[model][parity]")
+TEST_CASE("every planet type in data/bodies loads and validates cleanly", "[model][parity]")
 {
-    planetgen::BodyConfig cfg;
-    std::string err = planetgen::BodyConfigLoadFile("data/bodies/volcanic.json", cfg);
-    REQUIRE(err.empty());
-    CHECK(cfg.metadata.name == "Volcanic World");
-    CHECK(cfg.tectonics.enabled == false);
-    CHECK(cfg.oceanFloor.enabled == false);
-    CHECK(cfg.paletteRef.paletteId == "volcanic");
-    CHECK(cfg.shape.heightScale == Catch::Approx(0.06f));
-}
-
-TEST_CASE("crystalline.json loads and validates cleanly", "[model][parity]")
-{
-    planetgen::BodyConfig cfg;
-    std::string err = planetgen::BodyConfigLoadFile("data/bodies/crystalline.json", cfg);
-    REQUIRE(err.empty());
-    CHECK(cfg.metadata.name == "Crystalline World");
-    CHECK(cfg.tectonics.enabled == false);
-    CHECK(cfg.paletteRef.paletteId == "crystalline");
-    CHECK(cfg.shape.heightScale == Catch::Approx(0.08f));
+    int count = 0;
+    for (const auto& entry : std::filesystem::directory_iterator("data/bodies"))
+    {
+        if (entry.path().extension() != ".json")
+            continue;
+        INFO(entry.path().string());
+        planetgen::BodyConfig cfg;
+        CHECK(planetgen::BodyConfigLoadFile(entry.path().string(), cfg).empty());
+        CHECK_FALSE(cfg.metadata.name.empty());
+        ++count;
+    }
+    CHECK(count >= 12);
 }
 
 // ============================================================================

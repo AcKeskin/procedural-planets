@@ -2,7 +2,6 @@
 add_library(render STATIC
     Window.cpp
     Shader.cpp
-    ComputeShader.cpp
     gui/GuiManager.cpp
     gui/ScenePanel.cpp
     gui/TerrainPanel.cpp
@@ -32,6 +31,9 @@ add_library(render STATIC
     effects/GroundTextures.cpp
     cinematic/CinematicController.cpp
     cinematic/CaptureManager.cpp
+    types/BodyRegistry.cpp
+    types/BodyLook.cpp
+    types/BodyVariety.cpp
     # Model and backend sources compiled directly (DLL boundary: symbols not exported via PG_API)
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfig.cpp
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/BodyConfigProjection.cpp
@@ -39,7 +41,6 @@ add_library(render STATIC
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/PaletteRegistry.cpp
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/materials/GroundMaterials.cpp
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/materials/CloudNoise.cpp
-    ${CMAKE_SOURCE_DIR}/libplanetgen/src/backend/ParamMappers.cpp
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
@@ -65,3 +66,13 @@ target_link_libraries(render PUBLIC
     OpenGL::GL
     nlohmann_json::nlohmann_json
 )
+
+# Tests for the render-side data code (planet type registry and traits). Runs from the source
+# root so it can read data/.
+add_executable(render_tests
+    tests/test_body_registry.cpp
+    tests/test_body_look.cpp
+    tests/test_body_variety.cpp
+)
+target_link_libraries(render_tests PRIVATE render Catch2::Catch2WithMain)
+catch_discover_tests(render_tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

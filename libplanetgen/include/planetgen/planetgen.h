@@ -112,6 +112,16 @@ typedef struct PgBodyDesc
     float detail_persistence;
     float detail_lacunarity;
     float perturb_scale;
+
+    // Terrain styles for planet types (strength 0 = off)
+    float style_dunes;
+    float style_dune_scale;
+    float style_craters;
+    float style_crater_scale;
+    float style_terraces;
+    float style_terrace_steps;
+    float style_canyons;
+    float style_spires;
 } PgBodyDesc;
 
 // Shading configuration

@@ -1,5 +1,6 @@
 #include "SurfacePanel.h"
 #include "../settings/OceanSettings.h"
+#include "../settings/SurfaceSettings.h"
 #include "../BodyRuntime.h"
 #include "GuiLayout.h"
 #include <imgui.h>
@@ -7,7 +8,8 @@
 namespace planets::render
 {
 
-bool SurfacePanel::Draw(BodyRuntime* activeBody, effects::OceanSettings& ocean, float& seaLevel, bool& visible)
+bool SurfacePanel::Draw(BodyRuntime* activeBody, SurfaceSettings& surface, effects::OceanSettings& ocean, float& seaLevel,
+                        bool& visible)
 {
     if (!visible)
         return false;
@@ -17,7 +19,10 @@ bool SurfacePanel::Draw(BodyRuntime* activeBody, effects::OceanSettings& ocean, 
     PushLabelColumn();
 
     if (activeBody)
+    {
         regen |= DrawShadingBlock(*activeBody);
+        regen |= DrawPlanetType(*activeBody, surface);
+    }
 
     if (activeBody && activeBody->HasSolidSurface())
     {
@@ -104,6 +109,58 @@ bool SurfacePanel::DrawShadingBlock(BodyRuntime& body)
     return regen;
 }
 
+bool SurfacePanel::DrawPlanetType(BodyRuntime& body, SurfaceSettings& surface)
+{
+    bool regen = false;
+    if (ImGui::CollapsingHeader("Planet Type"))
+    {
+        ImGui::Text("Materials");
+        ImGui::ColorEdit3("Rock Tint", &surface.rockTint.x);
+        ImGui::SetItemTooltip("Multiplies the rock on slopes (1 = Earth)");
+        ImGui::ColorEdit3("Sand Tint", &surface.sandTint.x);
+        ImGui::SetItemTooltip("Multiplies beaches, deserts and dunes (1 = Earth)");
+        ImGui::ColorEdit3("Snow Tint", &surface.snowTint.x);
+        ImGui::SetItemTooltip("Multiplies snow and ice caps (1 = Earth)");
+        ImGui::SliderFloat("Vegetation", &surface.vegetation, 0.0f, 1.0f, "%.2f");
+        ImGui::SetItemTooltip("Grass texture on the flats: 0 = bare soil (dead worlds), 1 = Earth");
+        ImGui::SliderFloat("Sand Cover", &surface.sandCover, 0.0f, 1.0f, "%.2f");
+        ImGui::SetItemTooltip("Sand on every flat: 1 = dune sea");
+
+        ImGui::Separator();
+        ImGui::Text("Climate");
+        ImGui::SliderFloat("Polar Caps", &surface.polarCaps, 0.0f, 0.8f, "%.2f");
+        ImGui::SetItemTooltip("Ice caps from each pole, also on hot worlds (0 = Earth's climate only)");
+        ImGui::SliderFloat("Tidally Locked", &surface.substellar, 0.0f, 1.0f, "%.2f");
+        ImGui::SetItemTooltip("1 = eye world: hot desert under the sun, a living ring, frozen night side");
+        ImGui::SliderFloat("City Coverage", &surface.cityCoverage, 0.0f, 1.0f, "%.2f");
+        ImGui::SetItemTooltip("How much land is built up: low = separate cities, 1 = one planet-wide city "
+                              "(Scene > Night Lights sets the brightness)");
+
+        ImGui::Separator();
+        ImGui::Text("Terrain Style (regenerates)");
+        auto& ts = body.Config().terrainStyle;
+        auto style = [&regen](const char* label, float& v, float max, const char* tip)
+        {
+            ImGui::SliderFloat(label, &v, 0.0f, max, "%.2f");
+            ImGui::SetItemTooltip("%s", tip);
+            if (ImGui::IsItemDeactivatedAfterEdit())
+                regen = true;
+        };
+        style("Dunes", ts.dunes, 3.0f, "Wind-aligned sand ridges on the land");
+        style("Dune Scale", ts.duneScale, 3.0f, "Higher = smaller, denser dunes");
+        style("Craters", ts.craters, 2.0f, "Impact craters with raised rims, everywhere");
+        style("Crater Scale", ts.craterScale, 3.0f, "Higher = smaller, more numerous craters");
+        style("Terraces", ts.terraces, 1.0f, "Stepped land: flat mesa tops and cliffs");
+        ImGui::SliderFloat("Terrace Steps", &ts.terraceSteps, 1.0f, 30.0f, "%.0f");
+        ImGui::SetItemTooltip("Number of steps over the land height");
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            regen = true;
+        style("Canyons", ts.canyons, 2.0f, "Narrow carved channels and sinkholes");
+        style("Spires", ts.spires, 2.0f, "Tall pointed rock or crystal spikes");
+    }
+    return regen;
+}
+
 void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& seaLevel)
 {
     ImGui::Checkbox("Enable Ocean", &settings.enabled);
@@ -132,6 +189,20 @@ void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& sea
         ImGui::SetItemTooltip("Wave frequency relative to planet size: higher = smaller waves");
         ImGui::SliderFloat("Wave Speed", &settings.waveSpeed, 0.1f, 2.0f, "%.1f");
         ImGui::SetItemTooltip("How fast the waves move");
+
+        ImGui::Separator();
+        ImGui::Text("Fluid");
+        ImGui::SliderFloat("Glow", &settings.emissive, 0.0f, 5.0f, "%.2f");
+        ImGui::SetItemTooltip("The fluid glows in its own colour: lava ~3, acid a little");
+        ImGui::SliderFloat("Crust", &settings.crust, 0.0f, 1.0f, "%.2f");
+        ImGui::SetItemTooltip("Share of the surface under dark floating crust, glowing cracks between");
+        ImGui::ColorEdit3("Crust Color", &settings.crustColor.x);
+        ImGui::SliderFloat("Frozen", &settings.frozen, 0.0f, 1.0f, "%.2f");
+        ImGui::SetItemTooltip("1 = ice: no waves, opaque, cracked");
+        ImGui::SliderFloat("Reflectivity", &settings.reflectivity, 0.0f, 2.0f, "%.2f");
+        ImGui::SetItemTooltip("Scales the sky reflection and sun glint (lava barely reflects)");
+        ImGui::ColorEdit3("Foam Color", &settings.foamColor.x);
+        ImGui::SetItemTooltip("Surf along the shore");
     }
 }
 

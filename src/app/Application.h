@@ -12,6 +12,8 @@
 #include "gui/AtmospherePanel.h"
 #include "gui/DebugPanel.h"
 #include "gui/CloudsPanel.h"
+#include "types/BodyRegistry.h"
+#include "types/BodyLook.h"
 #include "settings/SceneSettings.h"
 #include "settings/TerrainSettings.h"
 #include "settings/OceanSettings.h"
@@ -102,6 +104,8 @@ private:
     void RenderGui();
 
     void RegenerateLodSystem();
+    // New world: a planet type with a variety block rolls a new seed; others (Earth) shuffle
+    // their generation parameters.
     void ShuffleTerrain();
     void StartCinematic();
     void StopCinematic();
@@ -122,11 +126,14 @@ private:
     // Pin capture-mode lighting exposure (re-applied after a showcase regenerate).
     void ApplyCaptureExposure();
 
-    // Load a BodyConfig from data/bodies/<name>.json and switch to it
-    void SwitchBody(planetgen::BodyConfig config);
-
-    // Load a BodyConfig from a path (file-scoped helper made reachable for the runner).
-    planetgen::BodyConfig LoadBodyConfigPublic(const std::string& path);
+    // Makes this body active and applies its look (sky, clouds, ocean, star).
+    void SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look = {}, bool resetCamera = true);
+    // Switches to a planet type from the registry; false (and a log line) when the id is unknown.
+    bool SwitchBodyById(const std::string& id);
+    // Switches to the body JSON at path, its variety rolled with the current seed.
+    bool SwitchBodyByPath(const std::string& path, bool resetCamera = true);
+    // After a seed change: rolls the active type's variety again. False when it has none.
+    bool RerollActiveBody();
 
     // Build QuadTreeConfig from current LodConfig
     render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
@@ -153,6 +160,7 @@ private:
     render::effects::OceanSettings _oceanSettings;
     render::effects::AtmosphereSettings _atmosphereSettings;
     render::effects::CloudSettings _cloudSettings;
+    render::SurfaceSettings _surfaceSettings;
     float _seaLevel;
 
     // Camera
@@ -179,7 +187,12 @@ private:
     std::unique_ptr<pg::Context> _libContext;
     pg::Body _libBody;
 
-    int _selectedBodyType = 0; // GUI selector index
+    std::vector<render::types::BodyEntry> _bodies; // planet types found in data/bodies
+    int _selectedBodyType = 0;                     // index into _bodies
+    std::string _activeBodyId;                     // registry id of the active body
+    std::string _activeBodyPath;                   // JSON the active body came from
+    bool _activeHasVariety = false;                // its type rolls traits from the seed
+    uint32_t _rolledSeed = 0;                      // seed the active world's traits were rolled with
 
     // Frame state
     float _lastTime;

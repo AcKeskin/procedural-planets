@@ -4,6 +4,7 @@ namespace planets::render
 {
 
 class BodyRuntime;
+struct SurfaceSettings;
 
 namespace effects
 {
@@ -15,10 +16,13 @@ struct OceanSettings;
 class SurfacePanel
 {
 public:
-    bool Draw(BodyRuntime* activeBody, effects::OceanSettings& ocean, float& seaLevel, bool& visible);
+    bool Draw(BodyRuntime* activeBody, SurfaceSettings& surface, effects::OceanSettings& ocean, float& seaLevel,
+              bool& visible);
 
 private:
     bool DrawShadingBlock(BodyRuntime& body);
+    // Planet type traits: materials and climate (live), terrain styles (regenerate).
+    bool DrawPlanetType(BodyRuntime& body, SurfaceSettings& surface);
     void DrawOceanContent(effects::OceanSettings& settings, float& seaLevel);
 };
 

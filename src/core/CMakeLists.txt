@@ -1,8 +1,6 @@
-# Core library: math, noise
+# Core library: math
 add_library(core STATIC
     math/Camera.cpp
-    noise/SimplexNoise.cpp
-    noise/FractalNoise.cpp
 )
 
 target_include_directories(core PUBLIC

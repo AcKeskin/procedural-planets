@@ -133,6 +133,11 @@ PgContext pg_context_create(const PgContextDesc* desc)
     reg(BP::Height,          planetgen::shaders::height_earth_comp,       "height");
     reg(BP::HeightMacro,     planetgen::WithDefine(planetgen::shaders::height_earth_comp, "MACRO_WORLD"),
         "height_macro");
+    reg(BP::HeightStyle,     planetgen::WithDefine(planetgen::shaders::height_earth_comp, "TERRAIN_STYLE"),
+        "height_style");
+    reg(BP::HeightMacroStyle,
+        planetgen::WithDefine(planetgen::WithDefine(planetgen::shaders::height_earth_comp, "MACRO_WORLD"), "TERRAIN_STYLE"),
+        "height_macro_style");
     reg(BP::ShadingEarth,    planetgen::shaders::shading_earth_comp,      "shading_earth");
     reg(BP::ShadingEarthMacro, planetgen::WithDefine(planetgen::shaders::shading_earth_comp, "MACRO_WORLD"),
         "shading_earth_macro");
@@ -189,7 +194,7 @@ PgBody pg_body_create(PgContext ctx, const PgBodyDesc* desc)
         return nullptr;
 
     body->ctx = ctx;
-    body->desc = *desc; // flat path: desc authoritative, config stays default
+    body->config = planetgen::BodyConfigFromDesc(*desc);
     ctx->ClearError();
     return body;
 }
@@ -223,7 +228,6 @@ PgBody pg_body_create_from_json(PgContext ctx, const char* json_path)
 
     body->ctx = ctx;
     body->config = config;
-    body->desc = planetgen::ProjectToBodyDesc(config);
     ctx->ClearError();
     return body;
 }
@@ -254,7 +258,6 @@ PgBody pg_body_create_from_json_string(PgContext ctx, const char* json)
 
     body->ctx = ctx;
     body->config = config;
-    body->desc = planetgen::ProjectToBodyDesc(config);
     ctx->ClearError();
     return body;
 }
@@ -283,21 +286,18 @@ PgResult pg_generate_heights(PgBody body, const float* vertices, uint32_t vertex
         return nullptr;
     }
 
-    const size_t vertexBytes = vertex_count * 3 * sizeof(float);
     const size_t heightBytes = vertex_count * sizeof(float);
     const size_t normalBytes = vertex_count * 3 * sizeof(float);
 
-    const auto vertexBuf = gpu.CreateBuffer(vertexBytes);
-    gpu.UploadBuffer(vertexBuf, vertices, vertexBytes);
-
-    // Dispatch through the height strategy — the C ABI keeps per-call granularity.
-    planetgen::StrategyContext sc{ gpu, ctx->registry, vertex_count, seed };
-    planetgen::HeightStrategy strategy;
-    const planetgen::HeightBuffers hb = strategy.Run(sc, body->desc, vertexBuf);
+    // Same height stage, mask and macro field as the patch path.
+    planetgen::GenerationPipeline pipeline(gpu, ctx->registry, ctx->palettes);
+    const planetgen::GenerationPipeline::MaskCache maskCache{ &body->maskTexture, &body->maskBuiltKey };
+    const planetgen::GenerationPipeline::MacroCache macroCache{ &ctx->macroTexture, &ctx->macroBuiltKey };
+    const planetgen::HeightBuffers hb =
+        pipeline.GenerateHeights(body->config, vertices, vertex_count, seed, maskCache, macroCache);
 
     if (!hb.heights || !hb.normals)
     {
-        gpu.DestroyBuffer(vertexBuf);
         if (hb.heights) gpu.DestroyBuffer(hb.heights);
         if (hb.normals) gpu.DestroyBuffer(hb.normals);
         ctx->SetError(PG_ERROR_NOT_INITIALIZED, "height strategy failed to produce buffers");
@@ -307,7 +307,6 @@ PgResult pg_generate_heights(PgBody body, const float* vertices, uint32_t vertex
     auto result = new (std::nothrow) PgResult_T();
     if (!result)
     {
-        gpu.DestroyBuffer(vertexBuf);
         gpu.DestroyBuffer(hb.heights);
         gpu.DestroyBuffer(hb.normals);
         return nullptr;
@@ -323,8 +322,6 @@ PgResult pg_generate_heights(PgBody body, const float* vertices, uint32_t vertex
 
     result->heightsGpuBuffer = hb.heights;
     result->normalsGpuBuffer = hb.normals;
-
-    gpu.DestroyBuffer(vertexBuf);
 
     FillPalette(result, body);
     ctx->ClearError();
@@ -342,25 +339,17 @@ PgResult pg_generate_shading(PgBody body, const float* vertices, const float* he
     return GuardGen(ctx, [&]() -> PgResult {
     auto& gpu = *ctx->backend;
 
-    const size_t vertexBytes  = vertex_count * 3 * sizeof(float);
-    const size_t heightBytes  = vertex_count * sizeof(float);
     const size_t shadingBytes = vertex_count * 4 * sizeof(float);
 
-    const auto vertexBuf = gpu.CreateBuffer(vertexBytes);
-    const auto heightBuf = gpu.CreateBuffer(heightBytes);
-    gpu.UploadBuffer(vertexBuf, vertices, vertexBytes);
-    gpu.UploadBuffer(heightBuf, heights,  heightBytes);
-
-    // Dispatch through the shading strategy — earth/generic choice lives inside it.
-    planetgen::StrategyContext sc{ gpu, ctx->registry, vertex_count, seed };
-    planetgen::ShadingStrategy strategy;
-    const planetgen::GpuBufferHandle shadingBuf =
-        strategy.Run(sc, *desc, vertexBuf, heightBuf);
+    // Same shading stage and macro field as the patch path; the desc stays the caller's.
+    planetgen::GenerationPipeline pipeline(gpu, ctx->registry, ctx->palettes);
+    const planetgen::GenerationPipeline::MaskCache maskCache{ &body->maskTexture, &body->maskBuiltKey };
+    const planetgen::GenerationPipeline::MacroCache macroCache{ &ctx->macroTexture, &ctx->macroBuiltKey };
+    const planetgen::GpuBufferHandle shadingBuf = pipeline.GenerateShading(
+        body->config, *desc, vertices, heights, vertex_count, seed, maskCache, macroCache);
 
     if (!shadingBuf)
     {
-        gpu.DestroyBuffer(vertexBuf);
-        gpu.DestroyBuffer(heightBuf);
         ctx->SetError(PG_ERROR_NOT_INITIALIZED, "shading program not registered");
         return nullptr;
     }
@@ -368,9 +357,7 @@ PgResult pg_generate_shading(PgBody body, const float* vertices, const float* he
     auto result = new (std::nothrow) PgResult_T();
     if (!result)
     {
-        gpu.DestroyBuffer(vertexBuf);
         gpu.DestroyBuffer(shadingBuf);
-        gpu.DestroyBuffer(heightBuf);
         return nullptr;
     }
 
@@ -381,9 +368,6 @@ PgResult pg_generate_shading(PgBody body, const float* vertices, const float* he
     gpu.DownloadBuffer(shadingBuf, result->shading.data(), shadingBytes);
 
     result->shadingGpuBuffer = shadingBuf;
-
-    gpu.DestroyBuffer(vertexBuf);
-    gpu.DestroyBuffer(heightBuf);
 
     FillPalette(result, body);
     ctx->ClearError();

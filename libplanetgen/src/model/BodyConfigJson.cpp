@@ -201,6 +201,21 @@ std::string BodyConfigFromJson(const std::string& jsonStr, BodyConfig& out)
             cfg.erosion.evaporationRate = e.value("evaporationRate", cfg.erosion.evaporationRate);
         }
 
+        // --- TerrainStyle ---
+        if (j.contains("terrainStyle"))
+        {
+            const auto& t = j["terrainStyle"];
+            auto& ts = cfg.terrainStyle;
+            ts.dunes        = t.value("dunes", ts.dunes);
+            ts.duneScale    = t.value("duneScale", ts.duneScale);
+            ts.craters      = t.value("craters", ts.craters);
+            ts.craterScale  = t.value("craterScale", ts.craterScale);
+            ts.terraces     = t.value("terraces", ts.terraces);
+            ts.terraceSteps = t.value("terraceSteps", ts.terraceSteps);
+            ts.canyons      = t.value("canyons", ts.canyons);
+            ts.spires       = t.value("spires", ts.spires);
+        }
+
         // --- MacroWorld ---
         if (j.contains("macroWorld"))
         {
@@ -268,6 +283,17 @@ std::string BodyConfigToJson(const BodyConfig& cfg)
         { "iterations",      cfg.erosion.iterations      },
         { "thermalRate",     cfg.erosion.thermalRate     },
         { "thermalThreshold", cfg.erosion.thermalThreshold },
+    };
+
+    j["terrainStyle"] = {
+        { "canyons",      cfg.terrainStyle.canyons      },
+        { "craterScale",  cfg.terrainStyle.craterScale  },
+        { "craters",      cfg.terrainStyle.craters      },
+        { "duneScale",    cfg.terrainStyle.duneScale    },
+        { "dunes",        cfg.terrainStyle.dunes        },
+        { "spires",       cfg.terrainStyle.spires       },
+        { "terraceSteps", cfg.terrainStyle.terraceSteps },
+        { "terraces",     cfg.terrainStyle.terraces     },
     };
 
     j["macroWorld"] = {

@@ -91,6 +91,26 @@ public:
                        MaskCache mask = {},
                        MacroCache macro = {});
 
+    // Height stage alone (pg_generate_heights), with the same mask and macro field as
+    // the patch path. Returns GPU buffers the caller owns.
+    HeightBuffers GenerateHeights(const BodyConfig& config,
+                                  const float* vertices,
+                                  uint32_t vertexCount,
+                                  uint32_t seed,
+                                  MaskCache mask = {},
+                                  MacroCache macro = {});
+
+    // Shading stage alone over caller heights (pg_generate_shading), with the body's
+    // macro field. `desc` is the caller's; the config only picks the mask and field.
+    GpuBufferHandle GenerateShading(const BodyConfig& config,
+                                    const PgShadingDesc& desc,
+                                    const float* vertices,
+                                    const float* heights,
+                                    uint32_t vertexCount,
+                                    uint32_t seed,
+                                    MaskCache mask = {},
+                                    MacroCache macro = {});
+
 private:
     IComputeBackend& _backend;
     const ShaderRegistry& _registry;
