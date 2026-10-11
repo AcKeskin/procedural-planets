@@ -144,9 +144,9 @@ PlanetActions PlanetWindow::Draw(PlanetUi& ui)
         ui::ResetTracking();
         if (ImGui::BeginTabItem("Camera"))
         {
-            _debug.DrawContent(*ui.camera, *ui.moveSpeed, ui.autoOrbit, *ui.autoOrbitSpeed);
-            ImGui::SeparatorText("Turntable");
-            _cinematic.DrawContent(*ui.cinematic, ui.planetRadius, actions.playCinematic);
+            PushLabelColumn();
+            _camera.Draw(*ui.camera, *ui.moveSpeed, *ui.cinematic, actions.playCinematic);
+            ImGui::PopItemWidth();
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("System"))

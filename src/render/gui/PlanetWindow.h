@@ -1,7 +1,6 @@
 #pragma once
 
-#include "CinematicPanel.h"
-#include "DebugPanel.h"
+#include "CameraTab.h"
 #include "LightTab.h"
 #include "OceanTab.h"
 #include "SkyTab.h"
@@ -50,10 +49,7 @@ struct PlanetUi
     SceneSettings* scene = nullptr;
     core::Camera* camera = nullptr; // the Camera tab edits FOV and auto-rotate
     float* moveSpeed = nullptr;
-    bool autoOrbit = false;
-    float* autoOrbitSpeed = nullptr;
     CinematicSettings* cinematic = nullptr;
-    float planetRadius = 1.0f;
     float frameMs = 16.0f;
 
     const types::LookState* baseline = nullptr; // the rolled values edits are measured against
@@ -95,8 +91,7 @@ private:
     OceanTab _ocean;
     SkyTab _sky;
     LightTab _light;
-    DebugPanel _debug;
-    CinematicPanel _cinematic;
+    CameraTab _camera;
 };
 
 } // namespace planets::render

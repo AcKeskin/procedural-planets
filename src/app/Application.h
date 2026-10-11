@@ -41,7 +41,6 @@ namespace AppDefaults
 {
 inline constexpr float SeaLevel = 0.995f;
 inline constexpr float InitialCameraDistanceMultiplier = 2.0f;
-inline constexpr float AutoOrbitSpeed = 5.0f;
 inline constexpr float FresnelStrengthNear = 0.5f;
 inline constexpr float FresnelStrengthFar = 2.0f;
 inline constexpr float FresnelPower = 3.0f;
@@ -177,7 +176,6 @@ private:
     // Camera. Auto-rotate lives in _camera.Hud().autoRotate (the O key and the Camera tab share it).
     core::Camera _camera;
     core::CameraController _cameraCtl;
-    float _autoOrbitSpeed = AppDefaults::AutoOrbitSpeed;
     Bookmarks _bookmarks;
     bool _orbitDragging = false; // LMB drag that started on the scene, not on a panel
     bool _lookDragging = false;  // same for RMB

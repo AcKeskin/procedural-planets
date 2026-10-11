@@ -9,8 +9,7 @@ add_library(render STATIC
     gui/SkyTab.cpp
     gui/LightTab.cpp
     gui/SystemTab.cpp
-    gui/DebugPanel.cpp
-    gui/CinematicPanel.cpp
+    gui/CameraTab.cpp
     gui/PlanetWindow.cpp
     Renderer.cpp
     GpuTimer.cpp

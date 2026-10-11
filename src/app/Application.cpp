@@ -405,7 +405,7 @@ void Application::UpdateCamera(float deltaTime, bool keysBlocked)
         if (_input.IsKeyDown(Slower))
             control.boost *= SlowerFactor;
     }
-    control.autoRotateDegPerSec = _autoOrbitSpeed;
+    control.autoRotateDegPerSec = _cinematicSettings.turntable.orbitSpeed;
 
     if (_input.WasDoubleClicked() && !io.WantCaptureMouse)
         FlyToCursor();
@@ -539,10 +539,7 @@ void Application::RenderGui()
         ui.scene = &_sceneSettings;
         ui.camera = &_camera;
         ui.moveSpeed = &_cameraCtl.SpeedMultiplier();
-        ui.autoOrbit = _camera.Hud().autoRotate;
-        ui.autoOrbitSpeed = &_autoOrbitSpeed;
         ui.cinematic = &_cinematicSettings;
-        ui.planetRadius = PlanetRadius();
         ui.frameMs = _frameMs;
         ui.baseline = &_baseline;
         ui.lockMask = &_lockMask;

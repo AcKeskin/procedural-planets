@@ -39,3 +39,6 @@ Makefile
 
 # ImGui window layout, written next to the exe at runtime; the default layout comes from code
 imgui.ini
+# Per-machine state the app writes next to it: help shown once, camera bookmarks
+gui_state.json
+bookmarks.json
