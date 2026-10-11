@@ -248,9 +248,6 @@ std::string BodyConfigFromJson(const std::string& jsonStr, BodyConfig& out)
         if (j.contains("shaderPaths"))
         {
             const auto& sp = j["shaderPaths"];
-            cfg.shaderPaths.heightShaderPath   = sp.value("height",   cfg.shaderPaths.heightShaderPath);
-            cfg.shaderPaths.shadingShaderPath  = sp.value("shading",  cfg.shaderPaths.shadingShaderPath);
-            cfg.shaderPaths.erosionShaderPath  = sp.value("erosion",  cfg.shaderPaths.erosionShaderPath);
             cfg.shaderPaths.vertexShaderPath   = sp.value("vertex",   cfg.shaderPaths.vertexShaderPath);
             cfg.shaderPaths.fragmentShaderPath = sp.value("fragment", cfg.shaderPaths.fragmentShaderPath);
         }
@@ -354,10 +351,7 @@ std::string BodyConfigToJson(const BodyConfig& cfg)
     j["paletteRef"] = { { "paletteId", cfg.paletteRef.paletteId } };
 
     j["shaderPaths"] = {
-        { "erosion",  cfg.shaderPaths.erosionShaderPath  },
         { "fragment", cfg.shaderPaths.fragmentShaderPath },
-        { "height",   cfg.shaderPaths.heightShaderPath   },
-        { "shading",  cfg.shaderPaths.shadingShaderPath  },
         { "vertex",   cfg.shaderPaths.vertexShaderPath   },
     };
 
