@@ -12,11 +12,19 @@ namespace
 constexpr const char* StatePath = "gui_state.json";
 }
 
+bool IsHelpSeen(const nlohmann::json& state)
+{
+    if (!state.is_object())
+        return false;
+    const auto it = state.find("helpSeen");
+    return it != state.end() && it->is_boolean() && it->get<bool>();
+}
+
 void HelpOverlay::LoadFirstLaunchState()
 {
     std::ifstream in(StatePath);
     nlohmann::json state = nlohmann::json::parse(in, nullptr, false);
-    if (state.is_object() && state.value("helpSeen", false))
+    if (IsHelpSeen(state))
         return;
 
     _open = true;

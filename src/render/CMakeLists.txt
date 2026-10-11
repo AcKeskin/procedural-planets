@@ -73,6 +73,10 @@ add_executable(render_tests
     tests/test_surface_settings.cpp
     tests/test_look_units.cpp
     tests/test_camera_controller.cpp
+    tests/test_bookmarks.cpp
+    ../app/Bookmarks.cpp
+    ../app/HelpOverlay.cpp
 )
+target_include_directories(render_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/app)
 target_link_libraries(render_tests PRIVATE render Catch2::Catch2WithMain)
 catch_discover_tests(render_tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
