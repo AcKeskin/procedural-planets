@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Input.h"
+#include "HelpOverlay.h"
+#include "Toast.h"
 #include "Window.h"
 #include "Renderer.h"
 #include "lod/PlanetQuadTree.h"
@@ -95,11 +97,16 @@ public:
     bool SwitchBodyById(const std::string& id);
     void SetSeed(uint32_t seed) { _genConfig.seed = seed; }
 
+    // Short message in the bottom-right corner (about 2.5 s).
+    void ShowToast(std::string text) { _toasts.Show(std::move(text)); }
+
     // Pin capture-mode lighting exposure (re-applied after a showcase regenerate).
     void ApplyCaptureExposure();
 
 private:
     void ProcessInput(float deltaTime);
+    // Esc: close help, else stop the turntable; held for a second it quits.
+    void HandleEscape(float deltaTime, bool keysBlocked);
     void Render();
     void RenderGui();
     // Main menu bar: View menu, type, seed, reroll, frame time. Visible even when Tab hides the
@@ -163,6 +170,11 @@ private:
     render::CaptureManager _captureManager;
     bool _guiVisible = true;
     bool _screenshotRequested = false;
+
+    HelpOverlay _help;
+    Toasts _toasts;
+    float _escHeld = 0.0f;       // seconds Esc has been held toward quit
+    bool _escConsumed = false;   // this press already closed help / stopped the turntable
 
     // Active body — typed config + runtime shim
     planetgen::PaletteRegistry _paletteRegistry;

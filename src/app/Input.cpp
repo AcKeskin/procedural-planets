@@ -18,10 +18,25 @@ Input::Input()
 {
 }
 
+namespace
+{
+Input* g_scrollTarget = nullptr; // GLFW's scroll callback has no user pointer to spare
+}
+
+void Input::ScrollCallback(GLFWwindow*, double, double yoffset)
+{
+    if (g_scrollTarget)
+        g_scrollTarget->_scrollAccum += static_cast<float>(yoffset);
+}
+
 void Input::Initialize(GLFWwindow* window)
 {
     _window = window;
     _firstUpdate = true;
+
+    // Installed before the GUI backend: ImGui chains to whatever callback was set first.
+    g_scrollTarget = this;
+    glfwSetScrollCallback(window, ScrollCallback);
 }
 
 void Input::Update()
@@ -42,6 +57,30 @@ void Input::Update()
         _lastMouseX = _mouseX;
         _lastMouseY = _mouseY;
         _firstUpdate = false;
+    }
+
+    _scrollDelta = _scrollAccum;
+    _scrollAccum = 0.0f;
+
+    const bool prevLeftDown = _leftDown;
+    _leftDown = glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+    _doubleClicked = false;
+    if (_leftDown && !prevLeftDown)
+    {
+        const double now = glfwGetTime();
+        const float dx = _mouseX - _lastClickX;
+        const float dy = _mouseY - _lastClickY;
+        if (now - _lastClickTime < DoubleClickSeconds && dx * dx + dy * dy < DoubleClickPixels * DoubleClickPixels)
+        {
+            _doubleClicked = true;
+            _lastClickTime = -1.0; // a third click starts a new pair
+        }
+        else
+        {
+            _lastClickTime = now;
+            _lastClickX = _mouseX;
+            _lastClickY = _mouseY;
+        }
     }
 
     _mouseDeltaX = _mouseX - _lastMouseX;

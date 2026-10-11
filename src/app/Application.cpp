@@ -1,5 +1,6 @@
 #include "Application.h"
 #include "GpuConstants.h"
+#include "Keybinds.h"
 #include "planetgen/model/BodyConfigJson.h"
 #include "planetgen/model/BodyVariety.h"
 #include <nlohmann/json.hpp>
@@ -8,12 +9,18 @@
 #include <glm/glm.hpp>
 #include <imgui.h>
 #include <cstdio>
+#include <filesystem>
 #include <iostream>
 #include <fstream>
 #include <random>
 
 namespace planets::app
 {
+
+namespace
+{
+constexpr float HoldHintDelaySeconds = 0.2f; // short taps do not flash the hint
+}
 
 Application::Application()
     : _seaLevel(AppDefaults::SeaLevel)
@@ -45,6 +52,8 @@ bool Application::Initialize()
 
     _input.Initialize(_window.GetHandle());
     _guiManager.Initialize(_window.GetHandle());
+    if (!_capture.enabled)
+        _help.LoadFirstLaunchState();
 
     if (!_renderer.Initialize(_window.GetWidth(), _window.GetHeight()))
     {
@@ -238,51 +247,88 @@ void Application::Shutdown()
     _window.Shutdown();
 }
 
+namespace
+{
+// With keyboard nav on, WantCaptureKeyboard is true whenever any ImGui window has focus (the
+// Planet window gets it at launch), which would kill every shortcut. Block only while a text
+// field or another widget is being edited.
+bool KeyboardBlockedByGui()
+{
+    return ImGui::GetIO().WantTextInput || ImGui::IsAnyItemActive();
+}
+} // namespace
+
+void Application::HandleEscape(float deltaTime, bool keysBlocked)
+{
+    if (keysBlocked || !_input.IsKeyDown(Key::Escape))
+    {
+        _escHeld = 0.0f;
+        _escConsumed = false;
+        return;
+    }
+
+    // A press does one job: close help, else stop the turntable. It never quits by itself.
+    if (Keybinds::Pressed(_input, Action::Escape))
+    {
+        if (_help.IsOpen())
+        {
+            _help.Close();
+            _escConsumed = true;
+        }
+        else if (_cinematicController.IsPlaying())
+        {
+            StopCinematic();
+            _escConsumed = true;
+        }
+    }
+    if (_escConsumed)
+        return;
+
+    _escHeld += deltaTime;
+    if (_escHeld >= Keybinds::QuitHoldSeconds)
+        _window.SetShouldClose(true);
+}
+
 void Application::ProcessInput(float deltaTime)
 {
-    bool guiWantsKeyboard = ImGui::GetIO().WantTextInput;
+    const bool keysBlocked = KeyboardBlockedByGui();
 
-    if (_input.IsKeyDown(Key::Escape))
+    HandleEscape(deltaTime, keysBlocked);
+
+    if (!keysBlocked)
     {
-        if (_cinematicController.IsPlaying())
-            StopCinematic();
-        else
-            _window.SetShouldClose(true);
-    }
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::Tab))
-        _guiVisible = !_guiVisible;
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::F5))
-    {
-        if (_cinematicController.IsPlaying())
-            StopCinematic();
-        else
-            StartCinematic();
-    }
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::F12))
-        _screenshotRequested = true;
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::G))
-    {
-        _autoOrbit = !_autoOrbit;
-        if (_autoOrbit)
+        using Keybinds::Pressed;
+        if (Pressed(_input, Action::Help))
+            _help.Toggle();
+        if (Pressed(_input, Action::HidePanel))
+            _guiVisible = !_guiVisible;
+        if (Pressed(_input, Action::Turntable))
         {
-            _camera.SetOrbitTarget(glm::vec3(0.0f));
-            _camera.SetMode(core::CameraMode::Orbit);
+            if (_cinematicController.IsPlaying())
+                StopCinematic();
+            else
+                StartCinematic();
         }
-        else
+        if (Pressed(_input, Action::Screenshot))
+            _screenshotRequested = true;
+        if (Pressed(_input, Action::ToggleMode))
         {
-            _camera.SetMode(core::CameraMode::FreeFly);
+            _autoOrbit = !_autoOrbit;
+            if (_autoOrbit)
+            {
+                _camera.SetOrbitTarget(glm::vec3(0.0f));
+                _camera.SetMode(core::CameraMode::Orbit);
+            }
+            else
+            {
+                _camera.SetMode(core::CameraMode::FreeFly);
+            }
         }
+        if (Pressed(_input, Action::Atmosphere))
+            _atmosphereSettings.enabled = !_atmosphereSettings.enabled;
+        if (Pressed(_input, Action::Reroll))
+            ShuffleTerrain();
     }
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::H))
-        _atmosphereSettings.enabled = !_atmosphereSettings.enabled;
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::R))
-        ShuffleTerrain();
 
     if (_cinematicController.IsPlaying())
     {
@@ -298,7 +344,7 @@ void Application::ProcessInput(float deltaTime)
         return;
     }
 
-    if (_input.IsMouseButtonDown(MouseButton::Right))
+    if (_input.IsMouseButtonDown(MouseButton::Right) && !ImGui::GetIO().WantCaptureMouse)
     {
         if (_input.IsCursorEnabled())
             _input.SetCursorEnabled(false);
@@ -314,17 +360,17 @@ void Application::ProcessInput(float deltaTime)
     float speedMultiplier = _input.IsKeyDown(Key::LeftShift) ? AppDefaults::SprintSpeedMultiplier : 1.0f;
     float speed = _moveSpeed * deltaTime * speedMultiplier;
 
-    if (_input.IsKeyDown(Key::W))
+    if (!keysBlocked && _input.IsKeyDown(Key::W))
         _camera.MoveForward(speed);
-    if (_input.IsKeyDown(Key::S))
+    if (!keysBlocked && _input.IsKeyDown(Key::S))
         _camera.MoveForward(-speed);
-    if (_input.IsKeyDown(Key::A))
+    if (!keysBlocked && _input.IsKeyDown(Key::A))
         _camera.MoveRight(-speed);
-    if (_input.IsKeyDown(Key::D))
+    if (!keysBlocked && _input.IsKeyDown(Key::D))
         _camera.MoveRight(speed);
-    if (_input.IsKeyDown(Key::E))
+    if (!keysBlocked && _input.IsKeyDown(Key::E))
         _camera.MoveUp(speed);
-    if (_input.IsKeyDown(Key::Q))
+    if (!keysBlocked && _input.IsKeyDown(Key::Q))
         _camera.MoveUp(-speed);
 }
 
@@ -355,8 +401,12 @@ void Application::Render()
 
     if (_screenshotRequested)
     {
-        _captureManager.CaptureScreenshot(capW, capH);
+        const bool saved = _captureManager.CaptureScreenshot(capW, capH);
         _screenshotRequested = false;
+        if (saved)
+            ShowToast("Saved " + std::filesystem::absolute(_captureManager.GetLastCapturePath()).string());
+        else
+            ShowToast("Screenshot failed");
     }
 
     // Headless capture point: scene composited, before the GUI overlay.
@@ -377,6 +427,14 @@ void Application::RenderGui()
     if (!_cinematicController.IsPlaying())
         DrawBar();
     _guiManager.DrawDockspace();
+
+    if (!_cinematicController.IsPlaying())
+    {
+        _help.Draw();
+        _toasts.Draw();
+        if (_escHeld > HoldHintDelaySeconds)
+            Toasts::DrawHoldHint("Hold Esc to quit", _escHeld / Keybinds::QuitHoldSeconds);
+    }
 
     if (_guiVisible)
     {
@@ -427,6 +485,11 @@ void Application::DrawBar()
     if (!ImGui::BeginMainMenuBar())
         return;
 
+    if (ImGui::BeginMenu("Help"))
+    {
+        ImGui::MenuItem("Controls", "F1", _help.OpenFlag());
+        ImGui::EndMenu();
+    }
     if (ImGui::BeginMenu("View"))
     {
         ImGui::MenuItem("Planet window", "Tab", &_guiVisible);
@@ -465,10 +528,19 @@ void Application::DrawBar()
         ShuffleTerrain();
     ImGui::SetItemTooltip("New random seed. Key: R.");
 
-    // Frame time on the right; the GPU split on hover.
+    // Frame time on the right; the GPU split on hover. A dim hint sits to its left.
     char frame[48];
     std::snprintf(frame, sizeof(frame), "%.1f ms  %.0f fps", _frameMs, _frameMs > 0.0f ? 1000.0f / _frameMs : 0.0f);
-    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize(frame).x - ImGui::GetStyle().ItemSpacing.x * 2.0f);
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float frameX = ImGui::GetWindowWidth() - ImGui::CalcTextSize(frame).x - spacing * 2.0f;
+    const char* hint = "F1 help";
+    const float hintX = frameX - ImGui::CalcTextSize(hint).x - spacing * 4.0f;
+    if (hintX > ImGui::GetCursorPosX())
+    {
+        ImGui::SameLine(hintX);
+        ImGui::TextDisabled("%s", hint);
+    }
+    ImGui::SameLine(frameX);
     ImGui::TextUnformatted(frame);
     if (ImGui::IsItemHovered())
     {
@@ -571,6 +643,7 @@ void Application::ShuffleTerrain()
     // A new world is a new seed: a type with variety rolls its traits again; Earth keeps its
     // settings and gets new continents from the seed.
     _genConfig.seed = std::random_device{}();
+    ShowToast("New seed " + std::to_string(_genConfig.seed));
     if (!RerollActiveBody())
         RegenerateLodSystem();
 }

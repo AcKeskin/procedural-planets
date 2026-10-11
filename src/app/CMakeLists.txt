@@ -4,6 +4,8 @@ add_executable(procedural-planets
     Application.cpp
     CaptureRequest.cpp
     Input.cpp
+    HelpOverlay.cpp
+    Toast.cpp
     modes/RunMode.cpp
     modes/InteractiveMode.cpp
     modes/CaptureMode.cpp

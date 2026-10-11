@@ -26,17 +26,6 @@ void DebugPanel::DrawContent(
     ImGui::Text("Movement");
     ImGui::SliderFloat("Speed", &moveSpeed, 1.0f, 500.0f, "%.1f");
 
-    ImGui::Separator();
-    ImGui::Text("Controls:");
-    ImGui::BulletText("WASD - Move");
-    ImGui::BulletText("Mouse (RMB) - Look");
-    ImGui::BulletText("Q/E - Up/Down");
-    ImGui::BulletText("Shift - Boost");
-    ImGui::BulletText("G - Toggle Auto-Orbit");
-    ImGui::BulletText("H - Toggle Atmosphere");
-    ImGui::BulletText("R - Shuffle Terrain");
-    ImGui::BulletText("ESC - Exit");
-
     ImGui::PopItemWidth();
 }
 
