@@ -3,7 +3,7 @@
 #include <nlohmann/json.hpp>
 #include <cstdint>
 
-namespace planets::render::types
+namespace planetgen
 {
 
 // A planet type's `variety` block: dotted keys into the body JSON, each with how to draw it.
@@ -16,4 +16,4 @@ bool HasVariety(const nlohmann::json& body);
 // The body with every variety key set to its rolled value. Unknown forms are skipped.
 nlohmann::json RollVariety(const nlohmann::json& body, uint32_t seed);
 
-} // namespace planets::render::types
+} // namespace planetgen

@@ -53,6 +53,7 @@ set(PLANETGEN_SOURCES
     src/model/BodyConfig.cpp
     src/model/BodyConfigProjection.cpp
     src/model/BodyConfigJson.cpp
+    src/model/BodyVariety.cpp
     src/model/PaletteRegistry.cpp
     src/strategy/HeightStrategy.cpp
     src/strategy/ShadingStrategy.cpp
@@ -78,6 +79,7 @@ set(PLANETGEN_HEADERS
     src/model/BodyConfig.h
     src/model/BodyConfigProjection.h
     src/model/BodyConfigJson.h
+    src/model/BodyVariety.h
     src/model/PaletteRegistry.h
     src/strategy/IGenerationStrategy.h
     src/strategy/HeightStrategy.h
@@ -158,6 +160,7 @@ set(PLANETGEN_TEST_SOURCES
     tests/test_terrain_style.cpp
     tests/test_body_desc.cpp
     tests/test_standalone_calls.cpp
+    tests/test_body_variety.cpp
 )
 
 add_executable(planetgen_tests ${PLANETGEN_TEST_SOURCES})
@@ -178,6 +181,7 @@ target_sources(planetgen_tests PRIVATE
     src/model/BodyConfig.cpp
     src/model/BodyConfigProjection.cpp
     src/model/BodyConfigJson.cpp
+    src/model/BodyVariety.cpp
     src/model/PaletteRegistry.cpp
     src/strategy/HeightStrategy.cpp
     src/strategy/ShadingStrategy.cpp

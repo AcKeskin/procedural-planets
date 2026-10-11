@@ -6,6 +6,7 @@
 #include "../model/BodyConfig.h"
 #include "../model/BodyConfigProjection.h"
 #include "../model/BodyConfigJson.h"
+#include "../model/BodyVariety.h"
 #include "../strategy/HeightStrategy.h"
 #include "../strategy/ShadingStrategy.h"
 #include "../strategy/ErosionStrategy.h"
@@ -16,7 +17,9 @@
 #include <cstring>
 #include <exception>
 #include <new>
+#include <sstream>
 #include <string>
+#include <nlohmann/json.hpp>
 
 // Dispatch mechanics (param mapping, workgroup sizing, GPU buffer threading)
 // now live in the strategy layer (src/strategy/*). This file owns only the
@@ -24,6 +27,21 @@
 
 namespace
 {
+
+PgBody NewBody(PgContext ctx, const planetgen::BodyConfig& config)
+{
+    auto body = new (std::nothrow) PgBody_T();
+    if (!body)
+    {
+        ctx->SetError(PG_ERROR_OUT_OF_MEMORY, "out of memory creating body");
+        return nullptr;
+    }
+
+    body->ctx = ctx;
+    body->config = config;
+    ctx->ClearError();
+    return body;
+}
 
 // Resolve the body's palette by id and copy it into the result (FFI-safe entries).
 void FillPalette(PgResult_T* result, const PgBody_T* body)
@@ -218,18 +236,7 @@ PgBody pg_body_create_from_json(PgContext ctx, const char* json_path)
         ctx->SetError(code, std::string("body config load failed: ") + err);
         return nullptr;
     }
-
-    auto body = new (std::nothrow) PgBody_T();
-    if (!body)
-    {
-        ctx->SetError(PG_ERROR_OUT_OF_MEMORY, "out of memory creating body");
-        return nullptr;
-    }
-
-    body->ctx = ctx;
-    body->config = config;
-    ctx->ClearError();
-    return body;
+    return NewBody(ctx, config);
 }
 
 PgBody pg_body_create_from_json_string(PgContext ctx, const char* json)
@@ -248,18 +255,37 @@ PgBody pg_body_create_from_json_string(PgContext ctx, const char* json)
                       std::string("body config parse failed: ") + err);
         return nullptr;
     }
+    return NewBody(ctx, config);
+}
 
-    auto body = new (std::nothrow) PgBody_T();
-    if (!body)
+PgBody pg_body_create_from_json_string_seeded(PgContext ctx, const char* json, uint32_t seed)
+{
+    if (!ctx || !json)
+        return nullptr;
+
+    const nlohmann::json body = nlohmann::json::parse(json, nullptr, false);
+    if (body.is_discarded())
     {
-        ctx->SetError(PG_ERROR_OUT_OF_MEMORY, "out of memory creating body");
+        ctx->SetError(PG_ERROR_JSON_PARSE_FAILED, "body config parse failed: invalid JSON");
         return nullptr;
     }
+    return pg_body_create_from_json_string(ctx, planetgen::RollVariety(body, seed).dump().c_str());
+}
 
-    body->ctx = ctx;
-    body->config = config;
-    ctx->ClearError();
-    return body;
+PgBody pg_body_create_from_json_seeded(PgContext ctx, const char* json_path, uint32_t seed)
+{
+    if (!ctx || !json_path)
+        return nullptr;
+
+    std::ifstream in(json_path);
+    if (!in.is_open())
+    {
+        ctx->SetError(PG_ERROR_FILE_NOT_FOUND, std::string("body config load failed: cannot open ") + json_path);
+        return nullptr;
+    }
+    std::stringstream text;
+    text << in.rdbuf();
+    return pg_body_create_from_json_string_seeded(ctx, text.str().c_str(), seed);
 }
 
 void pg_body_destroy(PgBody body)

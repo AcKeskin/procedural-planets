@@ -4,7 +4,7 @@
 #include "instrument/TimelineParser.h"
 #include "instrument/LiveServer.h"
 #include <model/BodyConfigJson.h>
-#include <types/BodyVariety.h>
+#include <model/BodyVariety.h>
 #include <nlohmann/json.hpp>
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
@@ -755,7 +755,7 @@ bool Application::SwitchBodyByPath(const std::string& path, bool resetCamera)
         std::cerr << "[SwitchBody] Cannot read " << path << std::endl;
         return false;
     }
-    const nlohmann::json world = render::types::RollVariety(body, _genConfig.seed);
+    const nlohmann::json world = planetgen::RollVariety(body, _genConfig.seed);
     planetgen::BodyConfig config;
     const std::string err = planetgen::BodyConfigFromJson(world.dump(), config);
     if (!err.empty())
@@ -764,7 +764,7 @@ bool Application::SwitchBodyByPath(const std::string& path, bool resetCamera)
         return false;
     }
     _activeBodyPath = path;
-    _activeHasVariety = render::types::HasVariety(body);
+    _activeHasVariety = planetgen::HasVariety(body);
     _rolledSeed = _genConfig.seed;
     SwitchBody(std::move(config), render::types::ParseBodyLook(world), resetCamera);
     return true;

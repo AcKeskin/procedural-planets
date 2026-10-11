@@ -170,6 +170,17 @@ public:
         return Body(pg_body_create_from_json_string(_handle, json.c_str()));
     }
 
+    // Planet types: roll the body's `variety` block with `seed` first.
+    Body CreateBodyFromJson(const std::string& jsonPath, uint32_t seed)
+    {
+        return Body(pg_body_create_from_json_seeded(_handle, jsonPath.c_str(), seed));
+    }
+
+    Body CreateBodyFromJsonString(const std::string& json, uint32_t seed)
+    {
+        return Body(pg_body_create_from_json_string_seeded(_handle, json.c_str(), seed));
+    }
+
     PgError GetError() const { return pg_context_get_error(_handle); }
 
     // Human-readable message for the last error on this context (valid until the
