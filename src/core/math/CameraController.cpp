@@ -41,6 +41,11 @@ glm::vec3 SafeNormalize(const glm::vec3& v, const glm::vec3& fallback)
     return len2 > 1e-12f ? v / std::sqrt(len2) : fallback;
 }
 
+bool IsFinite(const glm::vec3& v)
+{
+    return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+}
+
 // Vertical for the fly camera: world up far away, the surface normal near the planet.
 glm::vec3 LocalUp(const glm::vec3& position, float radius)
 {
@@ -369,9 +374,22 @@ void CameraController::FlyToPoint(const glm::vec3& surfacePoint, const CameraBod
     BeginMove(pose, FlyToSeconds, camera);
 }
 
-void CameraController::GoTo(const CameraPose& pose, Camera& camera)
+void CameraController::GoTo(const CameraPose& pose, const CameraBody& body, Camera& camera)
 {
-    BeginMove(pose, MoveSeconds, camera);
+    _bodyRadius = body.radius;
+    // A saved pose may come from another body or a hand-edited file: keep it above the floor and usable.
+    CameraPose safe = pose;
+    safe.position = ClampAboveFloor(pose.position, body);
+    const glm::vec3 cross = glm::cross(pose.forward, pose.up);
+    const bool usable = glm::dot(pose.forward, pose.forward) > 1e-8f && glm::dot(cross, cross) > 1e-8f &&
+                        IsFinite(pose.forward) && IsFinite(pose.up);
+    if (!usable)
+    {
+        const CameraPose centred = OrbitPoseAt(safe.position);
+        safe.forward = centred.forward;
+        safe.up = centred.up;
+    }
+    BeginMove(safe, MoveSeconds, camera);
 }
 
 bool CameraController::RaySphere(const glm::vec3& origin, const glm::vec3& dir, float radius, glm::vec3& hit)

@@ -18,6 +18,11 @@ CameraBody TestBody()
     return body;
 }
 
+bool IsFinite(const glm::vec3& v)
+{
+    return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+}
+
 void Run(CameraController& ctl, Camera& cam, const CameraControl& input, float seconds)
 {
     for (float t = 0.0f; t < seconds; t += 1.0f / 60.0f)
@@ -209,7 +214,7 @@ TEST_CASE("An eased move to a rolled Orbit pose ends without a snap", "[camera]"
     pose.position = glm::vec3(20.0f, 0.0f, 0.0f);
     pose.forward = glm::vec3(-1.0f, 0.0f, 0.0f);
     pose.up = glm::angleAxis(glm::radians(30.0f), pose.forward) * glm::vec3(0.0f, 1.0f, 0.0f);
-    ctl.GoTo(pose, cam);
+    ctl.GoTo(pose, TestBody(), cam);
 
     glm::vec3 prevUp = cam.GetUp();
     glm::vec3 prevForward = cam.GetForward();
@@ -226,6 +231,39 @@ TEST_CASE("An eased move to a rolled Orbit pose ends without a snap", "[camera]"
     REQUIRE(glm::dot(cam.GetForward(), pose.forward) > 0.9999f);
     REQUIRE(glm::dot(cam.GetUp(), pose.up) > 0.9999f);
     REQUIRE(lastStep > std::cos(glm::radians(1.0f)));
+}
+
+TEST_CASE("GoTo keeps a recalled pose above the floor", "[camera]")
+{
+    Camera cam;
+    CameraController ctl;
+    ctl.ResetView(TestBody(), cam, false);
+
+    CameraPose pose;
+    pose.mode = CameraMode::FreeFly;
+    pose.position = glm::vec3(0.0f, 0.0f, 5.0f); // inside the planet
+    ctl.GoTo(pose, TestBody(), cam);
+    Run(ctl, cam, CameraControl{}, 3.0f);
+    REQUIRE(glm::length(cam.GetPosition()) >= TestBody().floorRadius - 1e-4f);
+}
+
+TEST_CASE("GoTo with a degenerate direction falls back to facing the planet", "[camera]")
+{
+    Camera cam;
+    CameraController ctl;
+    ctl.ResetView(TestBody(), cam, false);
+
+    CameraPose pose;
+    pose.mode = CameraMode::FreeFly;
+    pose.position = glm::vec3(30.0f, 0.0f, 0.0f);
+    pose.forward = glm::vec3(0.0f);
+    ctl.GoTo(pose, TestBody(), cam);
+    Run(ctl, cam, CameraControl{}, 3.0f);
+
+    REQUIRE(IsFinite(cam.GetPosition()));
+    REQUIRE(IsFinite(cam.GetForward()));
+    REQUIRE(IsFinite(cam.GetUp()));
+    REQUIRE(glm::dot(cam.GetForward(), -glm::normalize(cam.GetPosition())) > 0.999f);
 }
 
 TEST_CASE("A long vertical orbit drag carries on over the pole without a flip", "[camera]")

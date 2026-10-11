@@ -450,7 +450,7 @@ void Application::RecallBookmark(int slot)
         return;
     }
     _sceneSettings.lightDir = bookmark.sunDir;
-    _cameraCtl.GoTo(bookmark.pose, _camera);
+    _cameraCtl.GoTo(bookmark.pose, CameraBodyNow(), _camera);
     ShowToast("Bookmark " + std::to_string(slot));
 }
 

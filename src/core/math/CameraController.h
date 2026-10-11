@@ -48,7 +48,7 @@ public:
     void ResetView(const CameraBody& body, Camera& camera, bool eased);
     // Fly (eased) to just above a point on the planet, facing the horizon.
     void FlyToPoint(const glm::vec3& surfacePoint, const CameraBody& body, Camera& camera);
-    void GoTo(const CameraPose& pose, Camera& camera);
+    void GoTo(const CameraPose& pose, const CameraBody& body, Camera& camera);
     CameraPose CapturePose(const Camera& camera) const;
 
     // Drop any eased move or velocity (a script or the turntable takes over).
