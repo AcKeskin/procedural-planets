@@ -4,10 +4,8 @@
 
 #include "planetgen/model/BodyConfigJson.h"
 
-#include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <type_traits>
 #include <nlohmann/json.hpp>
 
 using namespace planets::render;
@@ -175,53 +173,6 @@ TEST_CASE("look_units: a roll over the default scene drops edited exposure unles
 
 namespace
 {
-template <typename T>
-bool SameBytes(const T& a, const T& b)
-{
-    static_assert(std::is_trivially_copyable_v<T>);
-    return std::memcmp(&a, &b, sizeof(T)) == 0;
-}
-
-// Compares the fields a unit owns, written out here and not taken from CopyUnits.
-bool UnitEqual(LookUnit unit, const LookState& x, const LookState& y)
-{
-    const auto &cx = x.config, &cy = y.config;
-    switch (unit)
-    {
-    case LookUnit::Terrain:
-        return cx.metadata.radius == cy.metadata.radius && cx.metadata.atmosphereHeight == cy.metadata.atmosphereHeight &&
-               cx.metadata.hasSolidSurface == cy.metadata.hasSolidSurface &&
-               cx.metadata.hasAtmosphere == cy.metadata.hasAtmosphere && SameBytes(cx.shape, cy.shape) &&
-               SameBytes(cx.tectonics, cy.tectonics) && SameBytes(cx.oceanFloor, cy.oceanFloor) &&
-               SameBytes(cx.heightDetail, cy.heightDetail) && SameBytes(cx.erosion, cy.erosion) &&
-               SameBytes(cx.macroWorld, cy.macroWorld) && SameBytes(cx.terrainStyle, cy.terrainStyle);
-    case LookUnit::Surface:
-    {
-        // Seabed and shadow fill belong to Ocean and Light.
-        SurfaceSettings sx = x.surface;
-        sx.seafloor = y.surface.seafloor;
-        sx.skyAmbient = y.surface.skyAmbient;
-        return SameBytes(sx, y.surface) && SameBytes(cx.shading, cy.shading) && x.palette == y.palette;
-    }
-    case LookUnit::Ocean:
-        return cx.metadata.seaLevel == cy.metadata.seaLevel && SameBytes(x.ocean, y.ocean) &&
-               SameBytes(x.surface.seafloor, y.surface.seafloor);
-    case LookUnit::Sky:
-        return SameBytes(x.atmosphere, y.atmosphere) && SameBytes(x.clouds, y.clouds) &&
-               x.scene.lighting.hazeStrength == y.scene.lighting.hazeStrength &&
-               x.scene.lighting.hazeColor == y.scene.lighting.hazeColor;
-    case LookUnit::Light:
-    {
-        SceneSettings sx = x.scene;
-        sx.lighting.hazeStrength = y.scene.lighting.hazeStrength;
-        sx.lighting.hazeColor = y.scene.lighting.hazeColor;
-        return SameBytes(sx, y.scene) && SameBytes(x.surface.skyAmbient, y.surface.skyAmbient);
-    }
-    default:
-        return false;
-    }
-}
-
 std::vector<std::filesystem::path> ShippedBodies()
 {
     std::vector<std::filesystem::path> out;
@@ -266,7 +217,7 @@ TEST_CASE("look_units: copying one unit gives that unit of the source, for every
             LookState next = b;
             CopyUnits(UnitBit(unit), a, next);
             INFO(path.string() << " unit " << u);
-            CHECK(UnitEqual(unit, next, a));
+            CHECK(UnitsEqual(unit, next, a));
         }
     }
 }
@@ -323,4 +274,28 @@ TEST_CASE("look_units: a merged roll keeps the kept units live and their default
     const MergedRoll fresh = MergeRoll(w.b, live, oldBaseline, 0);
     CHECK(fresh.next.ocean.crust == w.b.ocean.crust);
     CHECK(fresh.baseline.ocean.crust == w.b.ocean.crust);
+}
+
+TEST_CASE("look_units: ChangedUnits flags only the tab whose value moved", "[look_units]")
+{
+    const TwoWorlds w;
+    CHECK(ChangedUnits(w.a, w.a) == 0u);
+
+    LookState live = w.a;
+    live.scene.lighting.ambientLight += 0.1f;
+    CHECK(ChangedUnits(live, w.a) == UnitBit(LookUnit::Light));
+
+    live = w.a;
+    live.atmosphere.enabled = !live.atmosphere.enabled;
+    CHECK(ChangedUnits(live, w.a) == UnitBit(LookUnit::Sky));
+
+    live = w.a;
+    live.config.metadata.seaLevel += 0.01f;
+    live.surface.seafloor.depthRange += 0.1f;
+    CHECK(ChangedUnits(live, w.a) == UnitBit(LookUnit::Ocean));
+
+    live = w.a;
+    live.surface.rock.slope += 0.1f;
+    live.config.terrainStyle.spires += 0.1f;
+    CHECK(ChangedUnits(live, w.a) == (UnitBit(LookUnit::Surface) | UnitBit(LookUnit::Terrain)));
 }

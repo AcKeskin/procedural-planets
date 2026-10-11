@@ -4,6 +4,8 @@
 #include "planetgen/model/BodyConfigJson.h"
 #include "planetgen/model/BodyVariety.h"
 #include <nlohmann/json.hpp>
+#include <cstring>
+#include <type_traits>
 
 namespace planets::render::types
 {
@@ -13,6 +15,13 @@ namespace
 bool Has(uint32_t mask, LookUnit u)
 {
     return (mask & UnitBit(u)) != 0;
+}
+
+template <typename T>
+bool SameBytes(const T& a, const T& b)
+{
+    static_assert(std::is_trivially_copyable_v<T>);
+    return std::memcmp(&a, &b, sizeof(T)) == 0;
 }
 
 bool StartsWith(const std::string& s, const char* prefix)
@@ -71,6 +80,56 @@ void CopyUnits(uint32_t mask, const LookState& from, LookState& to)
         to.scene.lighting.hazeColor = hazeColor;
         to.surface.skyAmbient = from.surface.skyAmbient;
     }
+}
+
+bool UnitsEqual(LookUnit unit, const LookState& x, const LookState& y)
+{
+    const auto &cx = x.config, &cy = y.config;
+    switch (unit)
+    {
+    case LookUnit::Terrain:
+        return cx.metadata.radius == cy.metadata.radius && cx.metadata.atmosphereHeight == cy.metadata.atmosphereHeight &&
+               cx.metadata.hasSolidSurface == cy.metadata.hasSolidSurface &&
+               cx.metadata.hasAtmosphere == cy.metadata.hasAtmosphere && SameBytes(cx.shape, cy.shape) &&
+               SameBytes(cx.tectonics, cy.tectonics) && SameBytes(cx.oceanFloor, cy.oceanFloor) &&
+               SameBytes(cx.heightDetail, cy.heightDetail) && SameBytes(cx.erosion, cy.erosion) &&
+               SameBytes(cx.macroWorld, cy.macroWorld) && SameBytes(cx.terrainStyle, cy.terrainStyle);
+    case LookUnit::Surface:
+    {
+        // Seabed and shadow fill belong to Ocean and Light.
+        SurfaceSettings sx = x.surface;
+        sx.seafloor = y.surface.seafloor;
+        sx.skyAmbient = y.surface.skyAmbient;
+        return SameBytes(sx, y.surface) && SameBytes(cx.shading, cy.shading) && x.palette == y.palette;
+    }
+    case LookUnit::Ocean:
+        return cx.metadata.seaLevel == cy.metadata.seaLevel && SameBytes(x.ocean, y.ocean) &&
+               SameBytes(x.surface.seafloor, y.surface.seafloor);
+    case LookUnit::Sky:
+        return SameBytes(x.atmosphere, y.atmosphere) && SameBytes(x.clouds, y.clouds) &&
+               x.scene.lighting.hazeStrength == y.scene.lighting.hazeStrength &&
+               x.scene.lighting.hazeColor == y.scene.lighting.hazeColor;
+    case LookUnit::Light:
+    {
+        SceneSettings sx = x.scene;
+        sx.lighting.hazeStrength = y.scene.lighting.hazeStrength;
+        sx.lighting.hazeColor = y.scene.lighting.hazeColor;
+        return SameBytes(sx, y.scene) && SameBytes(x.surface.skyAmbient, y.surface.skyAmbient);
+    }
+    default:
+        return false;
+    }
+}
+
+uint32_t ChangedUnits(const LookState& live, const LookState& baseline)
+{
+    uint32_t mask = 0;
+    for (uint32_t u = 0; u < static_cast<uint32_t>(LookUnit::Count); ++u)
+    {
+        if (!UnitsEqual(static_cast<LookUnit>(u), live, baseline))
+            mask |= 1u << u;
+    }
+    return mask;
 }
 
 MergedRoll MergeRoll(const LookState& rolled, const LookState& current, const LookState& baseline, uint32_t keptMask)

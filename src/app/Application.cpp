@@ -607,7 +607,8 @@ void Application::DrawBar()
     }
     ImGui::SetItemTooltip("Same seed + same type = same planet. Enter to apply.");
     // Amber '*': a lock, an edit or a tab Randomize means the seed alone no longer gives this planet.
-    if (_lockMask != 0 || _offSeedMask != 0 || _planetWindow.EditCount() > 0)
+    // Compared against the baseline, so a change made while its tab is closed counts too.
+    if (_lockMask != 0 || _offSeedMask != 0 || render::types::ChangedUnits(CaptureLook(), _baseline) != 0)
     {
         ImGui::SameLine(0.0f, 0.0f);
         ImGui::TextColored(render::ui::EditedColor, "*");
