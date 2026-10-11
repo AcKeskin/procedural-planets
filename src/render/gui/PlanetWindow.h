@@ -8,6 +8,9 @@
 #include "SurfaceTab.h"
 #include "SystemTab.h"
 #include "TerrainTab.h"
+#include "../types/LookUnits.h"
+#include <array>
+#include <set>
 
 namespace planets::core
 {
@@ -52,14 +55,19 @@ struct PlanetUi
     CinematicSettings* cinematic = nullptr;
     float planetRadius = 1.0f;
     float frameMs = 16.0f;
+
+    const types::LookState* baseline = nullptr; // the rolled values edits are measured against
+    uint32_t* lockMask = nullptr;               // one bit per LookUnit
+    uint32_t varietyUnits = 0;                  // units the type can randomize
 };
 
 // What the user asked for this frame; the app carries it out.
 struct PlanetActions
 {
     bool regenerate = false;
-    bool randomize = false;
     bool playCinematic = false;
+    int randomizeUnit = -1; // a LookUnit, or -1
+    int resetUnit = -1;
 };
 
 // The one docked window: tabs Terrain, Surface, Ocean, Sky, Light, Camera, System.
@@ -70,7 +78,17 @@ public:
 
     PlanetActions Draw(PlanetUi& ui);
 
+    // Edited values on all look tabs, as last drawn.
+    size_t EditCount() const;
+    // The values of these units were replaced; their edit records no longer hold.
+    void ForgetEdits(uint32_t units);
+
 private:
+    // Lock, Randomize, Reset and the edited count at the top of a look tab.
+    void Toolbar(types::LookUnit unit, const PlanetUi& ui, PlanetActions& actions);
+
+    std::array<std::set<const void*>, static_cast<size_t>(types::LookUnit::Count)> _edits;
+
     TerrainTab _terrain;
     SystemTab _system;
     SurfaceTab _surfaceTab;

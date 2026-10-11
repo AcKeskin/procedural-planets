@@ -1,7 +1,7 @@
 #include "Application.h"
 #include "GpuConstants.h"
+#include "gui/Widgets.h"
 #include "planetgen/model/BodyConfigJson.h"
-#include "planetgen/model/BodyVariety.h"
 #include <nlohmann/json.hpp>
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
@@ -405,13 +405,18 @@ void Application::RenderGui()
         ui.cinematic = &_cinematicSettings;
         ui.planetRadius = PlanetRadius();
         ui.frameMs = _frameMs;
+        ui.baseline = &_baseline;
+        ui.lockMask = &_lockMask;
+        ui.varietyUnits = _varietyUnits;
 
         const render::PlanetActions actions = _planetWindow.Draw(ui);
         bool needsRegen = actions.regenerate;
-        if (actions.randomize && _activeBody)
-            ShuffleTerrain();
+        if (actions.randomizeUnit >= 0)
+            RandomizeUnit(static_cast<render::types::LookUnit>(actions.randomizeUnit));
+        if (actions.resetUnit >= 0)
+            ResetUnit(static_cast<render::types::LookUnit>(actions.resetUnit));
         // A seed typed into the panel is a new world for a planet type: roll its traits too.
-        if (needsRegen && _activeHasVariety && _genConfig.seed != _rolledSeed && RerollActiveBody())
+        if (needsRegen && _genConfig.seed != _rolledSeed && RerollWorld())
             needsRegen = false;
         if (actions.playCinematic)
             StartCinematic();
@@ -456,14 +461,21 @@ void Application::DrawBar()
         seed != _genConfig.seed)
     {
         _genConfig.seed = seed;
-        if (!RerollActiveBody())
+        if (!RerollWorld())
             RegenerateLodSystem();
     }
     ImGui::SetItemTooltip("Same seed + same type = same planet. Enter to apply.");
+    // Amber '*': a lock, an edit or a tab Randomize means the seed alone no longer gives this planet.
+    if (_lockMask != 0 || _offSeedMask != 0 || _planetWindow.EditCount() > 0)
+    {
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::TextColored(render::ui::EditedColor, "*");
+        ImGui::SetItemTooltip("Locked, edited or randomized tabs: the seed alone no longer gives this planet.");
+    }
 
     if (ImGui::Button("Reroll"))
         ShuffleTerrain();
-    ImGui::SetItemTooltip("New random seed. Key: R.");
+    ImGui::SetItemTooltip("New random seed. Unlocked tabs take new values. Key: R.");
 
     // Frame time on the right; the GPU split on hover.
     char frame[48];
@@ -480,9 +492,38 @@ void Application::DrawBar()
     ImGui::EndMainMenuBar();
 }
 
-void Application::SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look, bool resetCamera)
+render::types::LookState Application::CaptureLook() const
 {
-    _activeBody = std::make_unique<render::BodyRuntime>(std::move(config), _paletteRegistry);
+    render::types::LookState s;
+    if (_activeBody)
+        s.config = _activeBody->Config();
+    s.config.metadata.seaLevel = _seaLevel;
+    s.atmosphere = _atmosphereSettings;
+    s.clouds = _cloudSettings;
+    s.ocean = _oceanSettings;
+    s.scene = _sceneSettings;
+    s.surface = _surfaceSettings;
+    s.palette = _activePalette;
+    return s;
+}
+
+void Application::ApplyLook(const render::types::LookState& s, bool rebuildBody, bool resetCamera)
+{
+    _atmosphereSettings = s.atmosphere;
+    _cloudSettings = s.clouds;
+    _oceanSettings = s.ocean;
+    _sceneSettings = s.scene;
+    _surfaceSettings = s.surface;
+    _seaLevel = s.config.metadata.seaLevel;
+    if (_capture.enabled)
+        ApplyCaptureExposure();
+    if (!rebuildBody)
+        return;
+
+    _activeBody = std::make_unique<render::BodyRuntime>(s.config, _paletteRegistry);
+    _activePalette = s.palette;
+    if (!_activePalette.empty())
+        _activeBody->OverridePalette(_activePalette);
 
     // The library owns all terrain compute; hand it the full config as data so it
     // bakes the continent mask from the in-memory (GUI-edited) config.
@@ -498,16 +539,6 @@ void Application::SwitchBody(planetgen::BodyConfig config, const render::types::
     }
     _terrainStats.gpuAvailable = true;
 
-    _seaLevel = _activeBody->GetSeaLevel();
-    // Each planet type brings its own sky, clouds, ocean and star; a switch replaces them.
-    render::types::ApplyBodyLook(
-        look, _atmosphereSettings, _cloudSettings, _oceanSettings, _sceneSettings, _surfaceSettings);
-    if (!look.palette.empty())
-        _activeBody->OverridePalette(look.palette);
-    _atmosphereSettings.enabled = _activeBody->HasAtmosphere() && look.atmosphere.enabled;
-    if (_capture.enabled)
-        ApplyCaptureExposure();
-
     RegenerateLodSystem();
 
     if (resetCamera)
@@ -517,9 +548,46 @@ void Application::SwitchBody(planetgen::BodyConfig config, const render::types::
         float farPlane = (std::max)(AppDefaults::MinFarPlane, PlanetRadius() * AppDefaults::FarPlaneRadiusMultiplier);
         _camera.SetFarPlane(farPlane);
     }
+}
 
-    std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << PlanetRadius() << ")"
-              << std::endl;
+bool Application::RollWorld(uint32_t seed, uint32_t units, bool resetCamera)
+{
+    using namespace render::types;
+    std::ifstream in(_activeBodyPath);
+    const nlohmann::json body = nlohmann::json::parse(in, nullptr, false);
+    if (body.is_discarded())
+    {
+        std::cerr << "[SwitchBody] Cannot read " << _activeBodyPath << std::endl;
+        return false;
+    }
+    LookState rolled;
+    const std::string err = RollLook(body, seed, _sceneSettings, rolled);
+    if (!err.empty())
+    {
+        std::cerr << "[SwitchBody] Bad body config in " << _activeBodyPath << ": " << err << std::endl;
+        return false;
+    }
+    _varietyUnits = VarietyUnits(body);
+
+    // Units that do not take the roll keep their values and the default they are measured against.
+    const uint32_t kept = AllUnits & ~units;
+    LookState next = rolled;
+    LookState baseline = rolled;
+    if (_activeBody)
+    {
+        CopyUnits(kept, CaptureLook(), next);
+        CopyUnits(kept, _baseline, baseline);
+    }
+    _baseline = std::move(baseline);
+    _planetWindow.ForgetEdits(units);
+
+    const uint32_t bodyUnits = UnitBit(LookUnit::Terrain) | UnitBit(LookUnit::Surface) | UnitBit(LookUnit::Ocean);
+    const bool rebuild = !_activeBody || (units & bodyUnits) != 0;
+    ApplyLook(next, rebuild, resetCamera);
+    if (rebuild)
+        std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << PlanetRadius()
+                  << ")" << std::endl;
+    return true;
 }
 
 bool Application::SwitchBodyById(const std::string& id)
@@ -537,42 +605,62 @@ bool Application::SwitchBodyById(const std::string& id)
 
 bool Application::SwitchBodyByPath(const std::string& path, bool resetCamera)
 {
-    std::ifstream in(path);
-    const nlohmann::json body = nlohmann::json::parse(in, nullptr, false);
-    if (body.is_discarded())
-    {
-        std::cerr << "[SwitchBody] Cannot read " << path << std::endl;
-        return false;
-    }
-    const nlohmann::json world = planetgen::RollVariety(body, _genConfig.seed);
-    planetgen::BodyConfig config;
-    const std::string err = planetgen::BodyConfigFromJson(world.dump(), config);
-    if (!err.empty())
-    {
-        std::cerr << "[SwitchBody] Bad body config in " << path << ": " << err << std::endl;
-        return false;
-    }
+    using namespace render::types;
+    const std::string previous = _activeBodyPath;
     _activeBodyPath = path;
-    _activeHasVariety = planetgen::HasVariety(body);
+    // A new type keeps only a locked Light tab: the star and exposure are the user's, the rest is the type's.
+    _lockMask &= UnitBit(LookUnit::Light);
+    _offSeedMask &= UnitBit(LookUnit::Light);
+    if (!RollWorld(_genConfig.seed, AllUnits & ~_lockMask, resetCamera))
+    {
+        _activeBodyPath = previous;
+        return false;
+    }
     _rolledSeed = _genConfig.seed;
-    SwitchBody(std::move(config), render::types::ParseBodyLook(world), resetCamera);
     return true;
 }
 
 bool Application::RerollActiveBody()
 {
-    if (!_activeHasVariety)
+    if (_varietyUnits == 0)
         return false;
-    return SwitchBodyByPath(_activeBodyPath, /*resetCamera=*/false);
+    return RerollWorld();
+}
+
+bool Application::RerollWorld()
+{
+    using namespace render::types;
+    const uint32_t units = AllUnits & ~_lockMask;
+    if (!RollWorld(_genConfig.seed, units, /*resetCamera=*/false))
+        return false;
+    // Terrain, Surface and Ocean all locked: the body was kept, but the land still follows the seed.
+    if ((units & (UnitBit(LookUnit::Terrain) | UnitBit(LookUnit::Surface) | UnitBit(LookUnit::Ocean))) == 0)
+        RegenerateLodSystem();
+    _offSeedMask &= ~units;
+    _rolledSeed = _genConfig.seed;
+    return true;
 }
 
 void Application::ShuffleTerrain()
 {
-    // A new world is a new seed: a type with variety rolls its traits again; Earth keeps its
-    // settings and gets new continents from the seed.
+    // A new world is a new seed: unlocked tabs take the type's values at that seed; Earth gets
+    // new continents.
     _genConfig.seed = std::random_device{}();
-    if (!RerollActiveBody())
+    if (!RerollWorld())
         RegenerateLodSystem();
+}
+
+void Application::RandomizeUnit(render::types::LookUnit unit)
+{
+    // A fresh roll for one tab; the seed stays, so the planet no longer matches it alone.
+    if (RollWorld(std::random_device{}(), render::types::UnitBit(unit), /*resetCamera=*/false))
+        _offSeedMask |= render::types::UnitBit(unit);
+}
+
+void Application::ResetUnit(render::types::LookUnit unit)
+{
+    if (RollWorld(_genConfig.seed, render::types::UnitBit(unit), /*resetCamera=*/false))
+        _offSeedMask &= ~render::types::UnitBit(unit);
 }
 
 void Application::StartCinematic()

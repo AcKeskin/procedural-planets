@@ -37,6 +37,7 @@ add_library(render STATIC
     cinematic/CaptureManager.cpp
     types/BodyRegistry.cpp
     types/BodyLook.cpp
+    types/LookUnits.cpp
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
@@ -71,6 +72,7 @@ add_executable(render_tests
     tests/test_ground_materials.cpp
     tests/test_cloud_noise.cpp
     tests/test_surface_settings.cpp
+    tests/test_look_units.cpp
 )
 target_link_libraries(render_tests PRIVATE render Catch2::Catch2WithMain)
 catch_discover_tests(render_tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

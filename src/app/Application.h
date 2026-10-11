@@ -8,6 +8,7 @@
 #include "gui/PlanetWindow.h"
 #include "types/BodyRegistry.h"
 #include "types/BodyLook.h"
+#include "types/LookUnits.h"
 #include "settings/SceneSettings.h"
 #include "settings/TerrainSettings.h"
 #include "settings/OceanSettings.h"
@@ -107,8 +108,7 @@ private:
     void DrawBar();
 
     void RegenerateLodSystem();
-    // New world: a planet type with a variety block rolls a new seed; others (Earth) shuffle
-    // their generation parameters.
+    // New world: a new seed; the unlocked tabs take the type's values at it.
     void ShuffleTerrain();
 
     // Resize the renderer's framebuffer to the current window size if they differ (cheap
@@ -119,12 +119,21 @@ private:
     // viewer (used per-frame in the cinematic when lightFollow is on).
     void UpdateFollowLight();
 
-    // Makes this body active and applies its look (sky, clouds, ocean, star).
-    void SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look = {}, bool resetCamera = true);
+    // The values the look tabs edit, as they are now.
+    render::types::LookState CaptureLook() const;
+    // Makes `s` live. rebuildBody: new runtime + library body + LOD (terrain, surface or sea level changed).
+    void ApplyLook(const render::types::LookState& s, bool rebuildBody, bool resetCamera);
+    // Rolls the active type at `seed`; only `units` take the roll, the other tabs keep their values.
+    bool RollWorld(uint32_t seed, uint32_t units, bool resetCamera);
     // Switches to the body JSON at path, its variety rolled with the current seed.
     bool SwitchBodyByPath(const std::string& path, bool resetCamera = true);
     // After a seed change: rolls the active type's variety again. False when it has none.
     bool RerollActiveBody();
+    // After a seed change: the unlocked tabs take the type's values at the new seed.
+    bool RerollWorld();
+    // One tab from a fresh roll (the seed stays) / back to the type's values at the current seed.
+    void RandomizeUnit(render::types::LookUnit unit);
+    void ResetUnit(render::types::LookUnit unit);
 
     // Build QuadTreeConfig from current LodConfig
     render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
@@ -178,7 +187,11 @@ private:
     int _selectedBodyType = 0;                     // index into _bodies
     std::string _activeBodyId;                     // registry id of the active body
     std::string _activeBodyPath;                   // JSON the active body came from
-    bool _activeHasVariety = false;                // its type rolls traits from the seed
+    uint32_t _varietyUnits = 0;                    // look tabs its type rolls from the seed
+    std::vector<glm::vec3> _activePalette;         // its type's palette (empty: the registry's)
+    render::types::LookState _baseline;            // the rolled values; edits are measured against it
+    uint32_t _lockMask = 0;                        // look tabs a reroll leaves alone
+    uint32_t _offSeedMask = 0;                     // look tabs randomized away from the seed
     uint32_t _rolledSeed = 0;                      // seed the active world's traits were rolled with
 
     // Frame state

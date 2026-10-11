@@ -18,13 +18,15 @@ void LightTab::Draw(SceneSettings& scene, SurfaceSettings& surface)
         const glm::vec3 dir = glm::normalize(scene.lightDir);
         float azimuth = std::atan2(dir.x, dir.z);
         float elevation = std::asin(dir.y);
+        // Both angles edit lightDir, so they share one edited state and one right-click menu.
+        const bool edited = BeginValue(scene.lightDir);
         bool turned = ImGui::SliderAngle("Sun Azimuth", &azimuth, -180.0f, 180.0f);
         ImGui::SetItemTooltip("Sun direction around the planet, in degrees.");
         turned |= ImGui::SliderAngle("Sun Elevation", &elevation, -90.0f, 90.0f);
-        ImGui::SetItemTooltip("Sun height in degrees. 0 = on the equator plane.");
         if (turned)
             scene.lightDir = glm::normalize(glm::vec3(std::cos(elevation) * std::sin(azimuth), std::sin(elevation),
                                                       std::cos(elevation) * std::cos(azimuth)));
+        EndValue(scene.lightDir, edited, "Sun height in degrees. 0 = on the equator plane.");
         Slider("Sun Intensity", l.sunIntensity, 0.6f, 1.8f, "%.2f", "Brightness of sunlight on the ground.");
         Color("Sun Colour", scene.sunColor, "Colour of the star's light.");
         Slider("Sun Size", scene.sunSize, 0.002f, 0.05f, "%.4f rad", "Angular radius of the sun disc. Real sun: 0.0047.",
