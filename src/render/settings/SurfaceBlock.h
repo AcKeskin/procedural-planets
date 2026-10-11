@@ -78,8 +78,8 @@ inline SurfaceBlock PackSurfaceBlock(const SurfaceSettings& s)
     b.soilRule2 = glm::vec4(s.ground.soilAmount, s.ground.polarSoil, 0.0f, 0.0f);
     b.detail0 = glm::vec4(s.detail.grain, s.detail.grainSnowFade, s.detail.mediumFrequency);
     b.detail1 = glm::vec4(s.detail.bumpFrequency, s.detail.bumpTilt, s.detail.bumpSnowFade, s.detail.textureBump);
-    b.detail2 = glm::vec4(s.detail.roughnessFloor, s.detail.matteRoughnessFloor, s.detail.gamma,
-                          s.detail.fineFrequency);
+    b.detail2 =
+        glm::vec4(s.detail.roughnessFloor, s.detail.matteRoughnessFloor, s.detail.gamma, s.detail.fineFrequency);
     b.detail3 = glm::vec4(s.detail.temperatureNoise, s.detail.moistureNoise, s.detail.moistureDetailNoise, 0.0f);
     b.seafloorShallow = glm::vec4(s.seafloor.shallowColor, s.seafloor.depthRange);
     b.seafloorDeep = glm::vec4(s.seafloor.deepColor, 0.0f);

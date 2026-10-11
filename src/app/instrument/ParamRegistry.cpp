@@ -127,8 +127,24 @@ struct Entry
     }
 
 // Guard a surface.* setter: reject when no surface settings are wired.
-#define SURF_FLOAT(EXPR)                                                                                                   [](const ParamTargets& t, const ParamValue& v) -> bool                                                                 {                                                                                                                          float f;                                                                                                               if (!t.surface || !AsFloat(v, f))                                                                                          return false;                                                                                                      EXPR = f;                                                                                                              return true;                                                                                                       }
-#define SURF_VEC3(EXPR)                                                                                                    [](const ParamTargets& t, const ParamValue& v) -> bool                                                                 {                                                                                                                          glm::vec3 vv;                                                                                                          if (!t.surface || !AsVec3(v, vv))                                                                                          return false;                                                                                                      EXPR = vv;                                                                                                             return true;                                                                                                       }
+#define SURF_FLOAT(EXPR)                                                                                               \
+    [](const ParamTargets& t, const ParamValue& v) -> bool                                                             \
+    {                                                                                                                  \
+        float f;                                                                                                       \
+        if (!t.surface || !AsFloat(v, f))                                                                              \
+            return false;                                                                                              \
+        EXPR = f;                                                                                                      \
+        return true;                                                                                                   \
+    }
+#define SURF_VEC3(EXPR)                                                                                                \
+    [](const ParamTargets& t, const ParamValue& v) -> bool                                                             \
+    {                                                                                                                  \
+        glm::vec3 vv;                                                                                                  \
+        if (!t.surface || !AsVec3(v, vv))                                                                              \
+            return false;                                                                                              \
+        EXPR = vv;                                                                                                     \
+        return true;                                                                                                   \
+    }
 
 // Guard a body.* setter: reject when no body is loaded.
 #define BODY_FLOAT(EXPR)                                                                                               \
