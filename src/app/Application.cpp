@@ -109,8 +109,7 @@ bool Application::Initialize()
     }
     else
     {
-        _camera.SetPosition(
-            glm::vec3(0.0f, 0.0f, PlanetRadius() * AppDefaults::InitialCameraDistanceMultiplier));
+        _camera.SetPosition(glm::vec3(0.0f, 0.0f, PlanetRadius() * AppDefaults::InitialCameraDistanceMultiplier));
     }
 
     _lastTime = static_cast<float>(glfwGetTime());
@@ -707,7 +706,7 @@ void Application::SwitchBody(planetgen::BodyConfig config, const render::types::
     }
     _terrainStats.gpuAvailable = true;
 
-        _seaLevel = _activeBody->GetSeaLevel();
+    _seaLevel = _activeBody->GetSeaLevel();
     // Each planet type brings its own sky, clouds, ocean and star; a switch replaces them.
     render::types::ApplyBodyLook(
         look, _atmosphereSettings, _cloudSettings, _oceanSettings, _sceneSettings, _surfaceSettings);
@@ -723,13 +722,12 @@ void Application::SwitchBody(planetgen::BodyConfig config, const render::types::
     {
         float camDist = PlanetRadius() * AppDefaults::InitialCameraDistanceMultiplier;
         _camera.SetPosition(glm::vec3(0.0f, 0.0f, camDist));
-        float farPlane =
-            (std::max)(AppDefaults::MinFarPlane, PlanetRadius() * AppDefaults::FarPlaneRadiusMultiplier);
+        float farPlane = (std::max)(AppDefaults::MinFarPlane, PlanetRadius() * AppDefaults::FarPlaneRadiusMultiplier);
         _camera.SetFarPlane(farPlane);
     }
 
-    std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << PlanetRadius()
-              << ")" << std::endl;
+    std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << PlanetRadius() << ")"
+              << std::endl;
 }
 
 bool Application::SwitchBodyById(const std::string& id)
@@ -824,8 +822,7 @@ void Application::RegenerateLodSystem()
 
     _renderer.SetActiveBody(_libBody.Handle(), *_activeBody, BuildQuadTreeConfig(), _genConfig.seed);
 
-    float farPlane =
-        (std::max)(AppDefaults::MinFarPlane, PlanetRadius() * AppDefaults::FarPlaneRadiusMultiplier);
+    float farPlane = (std::max)(AppDefaults::MinFarPlane, PlanetRadius() * AppDefaults::FarPlaneRadiusMultiplier);
     _camera.SetFarPlane(farPlane);
 }
 
