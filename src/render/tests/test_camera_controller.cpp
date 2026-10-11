@@ -50,7 +50,9 @@ TEST_CASE("Fly never goes below the clearance floor", "[camera]")
     CameraControl dive;
     dive.move = glm::vec3(0.0f, 0.0f, 1.0f); // forward, toward the planet
     Run(ctl, cam, dive, 30.0f);
-    REQUIRE(glm::length(cam.GetPosition()) >= TestBody().floorRadius - 1e-4f);
+    const CameraBody body = TestBody();
+    const float clearance = body.radius * 0.01f; // the controller keeps this margin above the floor
+    REQUIRE(glm::length(cam.GetPosition()) >= body.floorRadius + clearance - 1e-4f);
 }
 
 TEST_CASE("Orbit zoom eases toward the surface and stops above the floor", "[camera]")
@@ -100,6 +102,24 @@ TEST_CASE("An idle controller leaves a camera set from outside alone", "[camera]
     Run(ctl, cam, CameraControl{}, 1.0f);
     REQUIRE(cam.GetPosition() == position);
     REQUIRE(cam.GetForward() == forward);
+}
+
+TEST_CASE("An idle controller leaves an Orbit pose set from outside alone", "[camera]")
+{
+    Camera cam;
+    CameraController ctl;
+    cam.SetMode(CameraMode::Orbit);
+    cam.SetPosition(glm::vec3(0.0f, 0.0f, 20.0f));
+    cam.SetOrbitTarget(glm::vec3(0.0f));
+    cam.SetOrbitAngles(30.0f, 20.0f); // what a script does
+    const glm::vec3 position = cam.GetPosition();
+    const glm::vec3 forward = cam.GetForward();
+    const glm::vec3 up = cam.GetUp();
+
+    Run(ctl, cam, CameraControl{}, 1.0f);
+    REQUIRE(glm::distance(cam.GetPosition(), position) < 1e-3f);
+    REQUIRE(glm::dot(cam.GetForward(), forward) > 0.99999f);
+    REQUIRE(glm::dot(cam.GetUp(), up) > 0.99999f);
 }
 
 TEST_CASE("FramePlanet ends in Orbit with the whole planet in view", "[camera]")
@@ -295,16 +315,22 @@ TEST_CASE("A long vertical orbit drag carries on over the pole without a flip", 
     CameraControl drag;
     drag.orbitDrag = glm::vec2(0.0f, -10.0f); // drag down: the camera climbs
     float topY = cam.GetPosition().y;
+    float bottomY = topY;
+    bool upsideDown = false;
     glm::vec3 up = cam.GetUp();
-    for (int i = 0; i < 120; ++i)
+    for (int i = 0; i < 125; ++i)
     {
         ctl.Update(1.0f / 60.0f, TestBody(), drag, cam);
         REQUIRE(glm::dot(cam.GetUp(), up) > 0.9f); // no snap between frames
         up = cam.GetUp();
         topY = (std::max)(topY, cam.GetPosition().y);
+        bottomY = (std::min)(bottomY, cam.GetPosition().y);
+        upsideDown = upsideDown || cam.GetUp().y < 0.0f;
     }
-    // 120 steps of 3 degrees = 360: up over the pole, down the far side and back around.
+    // 125 steps of 2.88 degrees = 360: up over the pole, down the far side and back around.
     REQUIRE(topY > distance * 0.999f);
+    REQUIRE(bottomY < -distance * 0.999f);
+    REQUIRE(upsideDown);
     REQUIRE_THAT(glm::length(cam.GetPosition()), WithinAbs(distance, 1e-2));
 }
 
