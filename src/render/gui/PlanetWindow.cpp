@@ -63,7 +63,10 @@ void PlanetWindow::Toolbar(LookUnit unit, const PlanetUi& ui, PlanetActions& act
         actions.randomizeUnit = static_cast<int>(unit);
     ImGui::SetItemTooltip("%s", (ui.varietyUnits & bit) == 0 ? "This type has no random values in this tab."
                                                              : "New values for this tab only. The seed stays.");
+    ImGui::EndDisabled();
     ImGui::SameLine();
+    // Reset works without variety; only a lock blocks it.
+    ImGui::BeginDisabled(locked);
     if (ImGui::Button("Reset"))
         actions.resetUnit = static_cast<int>(unit);
     ImGui::SetItemTooltip("This tab back to the type's values at the current seed.");
