@@ -3,7 +3,7 @@
 #include "../BodyRuntime.h"
 #include "GuiLayout.h"
 #include <imgui.h>
-#include <cstdlib>
+#include <random>
 
 namespace planets::render
 {
@@ -229,7 +229,7 @@ bool TerrainPanel::DrawTerrainBlocks(BodyRuntime& body, uint32_t& seed, bool& ra
     ImGui::SameLine();
     if (ImGui::Button("Random Seed"))
     {
-        seed = static_cast<uint32_t>(std::rand());
+        seed = std::random_device{}(); // full 32-bit seed
         regen = true;
     }
     if (ImGui::Button("Randomize All"))

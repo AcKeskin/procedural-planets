@@ -185,7 +185,7 @@ void Application::SyncFramebufferToWindow()
 void Application::ApplyCaptureExposure()
 {
     // Brighten capture-mode exposure to a hero look (interactive defaults untouched).
-    // Re-applied after a showcase regenerate, since RandomizeBodyParameters resets lighting.
+    // Re-applied after a body switch, since the body's look sets its own lighting.
     _sceneSettings.lighting.sunIntensity = AppDefaults::CaptureSunIntensity;
     _sceneSettings.lighting.ambientLight = AppDefaults::CaptureAmbientLight;
 }
@@ -520,15 +520,11 @@ bool Application::RerollActiveBody()
 
 void Application::ShuffleTerrain()
 {
-    if (_activeHasVariety)
-    {
-        _genConfig.seed = std::random_device{}();
-        RerollActiveBody();
-        return;
-    }
-    if (_activeBody)
-        render::RandomizeBodyParameters(_activeBody->Config(), _sceneSettings, _atmosphereSettings, _genConfig.seed);
-    RegenerateLodSystem();
+    // A new world is a new seed: a type with variety rolls its traits again; Earth keeps its
+    // settings and gets new continents from the seed.
+    _genConfig.seed = std::random_device{}();
+    if (!RerollActiveBody())
+        RegenerateLodSystem();
 }
 
 void Application::StartCinematic()
