@@ -4,6 +4,13 @@ add_executable(procedural-planets
     Application.cpp
     CaptureRequest.cpp
     Input.cpp
+    modes/RunMode.cpp
+    modes/InteractiveMode.cpp
+    modes/CaptureMode.cpp
+    modes/CinematicMode.cpp
+    modes/ShowcaseMode.cpp
+    modes/ScriptMode.cpp
+    modes/LiveMode.cpp
     instrument/ParamRegistry.cpp
     instrument/TimelineParser.cpp
     instrument/CameraPath.cpp

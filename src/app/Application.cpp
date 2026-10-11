@@ -1,8 +1,5 @@
 #include "Application.h"
 #include "GpuConstants.h"
-#include "instrument/ScriptRunner.h"
-#include "instrument/TimelineParser.h"
-#include "instrument/LiveServer.h"
 #include "planetgen/model/BodyConfigJson.h"
 #include "planetgen/model/BodyVariety.h"
 #include <nlohmann/json.hpp>
@@ -12,18 +9,10 @@
 #include <imgui.h>
 #include <iostream>
 #include <fstream>
-#include <chrono>
-#include <cstdio>
 #include <random>
 
 namespace planets::app
 {
-
-namespace
-{
-
-// Load a BodyConfig from a JSON file; crash-safe fallback returns default
-} // namespace
 
 Application::Application()
     : _seaLevel(AppDefaults::SeaLevel)
@@ -121,22 +110,63 @@ bool Application::Initialize()
 
 void Application::Run()
 {
-    while (!_window.ShouldClose())
+    while (!ShouldClose())
     {
-        float currentTime = static_cast<float>(glfwGetTime());
-        _deltaTime = currentTime - _lastTime;
-        _lastTime = currentTime;
-
-        _window.PollEvents();
-        _input.Update();
-
-        ProcessInput(_deltaTime);
-
-        SyncFramebufferToWindow();
-
-        Render();
-        _window.SwapBuffers();
+        BeginInteractiveFrame();
+        PresentFrame();
     }
+}
+
+bool Application::Boot(const CaptureRequest& request)
+{
+    _capture = request;
+    return Initialize();
+}
+
+bool Application::ShouldClose() const
+{
+    return _window.ShouldClose();
+}
+
+void Application::BeginInteractiveFrame()
+{
+    const float now = static_cast<float>(glfwGetTime());
+    const float deltaTime = now - _lastTime;
+    _lastTime = now;
+
+    _window.PollEvents();
+    _input.Update();
+    ProcessInput(deltaTime);
+
+    // Before anything renders this frame: a live capture reads pixels from the scene FBO,
+    // which must already match the window size.
+    SyncFramebufferToWindow();
+}
+
+void Application::PresentFrame()
+{
+    Render();
+    _window.SwapBuffers();
+}
+
+bool Application::CaptureFrame(const std::string& path)
+{
+    if (!path.empty())
+        _capture.outputPath = path;
+    _headlessCaptureRequested = true; // Render() writes the PNG at the pre-GUI point and clears it
+    PresentFrame();
+    return !_headlessCaptureRequested;
+}
+
+void Application::StepCinematic(float dt)
+{
+    _window.PollEvents();
+    _cinematicController.Update(dt, _camera);
+    _lastTime += dt; // keep shader time deterministic too (ocean waves etc.)
+
+    // Keep the lit hemisphere facing the camera so the turntable never goes dark.
+    if (_capture.lightFollow)
+        UpdateFollowLight();
 }
 
 void Application::SyncFramebufferToWindow()
@@ -150,11 +180,6 @@ void Application::SyncFramebufferToWindow()
     _renderer.ResizeFramebuffer(w, h);
     _previousWidth = w;
     _previousHeight = h;
-}
-
-void Application::ApplyCaptureOverrides(const CaptureRequest& request)
-{
-    _capture = request;
 }
 
 void Application::ApplyCaptureExposure()
@@ -202,287 +227,6 @@ bool Application::DrainGeneration(int minFrames, int maxFrames)
             return true;
     }
     return false;
-}
-
-bool Application::RunCapture(const CaptureRequest& request)
-{
-    ApplyCaptureOverrides(request);
-
-    if (!Initialize())
-    {
-        std::cerr << "[Capture] Initialization failed." << std::endl;
-        return false;
-    }
-
-    // Wait for the async LOD to fully populate before the shot. --frames is the settle floor;
-    // draining guarantees no half-generated patch is captured.
-    if (!DrainGeneration(_capture.frames, AppDefaults::CaptureDrainMaxFrames))
-        std::cerr << "[Capture] Generation did not drain within " << AppDefaults::CaptureDrainMaxFrames
-                  << " frames; capturing anyway." << std::endl;
-
-    // Final frame: flag the capture so Render() writes the PNG at the pre-GUI point.
-    _headlessCaptureRequested = true;
-    Render();
-    _window.SwapBuffers();
-
-    bool ok = !_headlessCaptureRequested; // cleared once the capture ran
-    if (!ok)
-        std::cerr << "[Capture] Capture did not run (render path skipped it)." << std::endl;
-
-    Shutdown();
-    return ok;
-}
-
-bool Application::RunCinematicCapture(const CaptureRequest& request)
-{
-    ApplyCaptureOverrides(request);
-
-    if (!Initialize())
-    {
-        std::cerr << "[Cinematic] Initialization failed." << std::endl;
-        return false;
-    }
-
-    // Drain the LOD so frame 1 is fully populated, not half-generated.
-    if (!DrainGeneration(_capture.frames, AppDefaults::CaptureDrainMaxFrames))
-        std::cerr << "[Cinematic] Generation did not drain within " << AppDefaults::CaptureDrainMaxFrames
-                  << " frames; starting anyway." << std::endl;
-
-    // Configure the turntable from the request, then start it. Loop mode keeps the
-    // controller from auto-stopping mid-sequence; the frame count defines the length.
-    auto& tt = _cinematicSettings.turntable;
-    if (_capture.orbitSpeed > 0.0f)
-        tt.orbitSpeed = _capture.orbitSpeed;
-    tt.startYaw = _capture.startYaw;
-    tt.startPitch = _capture.startPitch;
-    // --distance sets the orbit radius (multiplier of planet radius); hold it across the orbit.
-    tt.zoomStartMultiplier = _capture.distanceMultiplier;
-    tt.zoomEndMultiplier = _capture.distanceMultiplier;
-    tt.durationMode = render::CinematicDurationMode::Loop;
-    StartCinematic();
-
-    // Fixed dt → deterministic, smooth motion independent of wall-clock.
-    const float dt = 1.0f / (std::max)(1.0f, _capture.cinematicFps);
-    const int frameCount = (std::max)(1, _capture.cinematicFrames);
-
-    char path[512];
-    int written = 0;
-    for (int f = 0; f < frameCount; ++f)
-    {
-        _window.PollEvents();
-        _cinematicController.Update(dt, _camera);
-        _lastTime += dt; // keep shader time deterministic too (ocean waves etc.)
-
-        // Keep the lit hemisphere facing the camera so the turntable never goes dark.
-        if (_capture.lightFollow)
-            UpdateFollowLight();
-
-        std::snprintf(path, sizeof(path), _capture.framePattern.c_str(), f + 1); // 1-based
-        _capture.outputPath = path;
-        _headlessCaptureRequested = true;
-        Render();
-        _window.SwapBuffers();
-
-        if (!_headlessCaptureRequested)
-            ++written;
-    }
-
-    StopCinematic();
-
-    std::cout << "[Cinematic] Wrote " << written << "/" << frameCount << " frames." << std::endl;
-    Shutdown();
-    return written == frameCount;
-}
-
-bool Application::RunGenerationShowcase(const CaptureRequest& request)
-{
-    ApplyCaptureOverrides(request);
-
-    if (!Initialize())
-    {
-        std::cerr << "[Showcase] Initialization failed." << std::endl;
-        return false;
-    }
-
-    if (!DrainGeneration(_capture.frames, AppDefaults::CaptureDrainMaxFrames))
-        std::cerr << "[Showcase] Generation did not drain within " << AppDefaults::CaptureDrainMaxFrames
-                  << " frames; starting anyway." << std::endl;
-
-    auto& tt = _cinematicSettings.turntable;
-    if (_capture.orbitSpeed > 0.0f)
-        tt.orbitSpeed = _capture.orbitSpeed;
-    tt.zoomStartMultiplier = _capture.distanceMultiplier;
-    tt.zoomEndMultiplier = _capture.distanceMultiplier;
-    tt.durationMode = render::CinematicDurationMode::Loop;
-
-    const float dt = 1.0f / (std::max)(1.0f, _capture.cinematicFps);
-    const int planets = (std::max)(1, _capture.planets);
-    const int hold = (std::max)(1, _capture.holdFrames);
-
-    // Cycle through every planet type for visual contrast.
-    const int typeCount = (std::max)(1, static_cast<int>(_bodies.size()));
-
-    char path[512];
-    int written = 0;
-    int frameIndex = 0;
-    for (int p = 0; p < planets; ++p)
-    {
-        // Each segment: switch to the next body type. SwitchBody resets the camera + radius,
-        // so re-seat the orbit afterwards.
-        const int type = p % typeCount;
-        // Earth segments use the authored earth.json with a stepped seed (reliably
-        // land-facing, like the hero still). Other types roll their variety from the seed.
-        // Random earths placed their land on the back/poles too often to use here.
-        if (type == 0)
-            _genConfig.seed = _capture.seed + static_cast<uint32_t>(p);
-        SwitchBodyById(_bodies.empty() ? "earth" : _bodies[type].id);
-
-        ApplyCaptureExposure();
-        StartCinematic(); // re-seat orbit target/distance for the new radius
-        DrainGeneration(1, AppDefaults::CaptureDrainMaxFrames);
-
-        for (int h = 0; h < hold; ++h, ++frameIndex)
-        {
-            _window.PollEvents();
-            _cinematicController.Update(dt, _camera);
-            _lastTime += dt;
-
-            if (_capture.lightFollow)
-                UpdateFollowLight();
-
-            std::snprintf(path, sizeof(path), _capture.framePattern.c_str(), frameIndex + 1);
-            _capture.outputPath = path;
-            _headlessCaptureRequested = true;
-            Render();
-            _window.SwapBuffers();
-
-            if (!_headlessCaptureRequested)
-                ++written;
-        }
-    }
-
-    StopCinematic();
-
-    const int total = planets * hold;
-    std::cout << "[Showcase] Wrote " << written << "/" << total << " frames across " << planets << " planets."
-              << std::endl;
-    Shutdown();
-    return written == total;
-}
-
-bool Application::RunScript(const CaptureRequest& request)
-{
-    ApplyCaptureOverrides(request);
-
-    std::ifstream in(_capture.scriptPath);
-    if (!in)
-    {
-        std::cerr << "[Script] could not open '" << _capture.scriptPath << "'" << std::endl;
-        return false;
-    }
-    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-
-    std::string err;
-    auto timeline = instrument::ParseTimeline(text, err);
-    if (!timeline)
-    {
-        std::cerr << "[Script] parse failed: " << err << std::endl;
-        return false;
-    }
-
-    // setup block overrides the CLI/defaults before the window is built.
-    if (timeline->hasSeed)
-        _capture.seed = timeline->seed;
-    if (timeline->hasBody)
-        _capture.body = timeline->body;
-    if (timeline->width > 0)
-        _capture.width = timeline->width;
-    if (timeline->height > 0)
-        _capture.height = timeline->height;
-
-    if (!Initialize())
-    {
-        std::cerr << "[Script] initialization failed." << std::endl;
-        return false;
-    }
-
-    if (timeline->hasBody && _capture.body != _activeBodyId)
-        SwitchBodyById(_capture.body);
-
-    // Initial settle so the first command runs against a fully-generated planet.
-    if (!DrainGeneration(_capture.frames, AppDefaults::CaptureDrainMaxFrames))
-        std::cerr << "[Script] generation did not drain within " << AppDefaults::CaptureDrainMaxFrames
-                  << " frames; starting anyway." << std::endl;
-
-    instrument::ScriptRunner runner(*this, timeline->fps);
-    instrument::TimelineSource source(std::move(timeline->commands));
-    runner.Run(source);
-
-    std::cout << "[Script] timeline complete." << std::endl;
-    Shutdown();
-    return true;
-}
-
-bool Application::RunLive(const CaptureRequest& request)
-{
-    // Visible interactive window: keep capture-mode framing off so the user sees a normal
-    // free-fly view; capture-on-demand still works via the _headlessCaptureRequested flag.
-    _capture = request;
-    _capture.enabled = false;
-
-    if (!Initialize())
-    {
-        std::cerr << "[Live] initialization failed." << std::endl;
-        return false;
-    }
-
-    if (!DrainGeneration(request.frames, AppDefaults::CaptureDrainMaxFrames))
-        std::cerr << "[Live] generation did not drain; starting anyway." << std::endl;
-
-    instrument::LiveCommandSource source;
-    instrument::LiveServer server(source);
-    if (!server.Start(request.livePort))
-    {
-        std::cerr << "[Live] could not start command server on port " << request.livePort << std::endl;
-        Shutdown();
-        return false;
-    }
-
-    // The runner mutates Application state on this (the render) thread only. fps sets the
-    // fixed dt used by path/wait/burst commands; the wall-clock loop itself is free-running.
-    instrument::ScriptRunner runner(*this, request.cinematicFps);
-
-    std::cout << "[Live] ready — send JSON commands (one per line) to drive the planet." << std::endl;
-
-    while (!_window.ShouldClose() && !source.IsClosed())
-    {
-        _window.PollEvents();
-        _input.Update();
-        ProcessInput(static_cast<float>(glfwGetTime()) - _lastTime);
-        _lastTime = static_cast<float>(glfwGetTime());
-
-        // Sync the framebuffer to the window size BEFORE dispatching commands: a capture/
-        // burst command renders + reads pixels inside Dispatch, so the scene FBO + viewport
-        // must already match the current window or the readback is garbled/wrong-aspect.
-        SyncFramebufferToWindow();
-
-        // Apply every command queued since the last frame, replying to each.
-        instrument::LiveItem item;
-        while (source.NextItem(item))
-        {
-            const std::string resp = runner.Dispatch(item.cmd);
-            if (item.done)
-                item.done->set_value(resp);
-        }
-
-        Render();
-        _window.SwapBuffers();
-    }
-
-    server.Stop();
-    std::cout << "[Live] session ended." << std::endl;
-    Shutdown();
-    return true;
 }
 
 void Application::Shutdown()
