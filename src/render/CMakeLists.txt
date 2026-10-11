@@ -5,8 +5,9 @@ add_library(render STATIC
     gui/GuiManager.cpp
     gui/ScenePanel.cpp
     gui/TerrainTab.cpp
+    gui/SurfaceTab.cpp
+    gui/OceanTab.cpp
     gui/SystemTab.cpp
-    gui/SurfacePanel.cpp
     gui/AtmospherePanel.cpp
     gui/DebugPanel.cpp
     gui/CinematicPanel.cpp

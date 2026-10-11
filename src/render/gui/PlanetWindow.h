@@ -5,7 +5,8 @@
 #include "CloudsPanel.h"
 #include "DebugPanel.h"
 #include "ScenePanel.h"
-#include "SurfacePanel.h"
+#include "OceanTab.h"
+#include "SurfaceTab.h"
 #include "SystemTab.h"
 #include "TerrainTab.h"
 
@@ -74,7 +75,8 @@ private:
     ScenePanel _scene;
     TerrainTab _terrain;
     SystemTab _system;
-    SurfacePanel _surface;
+    SurfaceTab _surfaceTab;
+    OceanTab _ocean;
     AtmospherePanel _atmosphere;
     CloudsPanel _clouds;
     DebugPanel _debug;

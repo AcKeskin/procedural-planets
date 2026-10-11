@@ -32,13 +32,17 @@ PlanetActions PlanetWindow::Draw(PlanetUi& ui)
         }
         if (ImGui::BeginTabItem("Surface"))
         {
-            actions.regenerate |= _surface.DrawContent(ui.body, *ui.surface, *ui.ocean, *ui.seaLevel);
+            PushLabelColumn();
+            if (ui.body)
+                actions.regenerate |= _surfaceTab.Draw(*ui.body, *ui.surface);
+            ImGui::PopItemWidth();
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Ocean"))
         {
             PushLabelColumn();
-            _surface.DrawOceanContent(*ui.ocean, *ui.seaLevel);
+            if (ui.body)
+                actions.regenerate |= _ocean.Draw(*ui.body, *ui.ocean, *ui.seaLevel, *ui.surface);
             ImGui::PopItemWidth();
             ImGui::EndTabItem();
         }
