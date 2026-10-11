@@ -1,7 +1,7 @@
 
 # Procedural Planets
 
-A GPU-accelerated procedural planet renderer built with C++17 and OpenGL. Generates realistic celestial bodies — Earth-like planets, volcanic worlds, crystalline moons — with terrain, biomes, oceans, a scattering atmosphere and volumetric clouds, all driven by compute shaders and procedural noise. You can fly from orbit down to the ground without a loading step.
+A GPU-accelerated procedural planet renderer built with C++17 and OpenGL. Generates Earth and 12 sci-fi planet types (dune, ice, ocean, toxic, lava, crystal and more) with terrain, biomes, oceans, a scattering atmosphere and volumetric clouds, all driven by compute shaders and procedural noise. You can fly from orbit down to the ground without a loading step.
 
 <p align="center">
   <img src="docs/images/hero_earth.png" alt="Earth-like procedural planet from space" width="720">
@@ -60,8 +60,8 @@ Turn it on in the Terrain panel: **Generation > Macro World > Enable Macro World
 - **HDR Rendering** — The scene renders in HDR with an exposure control, a tonemap that keeps highlight colour, and bloom around the sun and glints
 
 **App**
-- **Multi-Body Types** — Earth-like planets, volcanic worlds, crystalline moons — each with type-specific shaders, palettes, and GUI
-- **Parameter Randomizer** — One-click randomization of all planet parameters within Earth-like constraints
+- **Planet Types** — Earth plus dune, ice, ocean, toxic, barren, salt flats, alien lush, swamp, lava, eye (tidally locked), city and crystal. A type is one JSON file in `data/bodies`: palette, sky, weather, star colour, fluid (water, ice, lava, acid), terrain style (dunes, craters, terraces, canyons, spires) and climate traits
+- **Parameter Randomizer** — One click gives a new world: a planet type rolls palette, sky, weather and terrain style from its `variety` block and the seed; Earth shuffles its parameters within Earth-like constraints
 - **Cinematic System** — Turntable camera (F5) and headless capture: single screenshots, turntable frame sequences, and a showcase that cycles through random worlds
 - **Instrument Mode** — Script the camera and any setting from a JSON timeline (`--script`) or a live socket (`--live`), and capture frames; the README media is rendered this way
 - **Live Tweaking** — Grouped ImGui panels with tooltips for every setting
@@ -124,9 +124,9 @@ All parameters are exposed in ImGui panels, grouped by topic with tooltips:
 
 - **Scene** — sun direction, size and colour, stars, camera exposure and bloom, lighting
 - **Terrain** — seed, height scale, continents, tectonics, the macro world layer, and the LOD quad-tree (mesh resolution, max depth, split threshold)
-- **Surface** — adapts to the body type: Earth shows biome and climate controls, generic bodies show palette and noise parameters; also the ocean (colours, clarity, waves)
-- **Atmosphere** — scattering colours and strength, haze (Mie), density, quality; the Earth Preset button restores the defaults
-- **Clouds** — coverage, density, cloud size, base altitude, thickness, drift speed, shadow strength and quality. Clouds are part of the atmosphere, so they hide when the atmosphere is off
+- **Surface** — biome and climate controls, planet type traits (material tints, vegetation, polar caps, tidal lock, city lights, terrain styles) and the ocean (colours, clarity, waves, fluid)
+- **Atmosphere** — scattering colours and strength, haze (Mie) and its colour, density, quality; the Earth Preset button restores the defaults
+- **Clouds** — coverage, density, cloud size, base altitude, thickness, drift speed, shadow strength, colour and quality. Clouds are part of the atmosphere, so they hide when the atmosphere is off
 
 ### Command line
 
@@ -172,16 +172,15 @@ libplanetgen/           Standalone terrain generation library (DLL)
 shaders/
 ├── compute/            GPU terrain generation (height, shading, erosion)
 ├── includes/           Shared GLSL libraries (noise, lighting, sky scattering, cloud layer, ground materials, tonemap)
-├── earth/              Earth-specific surface rendering
-├── generic/            Palette-based surface rendering
+├── earth/              Surface rendering shared by every body
 ├── atmosphere.*        Atmospheric scattering and the final composite
 ├── clouds_march.frag   Volumetric cloud raymarch
 ├── ocean.*             Ocean surface
 └── space.*             Background rendering
 
 data/
-├── bodies/             Body type configs (earth.json, volcanic.json, crystalline.json)
-├── palettes/           Color palettes per body type (earth.json, volcanic.json, etc.)
+├── bodies/             Earth and the planet types, one JSON each (earth.json, dune.json, lava.json, ...)
+├── palettes/           Built-in library palettes (earth, volcanic, crystalline)
 └── scripts/            Sample instrument timelines for --script
 ```
 
@@ -193,7 +192,7 @@ A body is **data, not a subclass**. The canonical definition is `BodyConfig` (in
 
 The app wraps the active config in a `BodyRuntime` — a render-time *adapter* (no inheritance) that exposes metadata, shader paths, and render-uniform binding. The ImGui panels edit the config in place; any edit rebuilds the body so its continent mask re-bakes.
 
-New body types are added by creating a JSON config + palette file. No code changes required.
+New planet types are added by creating a JSON file in `data/bodies` (its palette, sky, fluid, terrain style and variety live in it). No code changes required.
 
 ### libplanetgen
 
@@ -213,7 +212,7 @@ The app drives terrain through the library's **per-patch** entry point (`pg_gene
 3. **Height Pass** — A compute shader generates terrain elevation from layered noise (continents, mountains, tectonic plates, ocean floor topology)
 4. **Shading Pass** — Another compute shader computes per-vertex climate data (temperature, moisture) or palette parameters
 5. **LOD Selection** — Each frame, patches pick their detail level based on distance and get culled if outside the view
-6. **Surface Rendering** — Body-type-specific fragment shaders apply biome colours and generated material textures (Earth) or palette gradients (generic), with lighting and cloud shadows
+6. **Surface Rendering** — One shared fragment shader applies the body's biome palette, generated material textures and planet type traits, with lighting and cloud shadows
 7. **Ocean** — Drawn on the terrain's own patches at sea level, coloured by real water depth and reflecting the sky
 8. **Clouds and Atmosphere** — The cloud layer is raymarched at half resolution, then the atmosphere pass composites it with the scene and adds scattering along each view ray. Both use the same sky model (`sky_radiance.glsl`), as does the ocean reflection
 9. **Tonemap** — The HDR image gets exposure, bloom and a tonemap before the UI is drawn
