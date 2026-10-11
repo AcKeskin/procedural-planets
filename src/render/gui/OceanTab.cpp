@@ -18,7 +18,7 @@ bool OceanTab::Draw(BodyRuntime& body, effects::OceanSettings& o, float& seaLeve
     if (ImGui::CollapsingHeader("Sea Level", ImGuiTreeNodeFlags_DefaultOpen))
     {
         // The body config holds it too, so a regenerate and a saved config use the same level.
-        if (Slider("Sea Level", seaLevel, 0.9f, 1.1f, "%.3f",
+        if (Slider("Sea Level##value", seaLevel, 0.9f, 1.1f, "%.3f",
                    "Water surface as a multiple of radius. 1.0 = base radius. 0.9 to 1.1."))
             body.Config().metadata.seaLevel = seaLevel;
         regen |= Committed();

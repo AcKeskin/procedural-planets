@@ -49,7 +49,7 @@ void SkyTab::Draw(effects::AtmosphereSettings& a, effects::CloudSettings& c, Lig
     {
         if (a.enabled)
         {
-            Slider("Haze", a.mieCoefficient, 0.0f, 15.0f, "%.2f",
+            Slider("Haze##value", a.mieCoefficient, 0.0f, 15.0f, "%.2f",
                    "Dims the far surface and widens the glow around the sun.", ImGuiSliderFlags_Logarithmic);
             Slider("Haze Falloff", a.mieDensityFalloff, 1.0f, 60.0f, "%.1f",
                    "How fast haze thins with height. High = low ground fog.");
@@ -67,7 +67,7 @@ void SkyTab::Draw(effects::AtmosphereSettings& a, effects::CloudSettings& c, Lig
     if (ImGui::CollapsingHeader("Clouds", ImGuiTreeNodeFlags_DefaultOpen))
     {
         ImGui::BeginDisabled(!a.enabled);
-        Check("Clouds", c.enabled, a.enabled ? "Show the cloud layer." : "Clouds need the atmosphere.");
+        Check("Clouds##value", c.enabled, a.enabled ? "Show the cloud layer." : "Clouds need the atmosphere.");
         ImGui::BeginDisabled(!c.enabled);
         Slider("Coverage", c.coverage, 0.0f, 1.0f, "%.2f", "Share of the sky with clouds. 0 to 1.");
         Slider("Density##clouds", c.density, 20.0f, 2000.0f, "%.0f", "How opaque each cloud is. 20 to 2000.",
