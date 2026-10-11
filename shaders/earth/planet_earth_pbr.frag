@@ -222,9 +222,9 @@ void main()
     Material rock  = rockMaterial(matPos, footprint, vFine);
     if (sStrata0.w > 0.0)
     {
-        // Rock layers: bands by height, bent by noise so they wander along the cliff. Bands thinner than
-        // a pixel fade to their mean instead of shimmering.
-        float warp = fbmFootprint(matPos, 2.0, 3, footprint, 0.5).x - 0.5;
+        // Rock layers: bands by height, bent by the patch and grain noise (already computed) so they
+        // wander along the cliff. Bands thinner than a pixel fade to their mean instead of shimmering.
+        float warp = (vMedium - 0.5) + (vFine - 0.5) * 0.25;
         float t = h * sStrata1.w + warp * sStrata2.x * 4.0;
         float band = 0.5 + 0.35 * sin(t * 6.2832) + 0.15 * sin(t * 17.3 + 1.3);
         band = mix(0.5, band, 1.0 - smoothstep(0.25, 0.6, fwidth(t)));
