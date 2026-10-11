@@ -1,7 +1,6 @@
 #include "planetgen/planetgen.h"
 #include "InternalTypes.h"
-#include "../backend/opengl/WindowedGLBackend.h"
-#include "../backend/opengl/HeadlessGLBackend.h"
+#include "../backend/opengl/GLBackend.h"
 #include "EmbeddedShaders.h"
 #include "../model/BodyConfig.h"
 #include "../model/BodyConfigProjection.h"
@@ -103,21 +102,9 @@ PgContext pg_context_create(const PgContextDesc* desc)
     if (!ctx)
         return nullptr;
 
-    std::unique_ptr<planetgen::IComputeBackend> backend;
-    bool ok = false;
-
-    if (desc->use_existing_context)
-    {
-        auto windowed = std::make_unique<planetgen::WindowedGLBackend>();
-        ok = windowed->Init();
-        backend = std::move(windowed);
-    }
-    else
-    {
-        auto headless = std::make_unique<planetgen::HeadlessGLBackend>();
-        ok = headless->Init();
-        backend = std::move(headless);
-    }
+    auto gl = std::make_unique<planetgen::GLBackend>(/*ownsContext=*/!desc->use_existing_context);
+    const bool ok = gl->Init();
+    std::unique_ptr<planetgen::IComputeBackend> backend = std::move(gl);
 
     if (!ok)
     {

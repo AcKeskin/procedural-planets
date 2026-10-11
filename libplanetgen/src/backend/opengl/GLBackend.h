@@ -3,16 +3,19 @@
 #include "../IComputeBackend.h"
 #include "GlDevice.h"
 
+struct GLFWwindow;
+
 namespace planetgen
 {
 
-// Wraps an existing GL context on the calling thread.
-// Caller owns the context lifetime — this class only inits gl3w.
-class WindowedGLBackend : public IComputeBackend
+// OpenGL compute backend. With ownsContext it creates a hidden 1x1 GLFW window for
+// offscreen compute and destroys it in the destructor. Without, it runs on the
+// caller's current context, whose lifetime the caller owns; only gl3w is inited.
+class GLBackend : public IComputeBackend
 {
 public:
-    WindowedGLBackend() = default;
-    ~WindowedGLBackend() override = default;
+    explicit GLBackend(bool ownsContext) : _ownsContext(ownsContext) {}
+    ~GLBackend() override;
 
     bool Init();
 
@@ -49,6 +52,8 @@ public:
     GlDevice& Device() { return _device; }
 
 private:
+    bool _ownsContext;
+    GLFWwindow* _window = nullptr;
     GlDevice _device;
 };
 

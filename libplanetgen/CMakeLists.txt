@@ -48,8 +48,7 @@ set(PLANETGEN_SOURCES
     src/backend/ParamMappers.cpp
     src/backend/ShaderRegistry.cpp
     src/backend/opengl/GlDevice.cpp
-    src/backend/opengl/WindowedGLBackend.cpp
-    src/backend/opengl/HeadlessGLBackend.cpp
+    src/backend/opengl/GLBackend.cpp
     src/model/BodyConfig.cpp
     src/model/BodyConfigProjection.cpp
     src/model/BodyConfigJson.cpp
@@ -73,8 +72,7 @@ set(PLANETGEN_HEADERS
     src/backend/ParamMappers.h
     src/backend/ShaderRegistry.h
     src/backend/opengl/GlDevice.h
-    src/backend/opengl/WindowedGLBackend.h
-    src/backend/opengl/HeadlessGLBackend.h
+    src/backend/opengl/GLBackend.h
     src/model/BodyConfig.h
     src/model/BodyConfigProjection.h
     src/model/BodyConfigJson.h

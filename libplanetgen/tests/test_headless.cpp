@@ -5,7 +5,7 @@
 #include <vector>
 #include <cmath>
 
-// Step 8b: HeadlessGLBackend integration tests.
+// Step 8b: GLBackend (headless) integration tests.
 // Requires a real local GPU — marked [gpu] so they can be skipped with
 // `ctest -L gpu` if running in a no-GPU CI environment.
 
@@ -31,7 +31,7 @@ PgContext MakeHeadlessCtx()
 
 } // namespace
 
-TEST_CASE("HeadlessGLBackend creates no visible window and produces output", "[gpu][headless]")
+TEST_CASE("GLBackend (headless) creates no visible window and produces output", "[gpu][headless]")
 {
     PgContext ctx = MakeHeadlessCtx();
     REQUIRE(ctx != nullptr);
@@ -64,7 +64,7 @@ TEST_CASE("HeadlessGLBackend creates no visible window and produces output", "[g
     pg_context_destroy(ctx);
 }
 
-TEST_CASE("HeadlessGLBackend custom GLSL registered and dispatched", "[gpu][headless]")
+TEST_CASE("GLBackend (headless) custom GLSL registered and dispatched", "[gpu][headless]")
 {
     // Register a trivial compute shader that writes 1.0 to a heights buffer,
     // dispatched via pg_generate_heights — but we can't inject custom shaders
@@ -117,7 +117,7 @@ TEST_CASE("HeadlessGLBackend custom GLSL registered and dispatched", "[gpu][head
     pg_context_destroy(ctx);
 }
 
-TEST_CASE("HeadlessGLBackend texture array round-trips a compute-written pattern", "[gpu][headless]")
+TEST_CASE("GLBackend (headless) texture array round-trips a compute-written pattern", "[gpu][headless]")
 {
     // Each texel gets (x, y, layer, x*y+layer) — any mix-up of axes or layers shows.
     const std::string src = R"(#version 450
