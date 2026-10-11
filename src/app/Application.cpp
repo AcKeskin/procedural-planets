@@ -84,6 +84,7 @@ bool Application::Initialize()
 
         ApplyCaptureExposure();
     }
+    _defaultScene = _sceneSettings;
 
     // Planet types are the JSON files in data/bodies; start on the requested one (Earth by default).
     _bodies = render::types::ScanBodies("data/bodies");
@@ -588,7 +589,7 @@ void Application::DrawBar()
         for (int i = 0; i < static_cast<int>(_bodies.size()); ++i)
         {
             if (ImGui::Selectable(_bodies[i].name.c_str(), i == _selectedBodyType) && i != _selectedBodyType)
-                SwitchBodyById(_bodies[i].id);
+                SwitchBodyById(_bodies[i].id, /*keepLiveScene=*/false);
         }
         ImGui::EndCombo();
     }
@@ -703,7 +704,7 @@ void Application::ApplyLook(const render::types::LookState& s, bool rebuildBody,
     }
 }
 
-bool Application::RollWorld(uint32_t seed, uint32_t units, bool resetCamera)
+bool Application::RollWorld(uint32_t seed, uint32_t units, bool resetCamera, bool keepLiveScene)
 {
     using namespace render::types;
     std::ifstream in(_activeBodyPath);
@@ -714,7 +715,7 @@ bool Application::RollWorld(uint32_t seed, uint32_t units, bool resetCamera)
         return false;
     }
     LookState rolled;
-    const std::string err = RollLook(body, seed, _sceneSettings, rolled);
+    const std::string err = RollLook(body, seed, keepLiveScene ? _sceneSettings : _defaultScene, rolled);
     if (!err.empty())
     {
         std::cerr << "[SwitchBody] Bad body config in " << _activeBodyPath << ": " << err << std::endl;
@@ -728,8 +729,9 @@ bool Application::RollWorld(uint32_t seed, uint32_t units, bool resetCamera)
     LookState baseline = rolled;
     if (_activeBody)
     {
-        CopyUnits(kept, CaptureLook(), next);
-        CopyUnits(kept, _baseline, baseline);
+        MergedRoll merged = MergeRoll(rolled, CaptureLook(), _baseline, kept);
+        next = std::move(merged.next);
+        baseline = std::move(merged.baseline);
     }
     _baseline = std::move(baseline);
     _planetWindow.ForgetEdits(units);
@@ -743,7 +745,7 @@ bool Application::RollWorld(uint32_t seed, uint32_t units, bool resetCamera)
     return true;
 }
 
-bool Application::SwitchBodyById(const std::string& id)
+bool Application::SwitchBodyById(const std::string& id, bool keepLiveScene)
 {
     const int index = render::types::FindBody(_bodies, id);
     if (index < 0)
@@ -753,10 +755,10 @@ bool Application::SwitchBodyById(const std::string& id)
     }
     _selectedBodyType = index;
     _activeBodyId = id;
-    return SwitchBodyByPath(_bodies[index].path);
+    return SwitchBodyByPath(_bodies[index].path, /*resetCamera=*/true, keepLiveScene);
 }
 
-bool Application::SwitchBodyByPath(const std::string& path, bool resetCamera)
+bool Application::SwitchBodyByPath(const std::string& path, bool resetCamera, bool keepLiveScene)
 {
     using namespace render::types;
     const std::string previous = _activeBodyPath;
@@ -764,7 +766,7 @@ bool Application::SwitchBodyByPath(const std::string& path, bool resetCamera)
     // A new type keeps only a locked Light tab: the star and exposure are the user's, the rest is the type's.
     _lockMask &= UnitBit(LookUnit::Light);
     _offSeedMask &= UnitBit(LookUnit::Light);
-    if (!RollWorld(_genConfig.seed, AllUnits & ~_lockMask, resetCamera))
+    if (!RollWorld(_genConfig.seed, AllUnits & ~_lockMask, resetCamera, keepLiveScene))
     {
         _activeBodyPath = previous;
         return false;
@@ -777,14 +779,14 @@ bool Application::RerollActiveBody()
 {
     if (_varietyUnits == 0)
         return false;
-    return RerollWorld();
+    return RerollWorld(/*keepLiveScene=*/true);
 }
 
-bool Application::RerollWorld()
+bool Application::RerollWorld(bool keepLiveScene)
 {
     using namespace render::types;
     const uint32_t units = AllUnits & ~_lockMask;
-    if (!RollWorld(_genConfig.seed, units, /*resetCamera=*/false))
+    if (!RollWorld(_genConfig.seed, units, /*resetCamera=*/false, keepLiveScene))
         return false;
     // Terrain, Surface and Ocean all locked: the body was kept, but the land still follows the seed.
     if ((units & (UnitBit(LookUnit::Terrain) | UnitBit(LookUnit::Surface) | UnitBit(LookUnit::Ocean))) == 0)
@@ -807,13 +809,13 @@ void Application::ShuffleTerrain()
 void Application::RandomizeUnit(render::types::LookUnit unit)
 {
     // A fresh roll for one tab; the seed stays, so the planet no longer matches it alone.
-    if (RollWorld(std::random_device{}(), render::types::UnitBit(unit), /*resetCamera=*/false))
+    if (RollWorld(std::random_device{}(), render::types::UnitBit(unit), /*resetCamera=*/false, /*keepLiveScene=*/false))
         _offSeedMask |= render::types::UnitBit(unit);
 }
 
 void Application::ResetUnit(render::types::LookUnit unit)
 {
-    if (RollWorld(_genConfig.seed, render::types::UnitBit(unit), /*resetCamera=*/false))
+    if (RollWorld(_genConfig.seed, render::types::UnitBit(unit), /*resetCamera=*/false, /*keepLiveScene=*/false))
         _offSeedMask &= ~render::types::UnitBit(unit);
 }
 

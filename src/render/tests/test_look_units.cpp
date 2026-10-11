@@ -135,3 +135,35 @@ TEST_CASE("look_units: copying every unit gives the source world", "[look_units]
     CHECK(next.surface.strata.strength == w.a.surface.strata.strength);
     CHECK(next.palette == w.a.palette);
 }
+
+TEST_CASE("look_units: a roll over the default scene drops edited exposure unless Light is kept", "[look_units]")
+{
+    const auto body = LoadBody("data/bodies/lava.json");
+    const SceneSettings defaults;
+    SceneSettings edited;
+    edited.exposure = 2.5f;
+    edited.lightDir = glm::normalize(glm::vec3(0.3f, 0.8f, 0.1f));
+
+    LookState fromDefault;
+    LookState fromEdited;
+    REQUIRE(RollLook(body, 5, defaults, fromDefault).empty());
+    REQUIRE(RollLook(body, 5, edited, fromEdited).empty());
+    CHECK(fromDefault.scene.exposure == defaults.exposure);
+    CHECK(fromEdited.scene.exposure == 2.5f);
+    CHECK(fromDefault.scene.lightDir == defaults.lightDir);
+
+    // The live world carries the edit and its baseline does not.
+    LookState live = fromDefault;
+    live.scene = edited;
+
+    const MergedRoll open = MergeRoll(fromDefault, live, fromDefault, AllUnits & ~UnitBit(LookUnit::Light));
+    CHECK(open.next.scene.exposure == defaults.exposure);
+    CHECK(open.baseline.scene.exposure == defaults.exposure);
+
+    const MergedRoll locked = MergeRoll(fromDefault, live, fromDefault, UnitBit(LookUnit::Light));
+    CHECK(locked.next.scene.exposure == 2.5f);
+    CHECK(locked.next.scene.lightDir == edited.lightDir);
+    CHECK(locked.baseline.scene.exposure == defaults.exposure);
+    // Other units still take the roll.
+    CHECK(locked.next.clouds.coverage == fromDefault.clouds.coverage);
+}

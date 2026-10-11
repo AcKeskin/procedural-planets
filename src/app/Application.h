@@ -93,7 +93,8 @@ public:
     const std::vector<render::types::BodyEntry>& Bodies() const { return _bodies; }
     const std::string& ActiveBodyId() const { return _activeBodyId; }
     // Switches to a planet type from the registry; false (and a log line) when the id is unknown.
-    bool SwitchBodyById(const std::string& id);
+    // keepLiveScene: roll over the live scene (scripts); false rolls over the startup defaults (GUI).
+    bool SwitchBodyById(const std::string& id, bool keepLiveScene = true);
     void SetSeed(uint32_t seed) { _genConfig.seed = seed; }
 
     // Short message in the bottom-right corner (about 2.5 s).
@@ -137,13 +138,14 @@ private:
     // Makes `s` live. rebuildBody: new runtime + library body + LOD (terrain, surface or sea level changed).
     void ApplyLook(const render::types::LookState& s, bool rebuildBody, bool resetCamera);
     // Rolls the active type at `seed`; only `units` take the roll, the other tabs keep their values.
-    bool RollWorld(uint32_t seed, uint32_t units, bool resetCamera);
+    // keepLiveScene: edited exposure, sun direction and the like carry over; else they return to _defaultScene.
+    bool RollWorld(uint32_t seed, uint32_t units, bool resetCamera, bool keepLiveScene);
     // Switches to the body JSON at path, its variety rolled with the current seed.
-    bool SwitchBodyByPath(const std::string& path, bool resetCamera = true);
+    bool SwitchBodyByPath(const std::string& path, bool resetCamera = true, bool keepLiveScene = true);
     // After a seed change: rolls the active type's variety again. False when it has none.
     bool RerollActiveBody();
     // After a seed change: the unlocked tabs take the type's values at the new seed.
-    bool RerollWorld();
+    bool RerollWorld(bool keepLiveScene = false);
     // One tab from a fresh roll (the seed stays) / back to the type's values at the current seed.
     void RandomizeUnit(render::types::LookUnit unit);
     void ResetUnit(render::types::LookUnit unit);
@@ -164,6 +166,7 @@ private:
 
     // App-visual settings (generation params live in the active body's BodyConfig).
     render::SceneSettings _sceneSettings;
+    render::SceneSettings _defaultScene; // scene after startup setup; GUI rolls start from it
     render::GenerationConfig _genConfig;
     render::LodConfig _lodConfig;
     render::TerrainStats _terrainStats;

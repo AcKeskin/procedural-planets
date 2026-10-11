@@ -69,6 +69,14 @@ void CopyUnits(uint32_t mask, const LookState& from, LookState& to)
     }
 }
 
+MergedRoll MergeRoll(const LookState& rolled, const LookState& current, const LookState& baseline, uint32_t keptMask)
+{
+    MergedRoll m{rolled, rolled};
+    CopyUnits(keptMask, current, m.next);
+    CopyUnits(keptMask, baseline, m.baseline);
+    return m;
+}
+
 LookUnit UnitOfKey(const std::string& key)
 {
     if (key == "metadata.seaLevel" || StartsWith(key, "render.ocean.") || StartsWith(key, "render.surface.seafloor."))

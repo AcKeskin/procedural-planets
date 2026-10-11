@@ -47,6 +47,15 @@ struct LookState
 // tabs: the seabed colours belong to Ocean, the shadow fill to Light, the simple haze to Sky.
 void CopyUnits(uint32_t mask, const LookState& from, LookState& to);
 
+// A roll applied over the current world: units in `keptMask` keep their live values in `next` and
+// their default in `baseline`; the rest take the roll in both.
+struct MergedRoll
+{
+    LookState next;
+    LookState baseline;
+};
+MergedRoll MergeRoll(const LookState& rolled, const LookState& current, const LookState& baseline, uint32_t keptMask);
+
 // The unit a variety key ("render.clouds.coverage") changes.
 LookUnit UnitOfKey(const std::string& key);
 
