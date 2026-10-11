@@ -156,6 +156,11 @@ BodyLook ParseBodyLook(const json& body)
     Read(m, "sandTint", look.surface.sandTint);
     Read(m, "snowTint", look.surface.snowTint);
 
+    const json& k = Block(render, "climate");
+    Read(k, "polarCaps", look.surface.polarCaps);
+    Read(k, "substellar", look.surface.substellar);
+    Read(k, "cityCoverage", look.surface.cityCoverage);
+
     if (render.contains("palette") && render["palette"].is_array())
     {
         for (const auto& entry : render["palette"])

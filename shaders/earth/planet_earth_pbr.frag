@@ -35,6 +35,10 @@ uniform float uCloudShadowStrength;
 uniform vec3 uRockTint;
 uniform vec3 uSandTint;
 uniform vec3 uSnowTint;
+// Planet type climate traits (0 = Earth).
+uniform float uPolarCaps;
+uniform float uSubstellar;
+uniform float uCityCoverage;
 
 uniform vec3  uCameraPos;
 uniform float uSeaLevel;
@@ -208,7 +212,21 @@ void main()
     // detail channels (.z warped, .w small-scale) roughen biome borders so they never trace the
     // mesh triangles.
     float temperature = clamp(vShadingData.x + (vShadingData.w - 0.5) * 0.06, 0.0, 1.0);
+    if (uSubstellar > 0.0)
+    {
+        // Tidally locked: temperature follows the sun height, not the latitude. The terrain stays
+        // in the same place under the sun, so the hot eye and the frozen back never move.
+        float sunHeight = dot(sphereNormal, -normalize(uLightDir));
+        float eyeTemp = clamp(0.32 + 0.7 * sunHeight + (vShadingData.w - 0.5) * 0.12 - h * 0.25, 0.0, 1.0);
+        temperature = mix(temperature, eyeTemp, uSubstellar);
+    }
     float moisture    = clamp(vShadingData.y + (vMedium - 0.5) * 0.18 + (vShadingData.z - 0.5) * 0.12, 0.0, 1.0);
+    if (uSubstellar > 0.0)
+    {
+        // The eye under the sun is baked dry.
+        float sunHeight = dot(sphereNormal, -normalize(uLightDir));
+        moisture *= 1.0 - smoothstep(0.55, 0.95, sunHeight) * uSubstellar;
+    }
 
     Biome biome = whittakerBiome(temperature, moisture);
 
@@ -236,6 +254,12 @@ void main()
     float snowLineEff = uSnowLine - (1.0 - temperature) * 0.04;
     float snowW = smoothstep(snowLineEff - 0.20, snowLineEff + 0.05, h);
     snowW = max(snowW, smoothstep(0.04, 0.0, temperature) * 0.5);   // polar cap
+    if (uPolarCaps > 0.0)
+    {
+        // Ice caps as a trait, also on hot worlds: by latitude, with a ragged edge.
+        float capEdge = 1.0 - uPolarCaps + (vShadingData.z - 0.5) * 0.08 + (vMedium - 0.5) * 0.04;
+        snowW = max(snowW, smoothstep(capEdge - 0.015, capEdge + 0.015, abs(sphereNormal.y)));
+    }
     snowW *= 1.0 - smoothstep(0.55, 0.85, steepness) * 0.7;
     mat.albedo    = mix(mat.albedo, snow.albedo, snowW);
     mat.roughness = mix(mat.roughness, snow.roughness, snowW);
@@ -327,6 +351,7 @@ void main()
                        * smoothstep(0.2, 0.5, moisture)
                        * (1.0 - smoothstep(0.3, 0.6, h))   // low elevation
                        * (1.0 - snowW);
+    habitability = mix(habitability, uNightLightStrength * (1.0 - snowW), uCityCoverage);
     color += nightLights(normalize(vWorldPos), day, habitability, vec3(1.0, 0.8, 0.45));
 
     // Mild gamma lift so shadows and midtones don't go muddy; no roll-off, the scene is HDR and

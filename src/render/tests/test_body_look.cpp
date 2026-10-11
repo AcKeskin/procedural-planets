@@ -65,6 +65,16 @@ TEST_CASE("body_look: weather and star class fill in values the blocks can overr
     CHECK(unknown.sunColor == SceneSettings{}.sunColor);
 }
 
+TEST_CASE("body_look: climate block sets polar caps, substellar and city coverage", "[body_look]")
+{
+    const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({
+        "render": {"climate": {"polarCaps": 0.2, "substellar": 1.0, "cityCoverage": 0.9}}})"));
+    CHECK_THAT(look.surface.polarCaps, WithinAbs(0.2, 1e-6));
+    CHECK_THAT(look.surface.substellar, WithinAbs(1.0, 1e-6));
+    CHECK_THAT(look.surface.cityCoverage, WithinAbs(0.9, 1e-6));
+    CHECK(types::ParseBodyLook(nlohmann::json::object()).surface.polarCaps == 0.0f);
+}
+
 TEST_CASE("body_look: wrong types are ignored", "[body_look]")
 {
     const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({
