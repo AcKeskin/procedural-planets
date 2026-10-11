@@ -668,7 +668,7 @@ void Application::RenderGui()
         if (randomize && _activeBody)
             ShuffleTerrain();
 
-        needsRegen |= _surfacePanel.Draw(_activeBody.get(), _oceanSettings, _seaLevel, visibility.surface);
+        needsRegen |= _surfacePanel.Draw(_activeBody.get(), _surfaceSettings, _oceanSettings, _seaLevel, visibility.surface);
         _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
         _cloudsPanel.Draw(_cloudSettings, _atmosphereSettings.enabled, visibility.clouds);
         _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
