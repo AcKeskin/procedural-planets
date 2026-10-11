@@ -1,6 +1,7 @@
 # Core library: math
 add_library(core STATIC
     math/Camera.cpp
+    math/CameraController.cpp
 )
 
 target_include_directories(core PUBLIC

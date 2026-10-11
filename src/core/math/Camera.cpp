@@ -1,5 +1,6 @@
 #include "Camera.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <algorithm>
 #include <cmath>
 
@@ -61,6 +62,41 @@ void Camera::LookAt(const glm::vec3& target)
     _yaw = glm::degrees(std::atan2(_forward.z, _forward.x));
 }
 
+void Camera::SetOrientation(const glm::vec3& forward, const glm::vec3& upHint)
+{
+    _forward = glm::normalize(forward);
+
+    glm::vec3 right = glm::cross(_forward, upHint);
+    if (glm::dot(right, right) < 1e-8f)
+        right = _right; // looking along the hint: keep the old roll
+    _right = glm::normalize(right);
+    _up = glm::normalize(glm::cross(_right, _forward));
+
+    _pitch = glm::degrees(std::asin(std::clamp(_forward.y, -1.0f, 1.0f)));
+    _yaw = glm::degrees(std::atan2(_forward.z, _forward.x));
+}
+
+void Camera::Look(float yawDelta, float pitchDelta, const glm::vec3& up)
+{
+    const glm::vec3 vertical = glm::normalize(up);
+
+    // Yaw (positive = turn right, same sense as Rotate) about the vertical.
+    glm::vec3 forward = glm::angleAxis(glm::radians(-yawDelta), vertical) * _forward;
+
+    const float current = glm::degrees(std::asin(std::clamp(glm::dot(forward, vertical), -1.0f, 1.0f)));
+    const float wanted = std::clamp(current + pitchDelta, -CameraDefaults::MaxPitch, CameraDefaults::MaxPitch);
+    const glm::vec3 right = glm::cross(forward, vertical);
+    if (glm::dot(right, right) > 1e-8f)
+        forward = glm::angleAxis(glm::radians(wanted - current), glm::normalize(right)) * forward;
+
+    SetOrientation(forward, vertical);
+}
+
+void Camera::Relevel(const glm::vec3& up)
+{
+    SetOrientation(_forward, up);
+}
+
 void Camera::SetOrbitTarget(const glm::vec3& target)
 {
     _orbitTarget = target;
@@ -87,18 +123,43 @@ void Camera::OrbitRotate(float yawDelta, float pitchDelta)
     _up = glm::normalize(glm::cross(_right, _forward));
 }
 
+void Camera::OrbitTumble(float yawDelta, float pitchDelta)
+{
+    // Yaw turns about the planet's axis, flipped when upside down so the screen direction holds.
+    // Pitch turns about the camera's right, which stays horizontal, so no roll builds up.
+    // Negative angles match OrbitRotate: +yaw moves from +x toward +z, +pitch moves up.
+    const float side = _up.y < -1e-4f ? -1.0f : 1.0f;
+    const glm::quat turn = glm::angleAxis(glm::radians(-yawDelta * side), glm::vec3(0.0f, 1.0f, 0.0f)) *
+                           glm::angleAxis(glm::radians(-pitchDelta), _right);
+    const glm::vec3 offset = turn * (_position - _orbitTarget);
+    _position = _orbitTarget + offset;
+    _forward = glm::normalize(-offset);
+    _right = glm::normalize(glm::cross(_forward, turn * _up));
+    _up = glm::cross(_right, _forward);
+
+    // Keep yaw/pitch readable for the HUD and for code that seats angles later.
+    const float dist = glm::length(offset);
+    _yaw = glm::degrees(std::atan2(offset.z, offset.x));
+    _pitch = glm::degrees(std::asin(std::clamp(offset.y / dist, -1.0f, 1.0f)));
+}
+
 void Camera::OrbitZoom(float amount)
 {
-    _orbitDistance -= amount;
-    _orbitDistance = std::max(_orbitDistance, CameraDefaults::MinOrbitDistance);
-
-    OrbitRotate(0.0f, 0.0f);
+    SetOrbitDistance(_orbitDistance - amount);
 }
 
 void Camera::SetOrbitDistance(float distance)
 {
+    // Moves along the current direction and keeps the orientation, so a tumbled view stays as it is.
     _orbitDistance = std::max(distance, CameraDefaults::MinOrbitDistance);
-    OrbitRotate(0.0f, 0.0f);
+    const glm::vec3 offset = _position - _orbitTarget;
+    const float len = glm::length(offset);
+    if (len < 1e-6f)
+    {
+        OrbitRotate(0.0f, 0.0f);
+        return;
+    }
+    _position = _orbitTarget + offset * (_orbitDistance / len);
 }
 
 void Camera::SetOrbitAngles(float yaw, float pitch)
@@ -106,6 +167,16 @@ void Camera::SetOrbitAngles(float yaw, float pitch)
     _yaw = yaw;
     _pitch = std::clamp(pitch, -CameraDefaults::MaxPitch, CameraDefaults::MaxPitch);
     OrbitRotate(0.0f, 0.0f); // recompute position + forward from the seated angles
+}
+
+void Camera::ReadOrbitAngles()
+{
+    const glm::vec3 offset = _position - _orbitTarget;
+    const float dist = glm::length(offset);
+    if (dist < 1e-6f)
+        return;
+    _yaw = glm::degrees(std::atan2(offset.z, offset.x));
+    _pitch = glm::degrees(std::asin(std::clamp(offset.y / dist, -1.0f, 1.0f)));
 }
 
 glm::mat4 Camera::GetViewMatrix() const

@@ -1,12 +1,15 @@
 #include "Application.h"
 #include "GpuConstants.h"
+#include "gui/Widgets.h"
+#include "Keybinds.h"
 #include "planetgen/model/BodyConfigJson.h"
-#include "planetgen/model/BodyVariety.h"
 #include <nlohmann/json.hpp>
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <imgui.h>
+#include <cstdio>
+#include <filesystem>
 #include <iostream>
 #include <fstream>
 #include <random>
@@ -14,9 +17,14 @@
 namespace planets::app
 {
 
+namespace
+{
+constexpr float HoldHintDelaySeconds = 0.2f; // short taps do not flash the hint
+constexpr const char* BookmarksPath = "bookmarks.json";
+}
+
 Application::Application()
     : _seaLevel(AppDefaults::SeaLevel)
-    , _moveSpeed(AppDefaults::MoveSpeed)
     , _lastTime(0.0f)
     , _previousWidth(0)
     , _previousHeight(0)
@@ -44,6 +52,8 @@ bool Application::Initialize()
 
     _input.Initialize(_window.GetHandle());
     _guiManager.Initialize(_window.GetHandle());
+    if (!_capture.enabled)
+        _help.LoadFirstLaunchState();
 
     if (!_renderer.Initialize(_window.GetWidth(), _window.GetHeight()))
     {
@@ -74,6 +84,7 @@ bool Application::Initialize()
 
         ApplyCaptureExposure();
     }
+    _defaultScene = _sceneSettings;
 
     // Planet types are the JSON files in data/bodies; start on the requested one (Earth by default).
     _bodies = render::types::ScanBodies("data/bodies");
@@ -98,7 +109,8 @@ bool Application::Initialize()
     }
     else
     {
-        _camera.SetPosition(glm::vec3(0.0f, 0.0f, PlanetRadius() * AppDefaults::InitialCameraDistanceMultiplier));
+        _cameraCtl.ResetView(CameraBodyNow(), _camera, /*eased=*/false);
+        _bookmarks.Load(BookmarksPath);
     }
 
     _lastTime = static_cast<float>(glfwGetTime());
@@ -133,6 +145,7 @@ void Application::BeginInteractiveFrame()
     const float now = static_cast<float>(glfwGetTime());
     const float deltaTime = now - _lastTime;
     _lastTime = now;
+    _frameMs += (deltaTime * 1000.0f - _frameMs) * 0.1f;
 
     _window.PollEvents();
     _input.Update();
@@ -185,7 +198,7 @@ void Application::SyncFramebufferToWindow()
 void Application::ApplyCaptureExposure()
 {
     // Brighten capture-mode exposure to a hero look (interactive defaults untouched).
-    // Re-applied after a showcase regenerate, since RandomizeBodyParameters resets lighting.
+    // Re-applied after a body switch, since the body's look sets its own lighting.
     _sceneSettings.lighting.sunIntensity = AppDefaults::CaptureSunIntensity;
     _sceneSettings.lighting.ambientLight = AppDefaults::CaptureAmbientLight;
 }
@@ -236,51 +249,97 @@ void Application::Shutdown()
     _window.Shutdown();
 }
 
+namespace
+{
+// With keyboard nav on, WantCaptureKeyboard is true whenever any ImGui window has focus (the
+// Planet window gets it at launch), which would kill every shortcut. Block only while a text
+// field or another widget is being edited.
+bool KeyboardBlockedByGui()
+{
+    return ImGui::GetIO().WantTextInput || ImGui::IsAnyItemActive();
+}
+} // namespace
+
+void Application::HandleEscape(float deltaTime, bool keysBlocked)
+{
+    if (keysBlocked || !_input.IsKeyDown(Key::Escape))
+    {
+        _escHeld = 0.0f;
+        _escConsumed = false;
+        return;
+    }
+
+    // A press does one job: close help, else stop the turntable. It never quits by itself.
+    if (Keybinds::Pressed(_input, Action::Escape))
+    {
+        if (_help.IsOpen())
+        {
+            _help.Close();
+            _escConsumed = true;
+        }
+        else if (_cinematicController.IsPlaying())
+        {
+            StopCinematic();
+            _escConsumed = true;
+        }
+    }
+    if (_escConsumed)
+        return;
+
+    _escHeld += deltaTime;
+    if (_escHeld >= Keybinds::QuitHoldSeconds)
+        _window.SetShouldClose(true);
+}
+
 void Application::ProcessInput(float deltaTime)
 {
-    bool guiWantsKeyboard = ImGui::GetIO().WantTextInput;
+    const bool keysBlocked = KeyboardBlockedByGui();
 
-    if (_input.IsKeyDown(Key::Escape))
+    HandleEscape(deltaTime, keysBlocked);
+
+    if (!keysBlocked)
     {
-        if (_cinematicController.IsPlaying())
-            StopCinematic();
-        else
-            _window.SetShouldClose(true);
-    }
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::Tab))
-        _guiVisible = !_guiVisible;
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::F5))
-    {
-        if (_cinematicController.IsPlaying())
-            StopCinematic();
-        else
-            StartCinematic();
-    }
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::F12))
-        _screenshotRequested = true;
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::G))
-    {
-        _autoOrbit = !_autoOrbit;
-        if (_autoOrbit)
+        using Keybinds::Pressed;
+        if (Pressed(_input, Action::Help))
+            _help.Toggle();
+        if (Pressed(_input, Action::HidePanel))
+            _guiVisible = !_guiVisible;
+        if (Pressed(_input, Action::Turntable))
         {
-            _camera.SetOrbitTarget(glm::vec3(0.0f));
-            _camera.SetMode(core::CameraMode::Orbit);
+            if (_cinematicController.IsPlaying())
+                StopCinematic();
+            else
+                StartCinematic();
         }
-        else
+        if (Pressed(_input, Action::Screenshot))
+            _screenshotRequested = true;
+        // The turntable owns the camera, so camera shortcuts wait until it stops.
+        if (!_cinematicController.IsPlaying())
         {
-            _camera.SetMode(core::CameraMode::FreeFly);
+            if (Pressed(_input, Action::ToggleMode))
+                _cameraCtl.ToggleMode(CameraBodyNow(), _camera);
+            if (Pressed(_input, Action::AutoRotate))
+            {
+                core::CameraHud& hud = _camera.Hud();
+                hud.autoRotate = !hud.autoRotate;
+                // Auto-rotate turns the orbit, so leave Fly for it.
+                if (hud.autoRotate && _cameraCtl.EffectiveMode(_camera) != core::CameraMode::Orbit)
+                    _cameraCtl.ToggleMode(CameraBodyNow(), _camera);
+            }
+            if (Pressed(_input, Action::FramePlanet))
+                _cameraCtl.FramePlanet(CameraBodyNow(), _camera);
+            if (Pressed(_input, Action::ResetView))
+                _cameraCtl.ResetView(CameraBodyNow(), _camera, /*eased=*/true);
+            if (const int slot = Keybinds::DigitPressed(_input, Action::SaveBookmark))
+                SaveBookmark(slot);
+            if (const int slot = Keybinds::DigitPressed(_input, Action::RecallBookmark))
+                RecallBookmark(slot);
         }
+        if (Pressed(_input, Action::Atmosphere))
+            _atmosphereSettings.enabled = !_atmosphereSettings.enabled;
+        if (Pressed(_input, Action::Reroll))
+            ShuffleTerrain();
     }
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::H))
-        _atmosphereSettings.enabled = !_atmosphereSettings.enabled;
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::R))
-        ShuffleTerrain();
 
     if (_cinematicController.IsPlaying())
     {
@@ -290,40 +349,114 @@ void Application::ProcessInput(float deltaTime)
         return;
     }
 
-    if (_autoOrbit)
+    UpdateCamera(deltaTime, keysBlocked);
+}
+
+core::CameraBody Application::CameraBodyNow() const
+{
+    const float radius = PlanetRadius();
+    core::CameraBody body;
+    body.radius = radius;
+    body.seaRadius = radius * _seaLevel;
+    // Patch heights live on the GPU, so there is no cheap height under the camera. The floor is
+    // the highest terrain the shape allows.
+    const float heightScale = _activeBody ? _activeBody->GetHeightScale() : 0.0f;
+    body.floorRadius = body.seaRadius + radius * heightScale * AppDefaults::HeightRangeMultiplier;
+    body.startDistance = radius * AppDefaults::InitialCameraDistanceMultiplier;
+    return body;
+}
+
+void Application::UpdateCamera(float deltaTime, bool keysBlocked)
+{
+    const ImGuiIO& io = ImGui::GetIO();
+    core::CameraControl control;
+
+    // A drag belongs to whoever got the press: a drag that starts on a panel never moves the camera.
+    const bool left = _input.IsMouseButtonDown(MouseButton::Left);
+    const bool right = _input.IsMouseButtonDown(MouseButton::Right);
+    if (left && !_leftWasDown)
+        _orbitDragging = !io.WantCaptureMouse;
+    if (right && !_rightWasDown)
+        _lookDragging = !io.WantCaptureMouse;
+    _orbitDragging = _orbitDragging && left;
+    _lookDragging = _lookDragging && right;
+    _leftWasDown = left;
+    _rightWasDown = right;
+
+    const glm::vec2 mouseDelta(_input.GetMouseDeltaX(), _input.GetMouseDeltaY());
+    if (_orbitDragging)
+        control.orbitDrag = mouseDelta;
+    if (_lookDragging)
+        control.look = mouseDelta; // in Orbit this switches to Fly
+
+    // Hide the cursor while looking, so the drag is not bounded by the window edge.
+    const bool wantHidden = _lookDragging;
+    if (wantHidden == _input.IsCursorEnabled())
+        _input.SetCursorEnabled(!wantHidden);
+
+    if (!io.WantCaptureMouse)
+        control.zoomNotches = _input.GetScrollDelta();
+
+    if (!keysBlocked)
     {
-        _camera.OrbitRotate(_autoOrbitSpeed * deltaTime, 0.0f);
+        using namespace Keybinds;
+        const auto axis = [this](Key plus, Key minus) {
+            return (_input.IsKeyDown(plus) ? 1.0f : 0.0f) - (_input.IsKeyDown(minus) ? 1.0f : 0.0f);
+        };
+        control.move = glm::vec3(axis(MoveRight, MoveLeft), axis(MoveUp, MoveDown), axis(MoveForward, MoveBack));
+        if (_input.IsKeyDown(Faster))
+            control.boost *= FasterFactor;
+        if (_input.IsKeyDown(Slower))
+            control.boost *= SlowerFactor;
+    }
+    control.autoRotateDegPerSec = _cinematicSettings.turntable.orbitSpeed;
+
+    if (_input.WasDoubleClicked() && !io.WantCaptureMouse)
+        FlyToCursor();
+
+    _cameraCtl.Update(deltaTime, CameraBodyNow(), control, _camera);
+}
+
+void Application::FlyToCursor()
+{
+    int width = 0;
+    int height = 0;
+    glfwGetWindowSize(_window.GetHandle(), &width, &height);
+    if (width <= 0 || height <= 0)
+        return;
+
+    const float ndcX = 2.0f * _input.GetMouseX() / static_cast<float>(width) - 1.0f;
+    const float ndcY = 1.0f - 2.0f * _input.GetMouseY() / static_cast<float>(height);
+    const glm::vec3 dir = core::CameraController::ScreenRay(_camera, ndcX, ndcY, _window.GetAspectRatio());
+
+    // The sea-level sphere stands in for the terrain; the camera lands above the safe floor anyway.
+    glm::vec3 hit;
+    if (core::CameraController::RaySphere(_camera.GetPosition(), dir, PlanetRadius() * _seaLevel, hit))
+        _cameraCtl.FlyToPoint(hit, CameraBodyNow(), _camera);
+}
+
+void Application::SaveBookmark(int slot)
+{
+    Bookmark bookmark;
+    bookmark.used = true;
+    bookmark.pose = _cameraCtl.CapturePose(_camera);
+    bookmark.sunDir = _sceneSettings.lightDir;
+    _bookmarks.Set(slot, bookmark);
+    ShowToast(_bookmarks.Save(BookmarksPath) ? "Saved bookmark " + std::to_string(slot)
+                                             : "Bookmark " + std::to_string(slot) + " not saved (file error)");
+}
+
+void Application::RecallBookmark(int slot)
+{
+    const Bookmark& bookmark = _bookmarks.Get(slot);
+    if (!bookmark.used)
+    {
+        ShowToast("Bookmark " + std::to_string(slot) + " is empty");
         return;
     }
-
-    if (_input.IsMouseButtonDown(MouseButton::Right))
-    {
-        if (_input.IsCursorEnabled())
-            _input.SetCursorEnabled(false);
-        _camera.Rotate(_input.GetMouseDeltaX() * AppDefaults::MouseRotationSensitivity,
-                       _input.GetMouseDeltaY() * AppDefaults::MouseRotationSensitivity);
-    }
-    else
-    {
-        if (!_input.IsCursorEnabled())
-            _input.SetCursorEnabled(true);
-    }
-
-    float speedMultiplier = _input.IsKeyDown(Key::LeftShift) ? AppDefaults::SprintSpeedMultiplier : 1.0f;
-    float speed = _moveSpeed * deltaTime * speedMultiplier;
-
-    if (_input.IsKeyDown(Key::W))
-        _camera.MoveForward(speed);
-    if (_input.IsKeyDown(Key::S))
-        _camera.MoveForward(-speed);
-    if (_input.IsKeyDown(Key::A))
-        _camera.MoveRight(-speed);
-    if (_input.IsKeyDown(Key::D))
-        _camera.MoveRight(speed);
-    if (_input.IsKeyDown(Key::E))
-        _camera.MoveUp(speed);
-    if (_input.IsKeyDown(Key::Q))
-        _camera.MoveUp(-speed);
+    _sceneSettings.lightDir = bookmark.sunDir;
+    _cameraCtl.GoTo(bookmark.pose, CameraBodyNow(), _camera);
+    ShowToast("Bookmark " + std::to_string(slot));
 }
 
 void Application::Render()
@@ -353,8 +486,12 @@ void Application::Render()
 
     if (_screenshotRequested)
     {
-        _captureManager.CaptureScreenshot(capW, capH);
+        const bool saved = _captureManager.CaptureScreenshot(capW, capH);
         _screenshotRequested = false;
+        if (saved)
+            ShowToast("Saved " + std::filesystem::absolute(_captureManager.GetLastCapturePath()).string());
+        else
+            ShowToast("Screenshot failed");
     }
 
     // Headless capture point: scene composited, before the GUI overlay.
@@ -371,32 +508,21 @@ void Application::RenderGui()
 {
     _guiManager.BeginFrame();
 
+    // The bar stays when Tab hides the Planet window; a playing turntable hides everything.
+    if (!_cinematicController.IsPlaying())
+        DrawBar();
+    _guiManager.DrawDockspace();
+
+    if (!_cinematicController.IsPlaying())
+    {
+        _help.Draw();
+        _toasts.Draw();
+        if (_escHeld > HoldHintDelaySeconds)
+            Toasts::DrawHoldHint("Hold Esc to quit", _escHeld / Keybinds::QuitHoldSeconds);
+    }
+
     if (_guiVisible)
     {
-        auto& visibility = _guiManager.GetVisibility();
-
-        // Body type selector
-        if (ImGui::Begin("Body Type", nullptr, ImGuiWindowFlags_NoCollapse))
-        {
-            const char* preview = _bodies.empty() ? "" : _bodies[_selectedBodyType].name.c_str();
-            if (ImGui::BeginCombo("Type", preview))
-            {
-                for (int i = 0; i < static_cast<int>(_bodies.size()); ++i)
-                {
-                    if (ImGui::Selectable(_bodies[i].name.c_str(), i == _selectedBodyType) && i != _selectedBodyType)
-                        SwitchBodyById(_bodies[i].id);
-                }
-                ImGui::EndCombo();
-            }
-            ImGui::SetItemTooltip("Planet types are the JSON files in data/bodies");
-
-            if (_activeBody)
-                ImGui::Text("Active: %s", _activeBody->GetTypeName().c_str());
-        }
-        ImGui::End();
-
-        _scenePanel.Draw(_sceneSettings, _atmosphereSettings.enabled, visibility.scene);
-
         _terrainStats.patchCount = _renderer.QuadTree().GetActiveLeafCount();
         _terrainStats.visiblePatchCount = _renderer.QuadTree().GetVisiblePatchCount();
         const render::GpuTimings gpu = _renderer.Timings();
@@ -404,27 +530,36 @@ void Application::RenderGui()
         _terrainStats.gpuOceanMs = gpu.oceanMs;
         _terrainStats.gpuEffectsMs = gpu.effectsMs;
 
-        bool randomize = false;
-        bool needsRegen =
-            _terrainPanel.Draw(_activeBody.get(), _genConfig, _lodConfig, _terrainStats, visibility.terrain, randomize);
+        render::PlanetUi ui;
+        ui.body = _activeBody.get();
+        ui.gen = &_genConfig;
+        ui.lod = &_lodConfig;
+        ui.stats = &_terrainStats;
+        ui.surface = &_surfaceSettings;
+        ui.ocean = &_oceanSettings;
+        ui.seaLevel = &_seaLevel;
+        ui.atmosphere = &_atmosphereSettings;
+        ui.clouds = &_cloudSettings;
+        ui.scene = &_sceneSettings;
+        ui.camera = &_camera;
+        ui.moveSpeed = &_cameraCtl.SpeedMultiplier();
+        ui.cinematic = &_cinematicSettings;
+        ui.frameMs = _frameMs;
+        ui.baseline = &_baseline;
+        ui.lockMask = &_lockMask;
+        ui.varietyUnits = _varietyUnits;
 
-        if (randomize && _activeBody)
-            ShuffleTerrain();
+        const render::PlanetActions actions = _planetWindow.Draw(ui);
+        bool needsRegen = actions.regenerate;
+        if (actions.randomizeUnit >= 0)
+            RandomizeUnit(static_cast<render::types::LookUnit>(actions.randomizeUnit));
+        if (actions.resetUnit >= 0)
+            ResetUnit(static_cast<render::types::LookUnit>(actions.resetUnit));
         // A seed typed into the panel is a new world for a planet type: roll its traits too.
-        if (needsRegen && _activeHasVariety && _genConfig.seed != _rolledSeed && RerollActiveBody())
+        if (needsRegen && _genConfig.seed != _rolledSeed && RerollWorld())
             needsRegen = false;
-
-        needsRegen |=
-            _surfacePanel.Draw(_activeBody.get(), _surfaceSettings, _oceanSettings, _seaLevel, visibility.surface);
-        _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
-        _cloudsPanel.Draw(_cloudSettings, _atmosphereSettings.enabled, visibility.clouds);
-        _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
-
-        bool playRequested = false;
-        _cinematicPanel.Draw(_cinematicSettings, PlanetRadius(), playRequested, visibility.cinematic);
-        if (playRequested)
+        if (actions.playCinematic)
             StartCinematic();
-
         if (needsRegen)
             RegenerateLodSystem();
     }
@@ -432,9 +567,121 @@ void Application::RenderGui()
     _guiManager.EndFrame();
 }
 
-void Application::SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look, bool resetCamera)
+void Application::DrawBar()
 {
-    _activeBody = std::make_unique<render::BodyRuntime>(std::move(config), _paletteRegistry);
+    if (!ImGui::BeginMainMenuBar())
+        return;
+
+    if (ImGui::BeginMenu("Help"))
+    {
+        ImGui::MenuItem("Controls", "F1", _help.OpenFlag());
+        ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("View"))
+    {
+        ImGui::MenuItem("Planet window", "Tab", &_guiVisible);
+        if (ImGui::MenuItem("Reset Layout"))
+            _guiManager.RequestResetLayout();
+        ImGui::EndMenu();
+    }
+    ImGui::Separator();
+
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9.0f);
+    const char* preview = _bodies.empty() ? "" : _bodies[_selectedBodyType].name.c_str();
+    if (ImGui::BeginCombo("Type", preview))
+    {
+        for (int i = 0; i < static_cast<int>(_bodies.size()); ++i)
+        {
+            if (ImGui::Selectable(_bodies[i].name.c_str(), i == _selectedBodyType) && i != _selectedBodyType)
+                SwitchBodyById(_bodies[i].id, /*keepLiveScene=*/false);
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("Planet type. Each type sets its own terrain, surface, sky and star.");
+
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 7.0f);
+    uint32_t seed = _genConfig.seed;
+    if (ImGui::InputScalar("Seed", ImGuiDataType_U32, &seed, nullptr, nullptr, "%u",
+                           ImGuiInputTextFlags_EnterReturnsTrue) &&
+        seed != _genConfig.seed)
+    {
+        _genConfig.seed = seed;
+        if (!RerollWorld())
+            RegenerateLodSystem();
+    }
+    ImGui::SetItemTooltip("Same seed + same type = same planet. Enter to apply.");
+    // Amber '*': a lock, an edit or a tab Randomize means the seed alone no longer gives this planet.
+    // Compared against the baseline, so a change made while its tab is closed counts too.
+    if (_lockMask != 0 || _offSeedMask != 0 || render::types::ChangedUnits(CaptureLook(), _baseline) != 0)
+    {
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::TextColored(render::ui::EditedColor, "*");
+        ImGui::SetItemTooltip("Locked, edited or randomized tabs: the seed alone no longer gives this planet.");
+    }
+
+    if (ImGui::Button("Reroll"))
+        ShuffleTerrain();
+    ImGui::SetItemTooltip("New random seed. Unlocked tabs take new values. Key: R.");
+
+    // Frame time on the right; the GPU split on hover. A dim hint sits to its left.
+    char frame[48];
+    std::snprintf(frame, sizeof(frame), "%.1f ms  %.0f fps", _frameMs, _frameMs > 0.0f ? 1000.0f / _frameMs : 0.0f);
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float frameX = ImGui::GetWindowWidth() - ImGui::CalcTextSize(frame).x - spacing * 2.0f;
+    char hint[96];
+    std::snprintf(hint, sizeof(hint), "%s  alt %.2f  speed %.2f   F1 help",
+                  _camera.GetMode() == core::CameraMode::Orbit ? "Orbit" : "Fly", _camera.Hud().altitude,
+                  _camera.Hud().speed);
+    const float hintX = frameX - ImGui::CalcTextSize(hint).x - spacing * 4.0f;
+    if (hintX > ImGui::GetCursorPosX())
+    {
+        ImGui::SameLine(hintX);
+        ImGui::TextDisabled("%s", hint);
+    }
+    ImGui::SameLine(frameX);
+    ImGui::TextUnformatted(frame);
+    if (ImGui::IsItemHovered())
+    {
+        const render::GpuTimings gpu = _renderer.Timings();
+        ImGui::SetTooltip("GPU terrain %.2f / ocean %.2f / effects %.2f ms", gpu.terrainMs, gpu.oceanMs,
+                          gpu.effectsMs);
+    }
+
+    ImGui::EndMainMenuBar();
+}
+
+render::types::LookState Application::CaptureLook() const
+{
+    render::types::LookState s;
+    if (_activeBody)
+        s.config = _activeBody->Config();
+    s.config.metadata.seaLevel = _seaLevel;
+    s.atmosphere = _atmosphereSettings;
+    s.clouds = _cloudSettings;
+    s.ocean = _oceanSettings;
+    s.scene = _sceneSettings;
+    s.surface = _surfaceSettings;
+    s.palette = _activePalette;
+    return s;
+}
+
+void Application::ApplyLook(const render::types::LookState& s, bool rebuildBody, bool resetCamera)
+{
+    _atmosphereSettings = s.atmosphere;
+    _cloudSettings = s.clouds;
+    _oceanSettings = s.ocean;
+    _sceneSettings = s.scene;
+    _surfaceSettings = s.surface;
+    _seaLevel = s.config.metadata.seaLevel;
+    if (_capture.enabled)
+        ApplyCaptureExposure();
+    if (!rebuildBody)
+        return;
+
+    _activeBody = std::make_unique<render::BodyRuntime>(s.config, _paletteRegistry);
+    _activePalette = s.palette;
+    if (!_activePalette.empty())
+        _activeBody->OverridePalette(_activePalette);
 
     // The library owns all terrain compute; hand it the full config as data so it
     // bakes the continent mask from the in-memory (GUI-edited) config.
@@ -450,31 +697,60 @@ void Application::SwitchBody(planetgen::BodyConfig config, const render::types::
     }
     _terrainStats.gpuAvailable = true;
 
-    _seaLevel = _activeBody->GetSeaLevel();
-    // Each planet type brings its own sky, clouds, ocean and star; a switch replaces them.
-    render::types::ApplyBodyLook(
-        look, _atmosphereSettings, _cloudSettings, _oceanSettings, _sceneSettings, _surfaceSettings);
-    if (!look.palette.empty())
-        _activeBody->OverridePalette(look.palette);
-    _atmosphereSettings.enabled = _activeBody->HasAtmosphere() && look.atmosphere.enabled;
-    if (_capture.enabled)
-        ApplyCaptureExposure();
-
     RegenerateLodSystem();
 
     if (resetCamera)
     {
         float camDist = PlanetRadius() * AppDefaults::InitialCameraDistanceMultiplier;
         _camera.SetPosition(glm::vec3(0.0f, 0.0f, camDist));
+        _cameraCtl.Cancel(_camera); // the controller re-adopts the pose next frame
         float farPlane = (std::max)(AppDefaults::MinFarPlane, PlanetRadius() * AppDefaults::FarPlaneRadiusMultiplier);
         _camera.SetFarPlane(farPlane);
     }
-
-    std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << PlanetRadius() << ")"
-              << std::endl;
 }
 
-bool Application::SwitchBodyById(const std::string& id)
+bool Application::RollWorld(uint32_t seed, uint32_t units, bool resetCamera, bool keepLiveScene)
+{
+    using namespace render::types;
+    std::ifstream in(_activeBodyPath);
+    const nlohmann::json body = nlohmann::json::parse(in, nullptr, false);
+    if (body.is_discarded())
+    {
+        std::cerr << "[SwitchBody] Cannot read " << _activeBodyPath << std::endl;
+        return false;
+    }
+    LookState rolled;
+    const std::string err = RollLook(body, seed, keepLiveScene ? _sceneSettings : _defaultScene, rolled);
+    if (!err.empty())
+    {
+        std::cerr << "[SwitchBody] Bad body config in " << _activeBodyPath << ": " << err << std::endl;
+        return false;
+    }
+    _varietyUnits = VarietyUnits(body);
+
+    // Units that do not take the roll keep their values and the default they are measured against.
+    const uint32_t kept = AllUnits & ~units;
+    LookState next = rolled;
+    LookState baseline = rolled;
+    if (_activeBody)
+    {
+        MergedRoll merged = MergeRoll(rolled, CaptureLook(), _baseline, kept);
+        next = std::move(merged.next);
+        baseline = std::move(merged.baseline);
+    }
+    _baseline = std::move(baseline);
+    _planetWindow.ForgetEdits(units);
+
+    const uint32_t bodyUnits = UnitBit(LookUnit::Terrain) | UnitBit(LookUnit::Surface) | UnitBit(LookUnit::Ocean);
+    const bool rebuild = !_activeBody || (units & bodyUnits) != 0;
+    ApplyLook(next, rebuild, resetCamera);
+    if (rebuild)
+        std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << PlanetRadius()
+                  << ")" << std::endl;
+    return true;
+}
+
+bool Application::SwitchBodyById(const std::string& id, bool keepLiveScene)
 {
     const int index = render::types::FindBody(_bodies, id);
     if (index < 0)
@@ -482,57 +758,86 @@ bool Application::SwitchBodyById(const std::string& id)
         std::cerr << "[SwitchBody] Unknown planet type '" << id << "'" << std::endl;
         return false;
     }
+    // The combo and id change only once the switch worked.
+    if (!SwitchBodyByPath(_bodies[index].path, /*resetCamera=*/true, keepLiveScene))
+        return false;
     _selectedBodyType = index;
     _activeBodyId = id;
-    return SwitchBodyByPath(_bodies[index].path);
+    return true;
 }
 
-bool Application::SwitchBodyByPath(const std::string& path, bool resetCamera)
+bool Application::SwitchBodyByPath(const std::string& path, bool resetCamera, bool keepLiveScene)
 {
-    std::ifstream in(path);
-    const nlohmann::json body = nlohmann::json::parse(in, nullptr, false);
-    if (body.is_discarded())
-    {
-        std::cerr << "[SwitchBody] Cannot read " << path << std::endl;
-        return false;
-    }
-    const nlohmann::json world = planetgen::RollVariety(body, _genConfig.seed);
-    planetgen::BodyConfig config;
-    const std::string err = planetgen::BodyConfigFromJson(world.dump(), config);
-    if (!err.empty())
-    {
-        std::cerr << "[SwitchBody] Bad body config in " << path << ": " << err << std::endl;
-        return false;
-    }
+    using namespace render::types;
+    const std::string previous = _activeBodyPath;
     _activeBodyPath = path;
-    _activeHasVariety = planetgen::HasVariety(body);
+    // A new type keeps only a locked Light tab: the star and exposure are the user's, the rest is the type's.
+    const uint32_t lockMask = _lockMask & UnitBit(LookUnit::Light);
+    if (!RollWorld(_genConfig.seed, AllUnits & ~lockMask, resetCamera, keepLiveScene))
+    {
+        _activeBodyPath = previous;
+        return false;
+    }
+    _lockMask = lockMask;
+    _offSeedMask &= UnitBit(LookUnit::Light);
     _rolledSeed = _genConfig.seed;
-    SwitchBody(std::move(config), render::types::ParseBodyLook(world), resetCamera);
     return true;
 }
 
 bool Application::RerollActiveBody()
 {
-    if (!_activeHasVariety)
+    if (_varietyUnits == 0)
         return false;
-    return SwitchBodyByPath(_activeBodyPath, /*resetCamera=*/false);
+    return RerollWorld(/*keepLiveScene=*/true);
+}
+
+bool Application::RerollWorld(bool keepLiveScene)
+{
+    using namespace render::types;
+    const uint32_t units = AllUnits & ~_lockMask;
+    if (!RollWorld(_genConfig.seed, units, /*resetCamera=*/false, keepLiveScene))
+        return false;
+    // Terrain, Surface and Ocean all locked: the body was kept, but the land still follows the seed.
+    if ((units & (UnitBit(LookUnit::Terrain) | UnitBit(LookUnit::Surface) | UnitBit(LookUnit::Ocean))) == 0)
+        RegenerateLodSystem();
+    _offSeedMask &= ~units;
+    _rolledSeed = _genConfig.seed;
+    return true;
 }
 
 void Application::ShuffleTerrain()
 {
-    if (_activeHasVariety)
-    {
-        _genConfig.seed = std::random_device{}();
-        RerollActiveBody();
-        return;
-    }
-    if (_activeBody)
-        render::RandomizeBodyParameters(_activeBody->Config(), _sceneSettings, _atmosphereSettings, _genConfig.seed);
-    RegenerateLodSystem();
+    // A new world is a new seed: unlocked tabs take the type's values at that seed; Earth gets
+    // new continents.
+    _genConfig.seed = std::random_device{}();
+    ShowToast("New seed " + std::to_string(_genConfig.seed));
+    if (!RerollWorld())
+        RegenerateLodSystem();
+}
+
+void Application::RandomizeUnit(render::types::LookUnit unit)
+{
+    // A fresh roll for one tab; the seed stays, so the planet no longer matches it alone.
+    if (RollWorld(std::random_device{}(), render::types::UnitBit(unit), /*resetCamera=*/false, /*keepLiveScene=*/false))
+        _offSeedMask |= render::types::UnitBit(unit);
+}
+
+void Application::ResetUnit(render::types::LookUnit unit)
+{
+    if (RollWorld(_genConfig.seed, render::types::UnitBit(unit), /*resetCamera=*/false, /*keepLiveScene=*/false))
+        _offSeedMask &= ~render::types::UnitBit(unit);
 }
 
 void Application::StartCinematic()
 {
+    // The GUI hides during the turntable, so a hidden open help would eat the first Esc.
+    _help.Close();
+    // UpdateCamera is skipped while it plays, so drop a held look drag and show the cursor again.
+    _lookDragging = false;
+    _orbitDragging = false;
+    _input.SetCursorEnabled(true);
+    _cameraCtl.Cancel(_camera);
+    _camera.Hud().autoRotate = false;
     _camera.SetOrbitTarget(glm::vec3(0.0f));
     _camera.SetMode(core::CameraMode::Orbit);
     _cinematicController.Start(_cinematicSettings, PlanetRadius(), _camera);
@@ -543,7 +848,9 @@ void Application::StopCinematic()
 {
     _cinematicController.Stop();
     _guiVisible = true;
-    _camera.SetMode(core::CameraMode::FreeFly);
+    // The turntable orbits, so the camera stays in Orbit; the controller re-adopts the pose.
+    _camera.SetMode(core::CameraMode::Orbit);
+    _cameraCtl.Cancel(_camera);
 }
 
 void Application::RegenerateLodSystem()

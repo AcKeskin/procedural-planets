@@ -20,26 +20,16 @@ public:
     void BeginFrame();
     void EndFrame();
 
-    struct PanelVisibility
-    {
-        bool scene = true;
-        bool terrain = true;
-        bool surface = true;
-        bool atmosphere = true;
-        bool clouds = true;
-        bool debug = true;
-        bool cinematic = true;
-    };
+    // The full-window dock host; call after the main menu bar so it sits below it.
+    void DrawDockspace();
 
-    PanelVisibility& GetVisibility() { return _visibility; }
-    const PanelVisibility& GetVisibility() const { return _visibility; }
+    // Rebuild the default dock layout on the next frame (View > Reset Layout).
+    void RequestResetLayout() { _resetLayout = true; }
 
 private:
-    void SetupDockspace();
 
     bool _initialized;
     bool _resetLayout;
-    PanelVisibility _visibility;
 };
 
 } // namespace planets::render

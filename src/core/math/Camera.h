@@ -23,6 +23,15 @@ inline constexpr float MaxPitch = 89.0f;
 inline constexpr float MinOrbitDistance = 1.0f;
 } // namespace CameraDefaults
 
+// Interactive-view readout the GUI shows and edits. The camera controller writes altitude and
+// speed each frame; autoRotate is the one switch both the O key and the Camera tab set.
+struct CameraHud
+{
+    float altitude = 0.0f; // above sea level
+    float speed = 0.0f;    // current fly speed, world units per second
+    bool autoRotate = false;
+};
+
 class Camera
 {
 public:
@@ -41,14 +50,31 @@ public:
     // so a subsequent delta Rotate stays continuous. Used for headless light-axis framing.
     void LookAt(const glm::vec3& target);
 
+    // Seat any orientation. upHint only picks the roll; yaw/pitch are back-solved so a later
+    // Rotate continues from here.
+    void SetOrientation(const glm::vec3& forward, const glm::vec3& upHint);
+
+    // Fly look about a local vertical (not always world Y): yaw turns about `up`, pitch tilts
+    // the view and stops short of straight up/down.
+    void Look(float yawDelta, float pitchDelta, const glm::vec3& up);
+
+    // Keep the view direction, level the roll against a new vertical.
+    void Relevel(const glm::vec3& up);
+
     // Orbit controls
     void SetOrbitTarget(const glm::vec3& target);
     void OrbitRotate(float yawDelta, float pitchDelta);
+    // Like OrbitRotate, but with no pitch limit: yaw turns about world Y and pitch about the
+    // camera's right, so a drag carries on over the poles without a flip or a roll.
+    void OrbitTumble(float yawDelta, float pitchDelta);
     void OrbitZoom(float amount);
     void SetOrbitDistance(float distance);
 
     // Seat the orbit camera at an absolute yaw/pitch (OrbitRotate is delta-only).
     void SetOrbitAngles(float yaw, float pitch);
+
+    // Back-solve yaw/pitch from the position and leave the pose as it is (for the HUD).
+    void ReadOrbitAngles();
 
     // Matrix getters
     glm::mat4 GetViewMatrix() const;
@@ -62,6 +88,11 @@ public:
 
     void SetPosition(const glm::vec3& pos) { _position = pos; }
     void SetFov(float fov) { _fov = fov; }
+    float GetFov() const { return _fov; }
+    const glm::vec3& GetOrbitTarget() const { return _orbitTarget; }
+    float GetOrbitDistance() const { return _orbitDistance; }
+    CameraHud& Hud() { return _hud; }
+    const CameraHud& Hud() const { return _hud; }
     void SetNearPlane(float nearDist) { _nearPlane = nearDist; }
     void SetFarPlane(float farDist) { _farPlane = farDist; }
     float GetNearPlane() const { return _nearPlane; }
@@ -86,6 +117,8 @@ private:
     // Orbit mode state
     glm::vec3 _orbitTarget;
     float _orbitDistance;
+
+    CameraHud _hud;
 
     // Projection parameters
     float _fov;

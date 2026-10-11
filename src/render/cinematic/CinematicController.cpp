@@ -45,8 +45,16 @@ void CinematicController::Update(float deltaTime, core::Camera& camera)
         return;
     }
 
-    const float progress = GetProgress();
-    const float orbitSpeed = ComputeOrbitSpeed(progress);
+    float progress = GetProgress();
+    float speedProgress = progress;
+    if (_settings.durationMode == CinematicDurationMode::Loop)
+    {
+        // Loop eases in and zooms over the first turn only, then keeps full speed: no slowdown every turn.
+        const float loopDuration = core::DegreesPerRotation / _settings.orbitSpeed;
+        progress = std::min(_elapsedTime / loopDuration, 1.0f);
+        speedProgress = std::min(progress, 0.5f);
+    }
+    const float orbitSpeed = ComputeOrbitSpeed(speedProgress);
     const float pitch = ComputePitch(_elapsedTime);
     const float targetDistance = ComputeZoomDistance(progress);
 

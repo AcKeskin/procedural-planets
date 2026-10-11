@@ -1,19 +1,17 @@
 #pragma once
 
 #include "Input.h"
+#include "Bookmarks.h"
+#include "HelpOverlay.h"
+#include "Toast.h"
 #include "Window.h"
 #include "Renderer.h"
-#include "ParameterRandomizer.h"
 #include "lod/PlanetQuadTree.h"
 #include "gui/GuiManager.h"
-#include "gui/ScenePanel.h"
-#include "gui/TerrainPanel.h"
-#include "gui/SurfacePanel.h"
-#include "gui/AtmospherePanel.h"
-#include "gui/DebugPanel.h"
-#include "gui/CloudsPanel.h"
+#include "gui/PlanetWindow.h"
 #include "types/BodyRegistry.h"
 #include "types/BodyLook.h"
+#include "types/LookUnits.h"
 #include "settings/SceneSettings.h"
 #include "settings/TerrainSettings.h"
 #include "settings/OceanSettings.h"
@@ -26,8 +24,8 @@
 #include <memory>
 #include "cinematic/CinematicController.h"
 #include "cinematic/CaptureManager.h"
-#include "gui/CinematicPanel.h"
 #include "math/Camera.h"
+#include "math/CameraController.h"
 #include "CaptureRequest.h"
 #include "planetgen/model/PaletteRegistry.h"
 
@@ -42,11 +40,7 @@ class ScriptRunner;
 namespace AppDefaults
 {
 inline constexpr float SeaLevel = 0.995f;
-inline constexpr float MoveSpeed = 75.0f;
 inline constexpr float InitialCameraDistanceMultiplier = 2.0f;
-inline constexpr float MouseRotationSensitivity = 0.1f;
-inline constexpr float SprintSpeedMultiplier = 5.0f;
-inline constexpr float AutoOrbitSpeed = 5.0f;
 inline constexpr float FresnelStrengthNear = 0.5f;
 inline constexpr float FresnelStrengthFar = 2.0f;
 inline constexpr float FresnelPower = 3.0f;
@@ -99,20 +93,36 @@ public:
     const std::vector<render::types::BodyEntry>& Bodies() const { return _bodies; }
     const std::string& ActiveBodyId() const { return _activeBodyId; }
     // Switches to a planet type from the registry; false (and a log line) when the id is unknown.
-    bool SwitchBodyById(const std::string& id);
+    // keepLiveScene: roll over the live scene (scripts); false rolls over the startup defaults (GUI).
+    bool SwitchBodyById(const std::string& id, bool keepLiveScene = true);
     void SetSeed(uint32_t seed) { _genConfig.seed = seed; }
+
+    // Short message in the bottom-right corner (about 2.5 s).
+    void ShowToast(std::string text) { _toasts.Show(std::move(text)); }
 
     // Pin capture-mode lighting exposure (re-applied after a showcase regenerate).
     void ApplyCaptureExposure();
 
 private:
     void ProcessInput(float deltaTime);
+    // Camera input for this frame (keys, drags, wheel), then the controller update.
+    void UpdateCamera(float deltaTime, bool keysBlocked);
+    // Double-click: fly to the sea-level point under the cursor, if the ray hits the planet.
+    void FlyToCursor();
+    void SaveBookmark(int slot);
+    void RecallBookmark(int slot);
+    core::CameraBody CameraBodyNow() const;
+
+    // Esc: close help, else stop the turntable; held for a second it quits.
+    void HandleEscape(float deltaTime, bool keysBlocked);
     void Render();
     void RenderGui();
+    // Main menu bar: View menu, type, seed, reroll, frame time. Visible even when Tab hides the
+    // Planet window.
+    void DrawBar();
 
     void RegenerateLodSystem();
-    // New world: a planet type with a variety block rolls a new seed; others (Earth) shuffle
-    // their generation parameters.
+    // New world: a new seed; the unlocked tabs take the type's values at it.
     void ShuffleTerrain();
 
     // Resize the renderer's framebuffer to the current window size if they differ (cheap
@@ -123,12 +133,22 @@ private:
     // viewer (used per-frame in the cinematic when lightFollow is on).
     void UpdateFollowLight();
 
-    // Makes this body active and applies its look (sky, clouds, ocean, star).
-    void SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look = {}, bool resetCamera = true);
+    // The values the look tabs edit, as they are now.
+    render::types::LookState CaptureLook() const;
+    // Makes `s` live. rebuildBody: new runtime + library body + LOD (terrain, surface or sea level changed).
+    void ApplyLook(const render::types::LookState& s, bool rebuildBody, bool resetCamera);
+    // Rolls the active type at `seed`; only `units` take the roll, the other tabs keep their values.
+    // keepLiveScene: edited exposure, sun direction and the like carry over; else they return to _defaultScene.
+    bool RollWorld(uint32_t seed, uint32_t units, bool resetCamera, bool keepLiveScene);
     // Switches to the body JSON at path, its variety rolled with the current seed.
-    bool SwitchBodyByPath(const std::string& path, bool resetCamera = true);
+    bool SwitchBodyByPath(const std::string& path, bool resetCamera = true, bool keepLiveScene = true);
     // After a seed change: rolls the active type's variety again. False when it has none.
     bool RerollActiveBody();
+    // After a seed change: the unlocked tabs take the type's values at the new seed.
+    bool RerollWorld(bool keepLiveScene = false);
+    // One tab from a fresh roll (the seed stays) / back to the type's values at the current seed.
+    void RandomizeUnit(render::types::LookUnit unit);
+    void ResetUnit(render::types::LookUnit unit);
 
     // Build QuadTreeConfig from current LodConfig
     render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
@@ -141,15 +161,12 @@ private:
 
     // GUI
     render::GuiManager _guiManager;
-    render::ScenePanel _scenePanel;
-    render::TerrainPanel _terrainPanel;
-    render::SurfacePanel _surfacePanel;
-    render::AtmospherePanel _atmospherePanel;
-    render::DebugPanel _debugPanel;
-    render::CloudsPanel _cloudsPanel;
+    render::PlanetWindow _planetWindow;
+    float _frameMs = 16.0f; // smoothed frame time for the bar
 
     // App-visual settings (generation params live in the active body's BodyConfig).
     render::SceneSettings _sceneSettings;
+    render::SceneSettings _defaultScene; // scene after startup setup; GUI rolls start from it
     render::GenerationConfig _genConfig;
     render::LodConfig _lodConfig;
     render::TerrainStats _terrainStats;
@@ -159,19 +176,26 @@ private:
     render::SurfaceSettings _surfaceSettings;
     float _seaLevel;
 
-    // Camera
+    // Camera. Auto-rotate lives in _camera.Hud().autoRotate (the O key and the Camera tab share it).
     core::Camera _camera;
-    float _moveSpeed;
-    bool _autoOrbit = false;
-    float _autoOrbitSpeed = AppDefaults::AutoOrbitSpeed;
+    core::CameraController _cameraCtl;
+    Bookmarks _bookmarks;
+    bool _orbitDragging = false; // LMB drag that started on the scene, not on a panel
+    bool _lookDragging = false;  // same for RMB
+    bool _leftWasDown = false;
+    bool _rightWasDown = false;
 
     // Cinematic
     render::CinematicController _cinematicController;
-    render::CinematicPanel _cinematicPanel;
     render::CinematicSettings _cinematicSettings;
     render::CaptureManager _captureManager;
     bool _guiVisible = true;
     bool _screenshotRequested = false;
+
+    HelpOverlay _help;
+    Toasts _toasts;
+    float _escHeld = 0.0f;       // seconds Esc has been held toward quit
+    bool _escConsumed = false;   // this press already closed help / stopped the turntable
 
     // Active body — typed config + runtime shim
     planetgen::PaletteRegistry _paletteRegistry;
@@ -187,7 +211,11 @@ private:
     int _selectedBodyType = 0;                     // index into _bodies
     std::string _activeBodyId;                     // registry id of the active body
     std::string _activeBodyPath;                   // JSON the active body came from
-    bool _activeHasVariety = false;                // its type rolls traits from the seed
+    uint32_t _varietyUnits = 0;                    // look tabs its type rolls from the seed
+    std::vector<glm::vec3> _activePalette;         // its type's palette (empty: the registry's)
+    render::types::LookState _baseline;            // the rolled values; edits are measured against it
+    uint32_t _lockMask = 0;                        // look tabs a reroll leaves alone
+    uint32_t _offSeedMask = 0;                     // look tabs randomized away from the seed
     uint32_t _rolledSeed = 0;                      // seed the active world's traits were rolled with
 
     // Frame state

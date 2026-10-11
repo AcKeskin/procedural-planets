@@ -3,13 +3,14 @@ add_library(render STATIC
     Window.cpp
     Shader.cpp
     gui/GuiManager.cpp
-    gui/ScenePanel.cpp
-    gui/TerrainPanel.cpp
-    gui/SurfacePanel.cpp
-    gui/AtmospherePanel.cpp
-    gui/DebugPanel.cpp
-    gui/CinematicPanel.cpp
-    gui/CloudsPanel.cpp
+    gui/TerrainTab.cpp
+    gui/SurfaceTab.cpp
+    gui/OceanTab.cpp
+    gui/SkyTab.cpp
+    gui/LightTab.cpp
+    gui/SystemTab.cpp
+    gui/CameraTab.cpp
+    gui/PlanetWindow.cpp
     Renderer.cpp
     GpuTimer.cpp
     Mesh.cpp
@@ -35,6 +36,7 @@ add_library(render STATIC
     cinematic/CaptureManager.cpp
     types/BodyRegistry.cpp
     types/BodyLook.cpp
+    types/LookUnits.cpp
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
@@ -69,6 +71,13 @@ add_executable(render_tests
     tests/test_ground_materials.cpp
     tests/test_cloud_noise.cpp
     tests/test_surface_settings.cpp
+    tests/test_look_units.cpp
+    tests/test_camera_controller.cpp
+    tests/test_bookmarks.cpp
+    tests/test_keybinds.cpp
+    ../app/Bookmarks.cpp
+    ../app/HelpOverlay.cpp
 )
+target_include_directories(render_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/app)
 target_link_libraries(render_tests PRIVATE render Catch2::Catch2WithMain)
 catch_discover_tests(render_tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
