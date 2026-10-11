@@ -202,6 +202,12 @@ const std::unordered_map<std::string, Entry>& Table()
         {"ocean.waveStrength", {false, SET_FLOAT(t.ocean->waveStrength)}},
         {"ocean.waveScale", {false, SET_FLOAT(t.ocean->waveScale)}},
         {"ocean.waveSpeed", {false, SET_FLOAT(t.ocean->waveSpeed)}},
+        {"ocean.emissive", {false, SET_FLOAT(t.ocean->emissive)}},
+        {"ocean.crust", {false, SET_FLOAT(t.ocean->crust)}},
+        {"ocean.frozen", {false, SET_FLOAT(t.ocean->frozen)}},
+        {"ocean.reflectivity", {false, SET_FLOAT(t.ocean->reflectivity)}},
+        {"ocean.foamColor", {false, SET_VEC3(t.ocean->foamColor)}},
+        {"ocean.crustColor", {false, SET_VEC3(t.ocean->crustColor)}},
 
         // ---- atmosphere (real-time) ----
         {"atmosphere.enabled", {false, SET_BOOL(t.atmosphere->enabled)}},

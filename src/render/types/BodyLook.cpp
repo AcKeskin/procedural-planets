@@ -75,6 +75,12 @@ BodyLook ParseBodyLook(const json& body)
     Read(o, "waveStrength", look.ocean.waveStrength);
     Read(o, "waveScale", look.ocean.waveScale);
     Read(o, "waveSpeed", look.ocean.waveSpeed);
+    Read(o, "emissive", look.ocean.emissive);
+    Read(o, "crust", look.ocean.crust);
+    Read(o, "frozen", look.ocean.frozen);
+    Read(o, "reflectivity", look.ocean.reflectivity);
+    Read(o, "foamColor", look.ocean.foamColor);
+    Read(o, "crustColor", look.ocean.crustColor);
 
     const json& s = Block(render, "star");
     Read(s, "color", look.sunColor);

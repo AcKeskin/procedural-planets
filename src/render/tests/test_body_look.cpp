@@ -23,7 +23,7 @@ TEST_CASE("body_look: fields in the block override, the rest keep defaults", "[b
         "render": {
             "atmosphere": {"wavelengths": [600, 520, 480], "intensity": 2.0},
             "clouds": {"coverage": 0.9, "enabled": false},
-            "ocean": {"deepColor": [0.2, 0.0, 0.1]},
+            "ocean": {"deepColor": [0.2, 0.0, 0.1], "emissive": 3.0, "frozen": 1.0},
             "star": {"color": [1.0, 0.5, 0.3]},
             "lighting": {"ambient": 0.1}
         }})"));
@@ -33,6 +33,9 @@ TEST_CASE("body_look: fields in the block override, the rest keep defaults", "[b
     CHECK_THAT(look.clouds.coverage, WithinAbs(0.9, 1e-6));
     CHECK_FALSE(look.clouds.enabled);
     CHECK(look.ocean.deepColor == glm::vec3(0.2f, 0.0f, 0.1f));
+    CHECK_THAT(look.ocean.emissive, WithinAbs(3.0, 1e-6));
+    CHECK_THAT(look.ocean.frozen, WithinAbs(1.0, 1e-6));
+    CHECK(look.ocean.reflectivity == effects::OceanSettings{}.reflectivity);
     CHECK(look.sunColor == glm::vec3(1.0f, 0.5f, 0.3f));
     CHECK_THAT(look.lighting.ambientLight, WithinAbs(0.1, 1e-6));
 }

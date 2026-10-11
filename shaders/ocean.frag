@@ -22,6 +22,14 @@ uniform float uClarity;      // terrain units of depth light travels before it i
 uniform float uWaveStrength;
 uniform float uWaveScale;
 uniform float uWaveSpeed;
+
+// What the fluid is (OceanSettings): water by default, or lava, ice, acid via the planet type.
+uniform float uFluidEmissive;
+uniform float uFluidCrust;
+uniform float uFluidFrozen;
+uniform float uFluidReflectivity;
+uniform vec3 uFoamColor;
+uniform vec3 uCrustColor;
 uniform float uTime;
 
 // The reflected sky is the atmosphere pass's own sky (sky_radiance.glsl); 0 = airless, black sky.
@@ -113,6 +121,44 @@ WaveSurface waveSurface(vec3 dir)
     return WaveSurface(normalize(dir - gradient), lostVariance);
 }
 
+// ---- crust and cracks (lava, ice) ----
+
+float fluidHash(vec3 p)
+{
+    p = fract(p * 0.1031);
+    p += dot(p, p.yzx + 33.33);
+    return fract((p.x + p.y) * p.z);
+}
+
+// Cellular pattern on the sphere. x = 1 on the crack between cells, 0 inside; y = cell id.
+vec2 fluidCells(vec3 dir, float scale)
+{
+    vec3 p = dir * kWaveReferenceRadius * scale;
+    // Warp the lattice so plate edges wander instead of running straight.
+    p += vec3(sin(p.y * 1.7 + p.z * 0.6), sin(p.z * 1.3 + p.x * 0.8), sin(p.x * 1.5 + p.y * 0.7)) * 0.35;
+    vec3 i = floor(p);
+    float best = 1e9, second = 1e9, id = 0.0;
+    for (int z = -1; z <= 1; ++z)
+        for (int y = -1; y <= 1; ++y)
+            for (int x = -1; x <= 1; ++x)
+            {
+                vec3 c = i + vec3(x, y, z);
+                vec3 q = c + vec3(fluidHash(c), fluidHash(c + 17.0), fluidHash(c + 31.0)) - p;
+                float d = dot(q, q);
+                if (d < best)
+                {
+                    second = best;
+                    best = d;
+                    id = fluidHash(c + 5.0);
+                }
+                else if (d < second)
+                    second = d;
+            }
+    float edge = sqrt(second) - sqrt(best);
+    float width = max(fwidth(edge), 1e-4) * 1.5;
+    return vec2(1.0 - smoothstep(0.0, 0.06 + width, edge), id);
+}
+
 // ---- shoreline ----
 
 const float kFoamBandUnits = 0.02; // terrain units of depth the surf band covers
@@ -169,7 +215,7 @@ void main()
     vec3 viewDir = normalize(uCameraPos - fragWorldPos);
     vec3 sphereNormal = normalize(fragNormal);
     WaveSurface waves = waveSurface(sphereNormal);
-    vec3 waveNormal = waves.normal;
+    vec3 waveNormal = normalize(mix(waves.normal, sphereNormal, uFluidFrozen)); // ice has no waves
 
     // Diffuse + ambient on the sphere normal, matching the land's terminator.
     vec3 lightDir = -normalize(uLightDir); // uLightDir points from the sun; negate → toward it (matches land)
@@ -185,16 +231,33 @@ void main()
     float shininess = clamp(2.0 / roughness2 - 2.0, 16.0, 6000.0);
     float glint = pow(ndh, shininess) * (shininess + 8.0) / (8.0 * 3.14159265) * 0.25;
 
-    float F = fresnel(dot(viewDir, waveNormal));
+    float F = fresnel(dot(viewDir, waveNormal)) * uFluidReflectivity;
     vec3 sky = skyRadiance(fragWorldPos, reflect(-viewDir, waveNormal), lightDir);
     color = mix(color, sky, F);
-    color += uSunColor * glint * diffuse * 0.9;
+    color += uSunColor * glint * diffuse * 0.9 * uFluidReflectivity * (1.0 - uFluidFrozen);
+
+    // Lava glows in its own colour (HDR, so it blooms); ice and crust show cracks.
+    if (uFluidEmissive > 0.0 || uFluidCrust > 0.0 || uFluidFrozen > 0.0)
+    {
+        // Two crack scales: large plates and fine fractures inside them.
+        vec2 cells = fluidCells(sphereNormal, 3.0);
+        vec2 fine = fluidCells(sphereNormal, 11.0);
+        float cracks = max(cells.x, fine.x * 0.6);
+        float plate = smoothstep(1.0 - uFluidCrust, 1.0 - uFluidCrust + 0.15, cells.y) * (1.0 - cracks);
+        vec3 crustLit = uCrustColor * (0.7 + 0.6 * fine.y) * (uAmbientLight + diffuse * uSunIntensity);
+        // Hot spots: the lava glows unevenly, brightest along the cracks.
+        float heat = 0.6 + 0.4 * fluidHash(floor(sphereNormal * kWaveReferenceRadius * 6.0)) + cracks * 0.6;
+        color += body.color * uFluidEmissive * heat * (1.0 - plate);
+        color = mix(color, crustLit, plate);
+        color *= 1.0 - cracks * uFluidFrozen * 0.3; // ice cracks read darker
+    }
 
     float foam = shoreFoam(depthUnits, sphereNormal);
-    color = mix(color, vec3(0.85, 0.92, 0.95) * (uAmbientLight + diffuse * uSunIntensity), foam * 0.6);
+    color = mix(color, uFoamColor * (uAmbientLight + diffuse * uSunIntensity), foam * 0.6);
 
     // Reflection makes grazing water opaque even where it is shallow and clear; foam is opaque.
     float alpha = clamp(max(max(body.opacity, F), foam * 0.6), 0.0, 1.0);
+    alpha = max(alpha, max(uFluidFrozen, step(0.0001, uFluidEmissive)) * smoothstep(0.0, 0.01, depthUnits));
 
     outColor = vec4(color, alpha);
 }
