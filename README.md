@@ -96,7 +96,7 @@ Everything is handled through CMake FetchContent, so you don't need to install a
 |---------|---------|---------|
 | [GLFW](https://github.com/glfw/glfw) | 3.4 | Window and input |
 | [GLM](https://github.com/g-truc/glm) | 1.0.1 | Mathematics |
-| [ImGui](https://github.com/ocornut/imgui) | docking | Debug GUI |
+| [ImGui](https://github.com/ocornut/imgui) | docking | GUI |
 | [gl3w](https://github.com/skaslev/gl3w) | latest | OpenGL loader |
 | [stb](https://github.com/nothings/stb) | latest | Image loading and PNG export |
 | [nlohmann/json](https://github.com/nlohmann/json) | 3.11.3 | JSON parsing |
@@ -113,7 +113,7 @@ Press `F1` in the app for the same key list. It opens once on first launch.
 | | `W A S D` | Fly forward, left, back, right. In Orbit this switches to Fly |
 | | `Q / E` | Fly down / up |
 | | `RMB` drag | Look around. In Orbit this switches to Fly |
-| | `Shift` / `Ctrl` | Faster x4 / slower x0.25 |
+| | `Left Shift` / `Left Ctrl` | Fly faster x4 / slower x0.25 |
 | | `G` | Switch Orbit / Fly (Orbit is the default) |
 | | `O` | Auto-rotate |
 | | `F` | Frame the planet |
@@ -141,17 +141,17 @@ All settings live in one docked Planet window with seven tabs. Every control has
 - **Surface** - materials, climate, surface rules and textures
 - **Ocean** - sea level, water, waves, fluid and seabed colour
 - **Sky** - atmosphere, haze and clouds
-- **Light** - sun, shadows and night lights, camera exposure
+- **Light** - sun, shadows and night lights, exposure, bloom and stars
 - **Camera** - view, orbit motion and the turntable
 - **System** - frame stats and mesh detail (LOD)
 
-The top bar shows the planet type, the seed, a Reroll button, the camera mode, altitude and speed, and the frame time.
+The top bar has the Help and View menus (View > Reset Layout restores the window layout), then the planet type, the seed, a Reroll button, the camera mode, altitude and speed, and the frame time.
 
 The five look tabs (Terrain, Surface, Ocean, Sky, Light) each have Lock, Randomize, Reset and an "N edited" count:
 
 - **Lock** keeps the tab's values on Reroll. A locked Terrain tab still takes its land shape from the seed.
-- **Randomize** gives new values to this tab only. The seed stays.
-- **Reset** sets the tab back to the type's values at the current seed.
+- **Randomize** gives new values to this tab only. The seed stays. It is greyed out on a locked tab, and when the type has no random values for the tab (Earth has none).
+- **Reset** sets the tab back to the type's values at the current seed. It is greyed out on a locked tab.
 - Edited values show in amber. Right-click a value for Reset value, Copy and Paste.
 - An amber `*` after the seed means the seed alone no longer gives this planet: a tab is locked, edited or randomized.
 - Reroll gives every unlocked tab the type's values at a new seed.
