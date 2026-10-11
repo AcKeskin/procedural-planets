@@ -667,6 +667,9 @@ void Application::RenderGui()
 
         if (randomize && _activeBody)
             ShuffleTerrain();
+        // A seed typed into the panel is a new world for a planet type: roll its traits too.
+        if (needsRegen && _activeHasVariety && _genConfig.seed != _rolledSeed && RerollActiveBody())
+            needsRegen = false;
 
         needsRegen |= _surfacePanel.Draw(_activeBody.get(), _surfaceSettings, _oceanSettings, _seaLevel, visibility.surface);
         _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
@@ -761,6 +764,7 @@ bool Application::SwitchBodyByPath(const std::string& path, bool resetCamera)
     }
     _activeBodyPath = path;
     _activeHasVariety = render::types::HasVariety(body);
+    _rolledSeed = _genConfig.seed;
     SwitchBody(std::move(config), render::types::ParseBodyLook(world), resetCamera);
     return true;
 }

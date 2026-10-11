@@ -192,6 +192,7 @@ private:
     std::string _activeBodyId;                     // registry id of the active body
     std::string _activeBodyPath;                   // JSON the active body came from
     bool _activeHasVariety = false;                // its type rolls traits from the seed
+    uint32_t _rolledSeed = 0;                      // seed the active world's traits were rolled with
 
     // Frame state
     float _lastTime;
