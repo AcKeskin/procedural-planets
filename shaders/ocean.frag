@@ -136,14 +136,17 @@ vec2 fluidCells(vec3 dir, float scale)
     vec3 p = dir * kWaveReferenceRadius * scale;
     // Warp the lattice so plate edges wander instead of running straight.
     p += vec3(sin(p.y * 1.7 + p.z * 0.6), sin(p.z * 1.3 + p.x * 0.8), sin(p.x * 1.5 + p.y * 0.7)) * 0.35;
-    vec3 i = floor(p);
+    // Points stay near their cell centre, so the 2x2x2 cells around p hold the nearest two
+    // (8 cells instead of 27; the ocean pass pays this per pixel).
+    vec3 i = floor(p - 0.5);
     float best = 1e9, second = 1e9, id = 0.0;
-    for (int z = -1; z <= 1; ++z)
-        for (int y = -1; y <= 1; ++y)
-            for (int x = -1; x <= 1; ++x)
+    for (int z = 0; z <= 1; ++z)
+        for (int y = 0; y <= 1; ++y)
+            for (int x = 0; x <= 1; ++x)
             {
                 vec3 c = i + vec3(x, y, z);
-                vec3 q = c + vec3(fluidHash(c), fluidHash(c + 17.0), fluidHash(c + 31.0)) - p;
+                vec3 jitter = vec3(fluidHash(c), fluidHash(c + 17.0), fluidHash(c + 31.0)) - 0.5;
+                vec3 q = c + 0.5 + jitter * 0.8 - p;
                 float d = dot(q, q);
                 if (d < best)
                 {
@@ -237,7 +240,7 @@ void main()
     color += uSunColor * glint * diffuse * 0.9 * uFluidReflectivity * (1.0 - uFluidFrozen);
 
     // Lava glows in its own colour (HDR, so it blooms); ice and crust show cracks.
-    if (uFluidEmissive > 0.0 || uFluidCrust > 0.0 || uFluidFrozen > 0.0)
+    if (uFluidCrust > 0.0 || uFluidFrozen > 0.0)
     {
         // Two crack scales: large plates and fine fractures inside them.
         vec2 cells = fluidCells(sphereNormal, 3.0);
@@ -251,6 +254,8 @@ void main()
         color = mix(color, crustLit, plate);
         color *= 1.0 - cracks * uFluidFrozen * 0.3; // ice cracks read darker
     }
+    else if (uFluidEmissive > 0.0)
+        color += body.color * uFluidEmissive; // a glowing fluid with no crust (acid) needs no cells
 
     float foam = shoreFoam(depthUnits, sphereNormal);
     color = mix(color, uFoamColor * (uAmbientLight + diffuse * uSunIntensity), foam * 0.6);
