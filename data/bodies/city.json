@@ -57,14 +57,15 @@
             "mieCoefficient": 1.2
         },
         "climate": {
-            "cityCoverage": 1.0,
+            "cityCoverage": 0.55,
             "polarCaps": 0.08
         },
         "clouds": {
             "coverage": 0.35
         },
         "lighting": {
-            "nightLights": 0.8
+            "ambient": 0.08,
+            "nightLights": 1.0
         },
         "materials": {
             "rockTint": [
@@ -268,10 +269,16 @@
         "terraces": 0.7
     },
     "variety": {
+        "render.climate.cityCoverage": {
+            "range": [
+                0.4,
+                0.75
+            ]
+        },
         "render.lighting.nightLights": {
             "range": [
-                0.5,
-                1.1
+                0.7,
+                1.3
             ]
         },
         "render.palette": {

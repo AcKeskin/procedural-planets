@@ -80,30 +80,57 @@ vec3 nightLights(vec3 worldDir, float day, float habitability, vec3 lightColor)
     return lightColor * intensity;
 }
 
-// City world: lit everywhere it is land, at three cell scales so it reads as a dense network from
-// orbit and as separate lights up close. Same hard night gate as nightLights.
-vec3 cityLights(vec3 worldDir, float day, float strength, vec3 lightColor)
+// Smooth value noise in [0,1] on nightHash3 lattice values.
+float cityNoise(vec3 p)
 {
-    float night = 1.0 - smoothstep(0.0, 0.12, day);
-    if (night < 0.002 || strength < 0.002)
+    vec3 i = floor(p);
+    vec3 f = p - i;
+    f = f * f * (3.0 - 2.0 * f);
+    float n000 = nightHash3(i).x, n100 = nightHash3(i + vec3(1, 0, 0)).x;
+    float n010 = nightHash3(i + vec3(0, 1, 0)).x, n110 = nightHash3(i + vec3(1, 1, 0)).x;
+    float n001 = nightHash3(i + vec3(0, 0, 1)).x, n101 = nightHash3(i + vec3(1, 0, 1)).x;
+    float n011 = nightHash3(i + vec3(0, 1, 1)).x, n111 = nightHash3(i + vec3(1, 1, 1)).x;
+    return mix(mix(mix(n000, n100, f.x), mix(n010, n110, f.x), f.y),
+               mix(mix(n001, n101, f.x), mix(n011, n111, f.x), f.y), f.z);
+}
+
+// How built-up the ground is: a few large metros, then towns. coverage 1 = every land pixel
+// (an ecumenopolis), lower values leave countryside dark between the cities.
+float cityDensity(vec3 worldDir, float coverage)
+{
+    // Warped so the value-noise lattice does not show as squares.
+    vec3 p = worldDir * 4.0;
+    p += vec3(cityNoise(p * 1.7 + 11.0), cityNoise(p * 1.7 + 23.0), cityNoise(p * 1.7 + 37.0)) * 1.2;
+    float field = cityNoise(p) * 0.6 + cityNoise(p * 2.9 + 31.0) * 0.3 + cityNoise(p * 8.3 + 73.0) * 0.1;
+    float edge = 1.0 - coverage;
+    return smoothstep(edge, edge + 0.18, field);
+}
+
+// City world lights on the night side: a faint glow over built-up ground plus street-light dots
+// at three cell sizes. A dot layer whose cells are smaller than a few pixels fades to its average,
+// so the far planet glows instead of glittering and the near ground never shows big blobs.
+// sunHeight = dot(sphere normal, direction to the sun).
+vec3 cityLights(vec3 worldDir, float sunHeight, float strength, float density, vec3 lightColor)
+{
+    float night = smoothstep(0.05, -0.3, sunHeight); // wide fade past the terminator, no edge
+    if (night < 0.002 || strength < 0.002 || density < 0.002)
         return vec3(0.0);
 
-    float glow = 0.0;
-    float cells = 90.0;
-    float weight = 0.35; // coarse cells are districts: dimmer, so they do not read as blobs up close
+    float glow = density * 0.04;
+    float cells = 400.0;
     for (int i = 0; i < 3; ++i)
     {
-        vec3 h = nightHash3(floor(worldDir * cells) + float(i) * 17.0);
-        if (h.z > 0.62)
-        {
-            float d = length((fract(worldDir * cells) - h).xy * 1.4);
-            float dot_ = smoothstep(0.5, 0.0, d);
-            glow += dot_ * dot_ * weight;
-        }
+        vec3 p = worldDir * cells;
+        vec3 h = nightHash3(floor(p) + float(i) * 17.0);
+        float lit = step(1.0 - density * 0.8, h.z);
+        float d = length((fract(p) - h).xy * 1.4);
+        float dots = lit * smoothstep(0.35, 0.0, d);
+        float pixelsPerCell = 1.0 / max(length(fwidth(p)), 1e-6);
+        float average = density * 0.8 * 0.08; // share of lit cells x mean dot energy
+        glow += mix(average, dots, smoothstep(2.0, 6.0, pixelsPerCell)) * 0.3;
         cells *= 5.0;
-        weight = 1.0;
     }
-    return lightColor * (glow + 0.02) * strength * night;
+    return lightColor * glow * strength * night;
 }
 
 // Blinn-Phong specular term

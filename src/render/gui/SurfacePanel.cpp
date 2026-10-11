@@ -133,8 +133,8 @@ bool SurfacePanel::DrawPlanetType(BodyRuntime& body, SurfaceSettings& surface)
         ImGui::SliderFloat("Tidally Locked", &surface.substellar, 0.0f, 1.0f, "%.2f");
         ImGui::SetItemTooltip("1 = eye world: hot desert under the sun, a living ring, frozen night side");
         ImGui::SliderFloat("City Coverage", &surface.cityCoverage, 0.0f, 1.0f, "%.2f");
-        ImGui::SetItemTooltip("City lights on all land, not only habitable land (Scene > Night Lights sets "
-                              "the brightness)");
+        ImGui::SetItemTooltip("How much land is built up: low = separate cities, 1 = one planet-wide city "
+                              "(Scene > Night Lights sets the brightness)");
 
         ImGui::Separator();
         ImGui::Text("Terrain Style (regenerates)");

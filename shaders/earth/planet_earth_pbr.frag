@@ -358,8 +358,13 @@ void main()
                        * (1.0 - snowW);
     color += nightLights(normalize(vWorldPos), day, habitability, vec3(1.0, 0.8, 0.45));
     if (uCityCoverage > 0.0)
-        color += cityLights(normalize(vWorldPos), day, uNightLightStrength * uCityCoverage * (1.0 - snowW),
+    {
+        // Cities favour lowlands and avoid steep rock and ice.
+        float buildable = (1.0 - smoothstep(0.35, 0.7, h)) * (1.0 - rockW) * (1.0 - snowW);
+        float density = cityDensity(normalize(vWorldPos), uCityCoverage) * buildable;
+        color += cityLights(normalize(vWorldPos), dot(sphereNormal, lightDir), uNightLightStrength, density,
                             vec3(1.0, 0.8, 0.45));
+    }
 
     // Mild gamma lift so shadows and midtones don't go muddy; no roll-off, the scene is HDR and
     // tonemap.glsl rolls highlights off once, at the end.
