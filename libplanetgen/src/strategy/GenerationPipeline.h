@@ -41,6 +41,25 @@ struct PipelineResult
     GpuBufferHandle shadingGpuBuffer = 0;
 };
 
+// Optional continent-mask cache, owned by the body and threaded into a call.
+// When non-null, the pipeline ensures (bakes/reuses) the mask and binds it for
+// the height stage. Null = no mask (e.g. the standalone per-stage ABI calls).
+// Namespace scope (not nested) so `= {}` default arguments compile on GCC/Clang.
+struct PipelineMaskCache
+{
+    GpuTextureHandle* texture = nullptr; // body's cached handle (inout)
+    uint64_t*         key     = nullptr; // body's cache key (inout)
+};
+
+// Optional macro world cache, owned by the context (shared by its bodies). When
+// non-null and the config enables the layer, the pipeline bakes/reuses the
+// field (it needs the mask) and binds it for height + shading.
+struct PipelineMacroCache
+{
+    GpuTextureHandle* texture = nullptr; // body's cached handle (inout)
+    uint64_t*         key     = nullptr; // body's cache key (inout)
+};
+
 class GenerationPipeline
 {
 public:
@@ -48,23 +67,8 @@ public:
                        const ShaderRegistry& registry,
                        const PaletteRegistry& palettes);
 
-    // Optional continent-mask cache, owned by the body and threaded into a call.
-    // When non-null, the pipeline ensures (bakes/reuses) the mask and binds it for
-    // the height stage. Null = no mask (e.g. the standalone per-stage ABI calls).
-    struct MaskCache
-    {
-        GpuTextureHandle* texture = nullptr; // body's cached handle (inout)
-        uint64_t*         key     = nullptr; // body's cache key (inout)
-    };
-
-    // Optional macro world cache, owned by the context (shared by its bodies). When
-    // non-null and the config enables the layer, the pipeline bakes/reuses the
-    // field (it needs the mask) and binds it for height + shading.
-    struct MacroCache
-    {
-        GpuTextureHandle* texture = nullptr; // body's cached handle (inout)
-        uint64_t*         key     = nullptr; // body's cache key (inout)
-    };
+    using MaskCache  = PipelineMaskCache;
+    using MacroCache = PipelineMacroCache;
 
     // Run the full pass sequence from a config. Enables erosion only when the
     // config's erosion block is on. `vertices` = packed float3 (x,y,z per vertex).

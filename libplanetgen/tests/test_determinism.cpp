@@ -1,8 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "planetgen/planetgen.h"
-#include <vector>
+#include <cmath>
 #include <cstring>
+#include <vector>
 
 // Step 9: Determinism harness.
 // Runs height (and shading) passes twice with identical inputs on a headless backend
