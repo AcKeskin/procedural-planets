@@ -22,6 +22,7 @@ bool SurfacePanel::Draw(
     {
         regen |= DrawShadingBlock(*activeBody);
         regen |= DrawPlanetType(*activeBody, surface);
+        DrawSurfaceRules(surface);
     }
 
     if (activeBody && activeBody->HasSolidSurface())
@@ -159,6 +160,116 @@ bool SurfacePanel::DrawPlanetType(BodyRuntime& body, SurfaceSettings& surface)
         style("Spires", ts.spires, 2.0f, "Tall pointed rock or crystal spikes");
     }
     return regen;
+}
+
+void SurfacePanel::DrawSurfaceRules(SurfaceSettings& s)
+{
+    if (!ImGui::CollapsingHeader("Surface Rules"))
+        return;
+    auto color = [](const char* label, glm::vec3& c, const char* tip)
+    {
+        ImGui::ColorEdit3(label, &c.x);
+        ImGui::SetItemTooltip("%s", tip);
+    };
+    auto value = [](const char* label, float& v, float lo, float hi, const char* tip)
+    {
+        ImGui::SliderFloat(label, &v, lo, hi, "%.3f");
+        ImGui::SetItemTooltip("%s", tip);
+    };
+    auto range = [](const char* label, glm::vec2& v, float lo, float hi, const char* tip)
+    {
+        ImGui::SliderFloat2(label, &v.x, lo, hi, "%.2f");
+        ImGui::SetItemTooltip("%s", tip);
+    };
+
+    if (ImGui::TreeNode("Rock"))
+    {
+        color("Rock Dark", s.rock.colorA, "Rock colour at the dark end of the grain");
+        color("Rock Light", s.rock.colorB, "Rock colour at the light end of the grain");
+        color("Streak Color", s.rock.streakColor, "Colour of the iron-like streaks in the rock");
+        value("Streak Amount", s.rock.streakAmount, 0.0f, 1.0f, "How strongly the streaks show");
+        value("Roughness Dark", s.rock.roughnessA, 0.0f, 1.0f, "Roughness of the dark rock (1 = matte)");
+        value("Roughness Light", s.rock.roughnessB, 0.0f, 1.0f, "Roughness of the light rock (1 = matte)");
+        value("Rock Slope", s.rock.slope, 0.0f, 1.0f, "Steepness where rock replaces ground: lower = more rock");
+        value("Slope Noise", s.rock.slopeNoise, 0.0f, 0.6f, "How much that threshold wanders, so the edge is not clean");
+        value("Rock Softness", s.rock.softness, 0.0f, 0.4f, "Width of the blend between ground and rock");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Sand"))
+    {
+        color("Sand Dark", s.sand.colorA, "Sand colour at the dark end of the grain");
+        color("Sand Light", s.sand.colorB, "Sand colour at the light end of the grain");
+        value("Sand Roughness", s.sand.roughness, 0.0f, 1.0f, "Roughness of sand (1 = matte)");
+        range("Aridity", s.sand.aridity, 0.0f, 1.0f, "Dryness range where beaches and deserts turn to sand");
+        range("Beach Height", s.sand.beachHeight, 0.0f, 1.0f, "Sand fades out over this height range");
+        range("Desert Aridity", s.sand.desertAridity, 0.0f, 1.0f, "Dryness range where the sand texture takes over");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Snow"))
+    {
+        color("Snow Dark", s.snow.colorA, "Snow colour at the dark end of the grain");
+        color("Snow Light", s.snow.colorB, "Snow colour at the light end of the grain");
+        value("Snow Roughness", s.snow.roughness, 0.0f, 1.0f, "Roughness of snow (lower = more glint)");
+        value("Cold Lowering", s.snow.coldLowering, 0.0f, 0.3f, "How far cold climates pull the snow line down");
+        value("Blend Below", s.snow.blendBelow, 0.0f, 0.5f, "Snow fades in this far below the snow line");
+        value("Blend Above", s.snow.blendAbove, 0.0f, 0.5f, "Snow is full this far above the snow line");
+        value("Polar Temperature", s.snow.polarTemperature, 0.0f, 0.3f, "Temperature below which the poles freeze");
+        value("Polar Amount", s.snow.polarAmount, 0.0f, 1.0f, "How white the frozen poles get");
+        range("Slope Shed", s.snow.slopeShed, 0.0f, 1.0f, "Steepness range where snow slides off");
+        value("Shed Amount", s.snow.shedAmount, 0.0f, 1.0f, "How much snow steep slopes lose");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Ground"))
+    {
+        range("Lightness", s.ground.lightness, 0.0f, 2.0f, "Patchy lightness range of the biome colour");
+        value("Ground Roughness", s.ground.roughness, 0.0f, 1.0f, "Roughness of the flat ground");
+        range("Soil Dryness", s.ground.soilDryness, 0.0f, 1.0f, "Dryness range where bare soil replaces grass");
+        value("Soil Amount", s.ground.soilAmount, 0.0f, 1.0f, "Most of the flat ground that soil can cover");
+        value("Polar Soil", s.ground.polarSoil, 0.0f, 1.0f, "Bare soil in the cold tundra band");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Detail"))
+    {
+        range("Grain", s.detail.grain, 0.0f, 2.0f, "Range of the fine albedo grain on every material");
+        value("Grain Snow Fade", s.detail.grainSnowFade, 0.0f, 1.0f, "How much smoother snow is than other ground");
+        value("Grain Frequency", s.detail.fineFrequency, 0.5f, 12.0f, "Size of the grain: higher = finer");
+        value("Patch Frequency", s.detail.mediumFrequency, 0.1f, 4.0f, "Size of the patchy variation: higher = smaller");
+        value("Bump Frequency", s.detail.bumpFrequency, 5.0f, 150.0f, "Size of the fine bumps: higher = finer");
+        value("Bump Tilt", s.detail.bumpTilt, 0.0f, 0.05f, "How strongly the fine bumps tilt the light");
+        value("Bump Snow Fade", s.detail.bumpSnowFade, 0.0f, 1.0f, "How much flatter snow is");
+        value("Texture Bump", s.detail.textureBump, 0.0f, 2.0f, "Tilt from the material texture normal maps");
+        value("Roughness Floor", s.detail.roughnessFloor, 0.0f, 1.0f, "Ground never gets glossier than this");
+        value("Rock Roughness Floor", s.detail.matteRoughnessFloor, 0.0f, 1.0f,
+              "Rock and snow never get glossier than this");
+        value("Gamma", s.detail.gamma, 0.5f, 1.5f, "Below 1 lifts shadows and midtones");
+        value("Temperature Noise", s.detail.temperatureNoise, 0.0f, 0.3f, "Noise on the climate band borders");
+        value("Moisture Noise", s.detail.moistureNoise, 0.0f, 0.5f, "Patchy noise on moisture (biome borders)");
+        value("Moisture Detail", s.detail.moistureDetailNoise, 0.0f, 0.5f, "Fine noise on moisture");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Textures"))
+    {
+        const char* names[SurfaceSettings::TextureCount] = {"Rock", "Grass", "Sand", "Snow", "Soil"};
+        for (int i = 0; i < SurfaceSettings::TextureCount; ++i)
+        {
+            ImGui::PushID(i);
+            ImGui::SeparatorText(names[i]);
+            auto& t = s.textures[i];
+            value("Fine Tile", t.fineTile, 0.01f, 0.5f, "Size of the fine texture tile: larger = bigger features");
+            value("Coarse Tile", t.coarseTile, 0.05f, 2.0f, "Size of the coarse tile that breaks up the repeat");
+            value("Strength", t.strength, 0.0f, 2.0f, "How much the texture changes the colour");
+            value("Normal Strength", t.normalStrength, 0.0f, 3.0f, "How much the texture tilts the light");
+            ImGui::PopID();
+        }
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Seafloor"))
+    {
+        color("Shallow Floor", s.seafloor.shallowColor, "Ground colour just below sea level");
+        color("Deep Floor", s.seafloor.deepColor, "Ground colour deep below sea level");
+        value("Depth Range", s.seafloor.depthRange, 0.005f, 0.3f, "Depth over which the floor goes from shallow to deep");
+        ImGui::TreePop();
+    }
 }
 
 void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& seaLevel)

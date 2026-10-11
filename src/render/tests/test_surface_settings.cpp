@@ -2,6 +2,7 @@
 
 #include "settings/SurfaceBlock.h"
 #include "types/BodyLook.h"
+#include "types/BodyVariety.h"
 
 #include <nlohmann/json.hpp>
 
@@ -45,6 +46,18 @@ TEST_CASE("surface: older materials keys still apply; render.surface wins over t
     CHECK(look.surface.rock.tint == glm::vec3(0.2f));
     CHECK(look.surface.ground.vegetation == 0.0f);
     CHECK(look.surface.sand.cover == 1.0f);
+}
+
+TEST_CASE("surface: a variety rule on render.surface rolls a value inside its range", "[surface]")
+{
+    const auto body = nlohmann::json::parse(R"({"render": {"surface": {"rock": {"slope": 0.35}}},
+        "variety": {"render.surface.rock.slope": {"range": [0.1, 0.2]}}})");
+    for (uint32_t seed = 0; seed < 20; ++seed)
+    {
+        const float slope = types::ParseBodyLook(types::RollVariety(body, seed)).surface.rock.slope;
+        CHECK(slope >= 0.1f);
+        CHECK(slope <= 0.2f);
+    }
 }
 
 TEST_CASE("surface: wrong types are ignored", "[surface]")

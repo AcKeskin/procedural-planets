@@ -26,6 +26,8 @@ private:
     bool DrawShadingBlock(BodyRuntime& body);
     // Planet type traits: materials and climate (live), terrain styles (regenerate).
     bool DrawPlanetType(BodyRuntime& body, SurfaceSettings& surface);
+    // Every rule of the surface shader, grouped by material (live, no regenerate).
+    void DrawSurfaceRules(SurfaceSettings& surface);
     void DrawOceanContent(effects::OceanSettings& settings, float& seaLevel);
 };
 

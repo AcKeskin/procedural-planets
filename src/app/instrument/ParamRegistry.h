@@ -7,6 +7,7 @@
 #include "../../render/settings/OceanSettings.h"
 #include "../../render/settings/AtmosphereSettings.h"
 #include "../../render/settings/CloudSettings.h"
+#include "../../render/settings/SurfaceSettings.h"
 
 #include <planetgen/planetgen.hpp>
 
@@ -34,6 +35,7 @@ struct ParamTargets
     render::GenerationConfig* gen = nullptr;
     float* seaLevel = nullptr;
     planetgen::BodyConfig* body = nullptr;
+    render::SurfaceSettings* surface = nullptr;
 };
 
 // Result of applying a dotted-key parameter.
