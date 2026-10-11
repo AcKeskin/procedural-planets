@@ -3,15 +3,14 @@ add_library(render STATIC
     Window.cpp
     Shader.cpp
     gui/GuiManager.cpp
-    gui/ScenePanel.cpp
     gui/TerrainTab.cpp
     gui/SurfaceTab.cpp
     gui/OceanTab.cpp
+    gui/SkyTab.cpp
+    gui/LightTab.cpp
     gui/SystemTab.cpp
-    gui/AtmospherePanel.cpp
     gui/DebugPanel.cpp
     gui/CinematicPanel.cpp
-    gui/CloudsPanel.cpp
     gui/PlanetWindow.cpp
     Renderer.cpp
     GpuTimer.cpp

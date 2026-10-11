@@ -1,11 +1,10 @@
 #pragma once
 
-#include "AtmospherePanel.h"
 #include "CinematicPanel.h"
-#include "CloudsPanel.h"
 #include "DebugPanel.h"
-#include "ScenePanel.h"
+#include "LightTab.h"
 #include "OceanTab.h"
+#include "SkyTab.h"
 #include "SurfaceTab.h"
 #include "SystemTab.h"
 #include "TerrainTab.h"
@@ -72,13 +71,12 @@ public:
     PlanetActions Draw(PlanetUi& ui);
 
 private:
-    ScenePanel _scene;
     TerrainTab _terrain;
     SystemTab _system;
     SurfaceTab _surfaceTab;
     OceanTab _ocean;
-    AtmospherePanel _atmosphere;
-    CloudsPanel _clouds;
+    SkyTab _sky;
+    LightTab _light;
     DebugPanel _debug;
     CinematicPanel _cinematic;
 };

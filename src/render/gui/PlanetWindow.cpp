@@ -1,5 +1,6 @@
 #include "PlanetWindow.h"
 #include "GuiLayout.h"
+#include "../BodyRuntime.h"
 #include "../settings/AtmosphereSettings.h"
 #include "../settings/CinematicSettings.h"
 #include "../settings/CloudSettings.h"
@@ -48,14 +49,16 @@ PlanetActions PlanetWindow::Draw(PlanetUi& ui)
         }
         if (ImGui::BeginTabItem("Sky"))
         {
-            _atmosphere.DrawContent(*ui.atmosphere);
-            ImGui::SeparatorText("Clouds");
-            _clouds.DrawContent(*ui.clouds, ui.atmosphere->enabled);
+            PushLabelColumn();
+            _sky.Draw(*ui.atmosphere, *ui.clouds, ui.scene->lighting, !ui.body || ui.body->HasAtmosphere());
+            ImGui::PopItemWidth();
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Light"))
         {
-            _scene.DrawContent(*ui.scene, ui.atmosphere->enabled);
+            PushLabelColumn();
+            _light.Draw(*ui.scene, *ui.surface);
+            ImGui::PopItemWidth();
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Camera"))
