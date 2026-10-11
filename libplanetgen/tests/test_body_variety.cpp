@@ -59,6 +59,21 @@ TEST_CASE("body_variety: rolled values stay inside their rules", "[body_variety]
     }
 }
 
+TEST_CASE("body_variety: adding a render.surface key does not change the other rolls", "[body_variety]")
+{
+    json withSurface = kBody;
+    withSurface["variety"]["render.surface.rock.slope"] = json::parse(R"({"range": [0.1, 0.2]})");
+    for (uint32_t seed = 0; seed < 10; ++seed)
+    {
+        json a = planetgen::RollVariety(kBody, seed);
+        json b = planetgen::RollVariety(withSurface, seed);
+        b["render"].erase("surface");
+        b.erase("variety");
+        a.erase("variety");
+        CHECK(a == b);
+    }
+}
+
 TEST_CASE("body_variety: no variety block or a bad rule leaves the body alone", "[body_variety]")
 {
     const json plain = json::parse(R"({"shape": {"heightScale": 0.03}})");

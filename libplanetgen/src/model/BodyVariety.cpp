@@ -83,6 +83,16 @@ bool Roll(const json& rule, std::mt19937& rng, json& out)
     }
     return false;
 }
+
+// FNV-1a: a stable hash of a key, the same on every build.
+uint32_t KeyHash(const std::string& key)
+{
+    uint32_t h = 2166136261u;
+    for (unsigned char c : key)
+        h = (h ^ c) * 16777619u;
+    return h;
+}
+
 } // namespace
 
 bool HasVariety(const json& body)
@@ -103,7 +113,12 @@ json RollVariety(const json& body, uint32_t seed)
     for (const auto& [key, rule] : body["variety"].items())
     {
         json value;
-        if (Roll(rule, rng, value))
+        // Surface keys roll from their own stream per key, so adding one never changes the
+        // world the other keys already give for a seed.
+        const bool own = key.rfind("render.surface.", 0) == 0;
+        std::seed_seq keySeq{seed, 0x9E3779B9u, KeyHash(key)};
+        std::mt19937 keyRng(keySeq);
+        if (Roll(rule, own ? keyRng : rng, value))
             Slot(world, key) = value;
         else
             std::cerr << "[planetgen] variety: Skipping '" << key << "': expected {range|pick|mix: [...]}" << std::endl;
