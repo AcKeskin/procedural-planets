@@ -1,7 +1,12 @@
 #pragma once
 
+#include <nlohmann/json_fwd.hpp>
+
 namespace planets::app
 {
+
+// True only for an object with a boolean true helpSeen. Any other type counts as not seen.
+bool IsHelpSeen(const nlohmann::json& state);
 
 // F1 key list, built from the Keybinds table. Opens by itself on the first launch.
 class HelpOverlay

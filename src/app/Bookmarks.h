@@ -22,6 +22,8 @@ public:
     static constexpr int SlotCount = 9;
 
     void Load(const std::string& path);
+    // Same as Load, from text. Never throws; a bad entry is skipped.
+    void LoadFromJson(const std::string& text);
     bool Save(const std::string& path) const;
 
     // slot is 1..9
