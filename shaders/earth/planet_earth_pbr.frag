@@ -15,6 +15,7 @@
 #include "pbr.glsl"
 #include "ground_material.glsl"
 #include "biome_palette.glsl"
+#include "surface_params.glsl"
 
 in vec3 vNormal;
 in vec3 vWorldPos;
@@ -30,17 +31,6 @@ uniform float uNightLightStrength; // emissive city lights on the night side (0 
 
 // Cloud shadow: sample the shared coverage field along the sun so shadows track the visible clouds.
 uniform float uCloudShadowStrength;
-
-// Planet type material tints (1 = Earth).
-uniform vec3 uRockTint;
-uniform vec3 uSandTint;
-uniform vec3 uSnowTint;
-uniform float uVegetation; // 1 = Earth grass texture on the flats, 0 = bare soil
-uniform float uSandCover;  // 1 = sand on every flat
-// Planet type climate traits (0 = Earth).
-uniform float uPolarCaps;
-uniform float uSubstellar;
-uniform float uCityCoverage;
 
 uniform vec3  uCameraPos;
 uniform float uSeaLevel;
@@ -59,10 +49,6 @@ uniform float uFresnelPow;
 uniform float uHazeStrength;
 uniform vec3  uHazeColor;
 uniform float uAOStrength;
-
-const vec3 DEEP_OCEAN    = vec3(0.015, 0.05, 0.13);
-const vec3 SHALLOW_OCEAN = vec3(0.04, 0.16, 0.34);
-const vec3 COASTAL       = vec3(0.10, 0.38, 0.40);
 
 // ---- procedural noise (self-contained; no dependency on the compute-side noise) ----
 float hash13(vec3 p)
@@ -142,28 +128,28 @@ struct Material { vec3 albedo; float roughness; };
 
 Material rockMaterial(vec3 wp, float footprint, float v)
 {
-    // grey granite with iron/ochre streaks
-    vec3 base = mix(vec3(0.30, 0.29, 0.27), vec3(0.42, 0.40, 0.37), v) * uRockTint;
+    // rock grain between two colours, with iron/ochre-like streaks
+    vec3 base = mix(sRockColorA.rgb, sRockColorB.rgb, v) * sRockTint.rgb;
     float ochre = smoothstep(0.55, 0.8, fbmFootprint(wp, 0.6, 4, footprint, 0.5).x);
-    base = mix(base, vec3(0.34, 0.26, 0.18) * uRockTint, ochre * 0.5);
-    return Material(base, mix(0.95, 0.7, v));
+    base = mix(base, sRockStreak.rgb * sRockTint.rgb, ochre * sRockStreak.w);
+    return Material(base, mix(sRockColorA.w, sRockColorB.w, v));
 }
 
 Material sandMaterial(float v)
 {
-    vec3 base = mix(vec3(0.62, 0.52, 0.36), vec3(0.74, 0.66, 0.46), v) * uSandTint;
-    return Material(base, 0.9);
+    vec3 base = mix(sSandColorA.rgb, sSandColorB.rgb, v) * sSandTint.rgb;
+    return Material(base, sSandColorA.w);
 }
 
 // Flat ground: the palette biome colour with patchy lightness.
 Material flatGroundMaterial(vec3 biomeColor, float v)
 {
-    return Material(biomeColor * mix(0.8, 1.15, v), 0.85);
+    return Material(biomeColor * mix(sGround.x, sGround.y, v), sGround.z);
 }
 
 Material snowMaterial(float v)
 {
-    return Material(mix(vec3(0.86, 0.88, 0.93), vec3(0.97, 0.98, 1.0), v) * uSnowTint, 0.4);
+    return Material(mix(sSnowColorA.rgb, sSnowColorB.rgb, v) * sSnowTint.rgb, sSnowColorA.w);
 }
 
 void main()
@@ -179,8 +165,8 @@ void main()
     // ---- ocean: simple PBR water, fresnel-tinted ----
     if (uHasSea != 0 && vHeight < uSeaLevel)
     {
-        float depth = clamp((uSeaLevel - vHeight) / 0.08, 0.0, 1.0);
-        vec3 waterAlbedo = mix(COASTAL, DEEP_OCEAN, depth);
+        float depth = clamp((uSeaLevel - vHeight) / sSeafloorShallow.w, 0.0, 1.0);
+        vec3 waterAlbedo = mix(sSeafloorShallow.rgb, sSeafloorDeep.rgb, depth);
         vec3 lit = cookTorrance(waterAlbedo, 0.0, 0.08, sphereNormal, viewDir,
                                 lightDir, vec3(uSunIntensity));
         vec3 color = lit + waterAlbedo * uAmbientLight;
@@ -207,28 +193,28 @@ void main()
 
     // Material variation fields (3D noise of position: seam-free and unstretched by construction).
     // The fine grain gains octaves down to a few pixels as the camera closes in.
-    vec4 fine = fbmFootprint(matPos, 3.0, 12, footprint, 0.5);
+    vec4 fine = fbmFootprint(matPos, sDetail2.w, 12, footprint, 0.5);
     float vFine   = fine.x;
-    float vMedium = fbmFootprint(matPos, 0.9, 4, footprint, 0.5).x; // patch-scale variation
+    float vMedium = fbmFootprint(matPos, sDetail0.w, 4, footprint, 0.5).x; // patch-scale variation
 
     // Climate: smooth fields, safe to interpolate per vertex. Per-pixel noise plus the vertex
     // detail channels (.z warped, .w small-scale) roughen biome borders so they never trace the
     // mesh triangles.
-    float temperature = clamp(vShadingData.x + (vShadingData.w - 0.5) * 0.06, 0.0, 1.0);
-    if (uSubstellar > 0.0)
+    float temperature = clamp(vShadingData.x + (vShadingData.w - 0.5) * sDetail3.x, 0.0, 1.0);
+    if (sClimate.y > 0.0)
     {
         // Tidally locked: temperature follows the sun height, not the latitude. The terrain stays
         // in the same place under the sun, so the hot eye and the frozen back never move.
         float sunHeight = dot(sphereNormal, -normalize(uLightDir));
         float eyeTemp = clamp(0.12 + 0.88 * sunHeight + (vShadingData.w - 0.5) * 0.12 - h * 0.25, 0.0, 1.0);
-        temperature = mix(temperature, eyeTemp, uSubstellar);
+        temperature = mix(temperature, eyeTemp, sClimate.y);
     }
-    float moisture    = clamp(vShadingData.y + (vMedium - 0.5) * 0.18 + (vShadingData.z - 0.5) * 0.12, 0.0, 1.0);
-    if (uSubstellar > 0.0)
+    float moisture    = clamp(vShadingData.y + (vMedium - 0.5) * sDetail3.y + (vShadingData.z - 0.5) * sDetail3.z, 0.0, 1.0);
+    if (sClimate.y > 0.0)
     {
         // The eye under the sun is baked dry.
         float sunHeight = dot(sphereNormal, -normalize(uLightDir));
-        moisture *= 1.0 - smoothstep(0.55, 0.95, sunHeight) * uSubstellar;
+        moisture *= 1.0 - smoothstep(0.55, 0.95, sunHeight) * sClimate.y;
     }
 
     Biome biome = whittakerBiome(temperature, moisture);
@@ -240,48 +226,48 @@ void main()
     // --- blend materials by slope / height / climate ---
     // Flats: the biome colour; beaches (dry, warm, low) blend to sand.
     float aridity = (1.0 - moisture) * smoothstep(0.35, 0.7, temperature);
-    float sandW = smoothstep(0.35, 0.65, aridity) * (1.0 - smoothstep(0.12, 0.25, h));
-    sandW = max(sandW, uSandCover);
+    float sandW = smoothstep(sSandRule.x, sSandRule.y, aridity) * (1.0 - smoothstep(sSandRule.z, sSandRule.w, h));
+    sandW = max(sandW, sSandTint.w);
     Material flatMat = flatGroundMaterial(biome.color, vMedium);
     flatMat.albedo    = mix(flatMat.albedo, sand.albedo, sandW);
     flatMat.roughness = mix(flatMat.roughness, sand.roughness, sandW);
 
     // rock takes over on slope (with noisy threshold so the line isn't clean)
-    float rockThresh = 0.35 + (vMedium - 0.5) * 0.25;
-    float rockW = smoothstep(rockThresh - 0.12, rockThresh + 0.12, steepness);
+    float rockThresh = sRockRule.x + (vMedium - 0.5) * sRockRule.y;
+    float rockW = smoothstep(rockThresh - sRockRule.z, rockThresh + sRockRule.z, steepness);
 
     Material mat;
     mat.albedo    = mix(flatMat.albedo, rock.albedo, rockW);
     mat.roughness = mix(flatMat.roughness, rock.roughness, rockW);
 
     // snow: altitude-driven, climate lowers the line; sheds on steep rock
-    float snowLineEff = uSnowLine - (1.0 - temperature) * 0.04;
-    float snowW = smoothstep(snowLineEff - 0.20, snowLineEff + 0.05, h);
-    snowW = max(snowW, smoothstep(0.04, 0.0, temperature) * 0.5);   // polar cap
-    if (uPolarCaps > 0.0)
+    float snowLineEff = uSnowLine - (1.0 - temperature) * sSnowRule0.x;
+    float snowW = smoothstep(snowLineEff - sSnowRule0.y, snowLineEff + sSnowRule0.z, h);
+    snowW = max(snowW, smoothstep(sSnowRule0.w, 0.0, temperature) * sSnowRule1.x);   // polar cap
+    if (sClimate.x > 0.0)
     {
         // Ice caps as a trait, also on hot worlds: by latitude, with a ragged edge.
-        float capEdge = 1.0 - uPolarCaps + (vShadingData.z - 0.5) * 0.08 + (vMedium - 0.5) * 0.04;
+        float capEdge = 1.0 - sClimate.x + (vShadingData.z - 0.5) * 0.08 + (vMedium - 0.5) * 0.04;
         snowW = max(snowW, smoothstep(capEdge - 0.015, capEdge + 0.015, abs(sphereNormal.y)));
     }
-    snowW *= 1.0 - smoothstep(0.55, 0.85, steepness) * 0.7;
+    snowW *= 1.0 - smoothstep(sSnowRule1.y, sSnowRule1.z, steepness) * sSnowRule1.w;
     mat.albedo    = mix(mat.albedo, snow.albedo, snowW);
     mat.roughness = mix(mat.roughness, snow.roughness, snowW);
 
     // Fine grain on every material (grass took none before), weaker on snow.
-    mat.albedo *= mix(1.0, mix(0.72, 1.28, vFine), 1.0 - snowW * 0.7);
+    mat.albedo *= mix(1.0, mix(sDetail0.x, sDetail0.y, vFine), 1.0 - snowW * sDetail0.z);
 
     // Texture detail: the same blend as above, spread over the five texture layers (dry flats get
     // the soil layer). Only layers with real weight are sampled.
     float flatW = (1.0 - rockW) * (1.0 - snowW);
-    float desert = smoothstep(0.45, 0.75, aridity);
+    float desert = smoothstep(sSoilRule.x, sSoilRule.y, aridity);
     sandW = max(sandW, desert);
-    float soilShare = max(smoothstep(0.6, 0.85, 1.0 - moisture) * 0.6, biome.polar * 0.7);
+    float soilShare = max(smoothstep(sSoilRule.z, sSoilRule.w, 1.0 - moisture) * sSoilRule2.x, biome.polar * sSoilRule2.y);
     float layerW[5];
     layerW[GROUND_ROCK]  = rockW * (1.0 - snowW);
     layerW[GROUND_SNOW]  = snowW;
     layerW[GROUND_SAND]  = flatW * sandW;
-    float grassShare = (1.0 - soilShare) * uVegetation;
+    float grassShare = (1.0 - soilShare) * sGround.w;
     layerW[GROUND_SOIL]  = flatW * (1.0 - sandW) * (1.0 - grassShare);
     layerW[GROUND_GRASS] = flatW * (1.0 - sandW) * grassShare;
 
@@ -293,7 +279,7 @@ void main()
     {
         if (layerW[layer] < 0.03)
             continue;
-        GroundSample g = groundLayer(matPos, tw, layer, footprint);
+        GroundSample g = groundLayer(matPos, tw, layer, footprint, sTexture[layer]);
         texAlbedo += g.albedo * layerW[layer];
         texNormal += g.normal * layerW[layer];
         texTotal += layerW[layer];
@@ -306,22 +292,20 @@ void main()
 
     // --- DETAIL NORMAL from the analytic gradient of the bump fbm. Octaves join as the footprint
     // shrinks, so the grain sharpens toward the ground and never aliases from far away. ---
-    const float kBumpFrequency = 45.0;
-    const float kBumpTilt = 0.012; // normal tilt per unit of gradient
     // Normals light non-linearly, so they shimmer sooner than colour: bump octaves fade at twice
-    // the footprint, and each finer octave is a little shallower (gain 0.4).
-    vec3 grad = fbmFootprint(matPos, kBumpFrequency, 8, footprint * 2.0, 0.4).yzw;
+    // the footprint, and each finer octave is a little shallower (gain 0.4). sDetail1.y is the
+    // normal tilt per unit of gradient, sDetail1.w the tilt from the material normal maps.
+    vec3 grad = fbmFootprint(matPos, sDetail1.x, 8, footprint * 2.0, 0.4).yzw;
     grad -= geoN * dot(grad, geoN); // keep the perturbation tangential
-    float bumpStrength = kBumpTilt * (1.0 - snowW * 0.6);
-    const float kTextureBump = 0.6; // tilt from the material normal maps
-    vec3 N = normalize(geoN - grad * bumpStrength + (texNormal - geoN * dot(texNormal, geoN)) * kTextureBump);
+    float bumpStrength = sDetail1.y * (1.0 - snowW * sDetail1.z);
+    vec3 N = normalize(geoN - grad * bumpStrength + (texNormal - geoN * dot(texNormal, geoN)) * sDetail1.w);
 
     // --- Cook-Torrance shading ---
     // Ground (grass/soil/sand) is near-matte: real surfaces have almost no specular lobe, and a
     // tight lobe over the bumped normal is exactly what rings. Floor roughness high on non-rock so
     // the specular highlight stays broad and faint. Snow/wet rock keep a little more glint.
     float matte = max(rockW, snowW);
-    float roughness = clamp(mat.roughness, mix(0.85, 0.4, matte), 1.0);
+    float roughness = clamp(mat.roughness, mix(sDetail2.x, sDetail2.y, matte), 1.0);
     float ao = calcSphericalAO(N, sphereNormal, uAOStrength);
 
     // Celestial lighting: warm/dusk-reddened key light. Cook-Torrance's own max(N·L,0) already
@@ -357,18 +341,18 @@ void main()
                        * (1.0 - smoothstep(0.3, 0.6, h))   // low elevation
                        * (1.0 - snowW);
     color += nightLights(normalize(vWorldPos), day, habitability, vec3(1.0, 0.8, 0.45));
-    if (uCityCoverage > 0.0)
+    if (sClimate.z > 0.0)
     {
         // Cities favour lowlands and avoid steep rock and ice.
         float buildable = (1.0 - smoothstep(0.35, 0.7, h)) * (1.0 - rockW) * (1.0 - snowW);
-        float density = cityDensity(normalize(vWorldPos), uCityCoverage) * buildable;
+        float density = cityDensity(normalize(vWorldPos), sClimate.z) * buildable;
         color += cityLights(normalize(vWorldPos), dot(sphereNormal, lightDir), uNightLightStrength, density,
                             vec3(1.0, 0.8, 0.45));
     }
 
     // Mild gamma lift so shadows and midtones don't go muddy; no roll-off, the scene is HDR and
     // tonemap.glsl rolls highlights off once, at the end.
-    color = pow(max(color, vec3(0.0)), vec3(0.9));
+    color = pow(max(color, vec3(0.0)), vec3(sDetail2.z));
 
     FragColor = vec4(color, 1.0);
 }

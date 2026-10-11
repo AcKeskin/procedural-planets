@@ -5,20 +5,113 @@
 namespace planets::render
 {
 
-// How a planet type's ground looks on top of the shared surface shader: tints for the rock,
-// sand and snow materials (1 = Earth). Set from the body's render block on switch.
+// Every rule of the shared surface shader, set per body from its `render.surface` block. The defaults
+// are the values the shader used as constants, so a body without the block looks like Earth always did.
+// Ranges are (start, end) of a smoothstep.
 struct SurfaceSettings
 {
-    glm::vec3 rockTint = glm::vec3(1.0f);
-    glm::vec3 sandTint = glm::vec3(1.0f);
-    glm::vec3 snowTint = glm::vec3(1.0f);
-    float vegetation = 1.0f; // 0 = no grass texture on the flats (bare soil instead)
-    float sandCover = 0.0f;  // 1 = sand on every flat (dune seas)
+    struct Rock
+    {
+        glm::vec3 colorA = glm::vec3(0.30f, 0.29f, 0.27f); // dark end of the grain
+        glm::vec3 colorB = glm::vec3(0.42f, 0.40f, 0.37f); // light end of the grain
+        float roughnessA = 0.95f;
+        float roughnessB = 0.7f;
+        glm::vec3 streakColor = glm::vec3(0.34f, 0.26f, 0.18f); // iron/ochre streaks
+        float streakAmount = 0.5f;
+        glm::vec3 tint = glm::vec3(1.0f);
+        float slope = 0.35f;      // steepness where rock takes over
+        float slopeNoise = 0.25f; // how much that threshold wanders
+        float softness = 0.12f;   // half-width of the rock edge
+    };
 
-    // Climate traits (0 = Earth's latitude climate)
-    float polarCaps = 0.0f;    // share of each hemisphere under ice, from the pole (0.2 = small caps)
-    float substellar = 0.0f;   // 1 = tidally locked: hot under the sun, frozen on the night side
-    float cityCoverage = 0.0f; // 1 = city lights on all land not under snow, not only habitable land
+    struct Sand
+    {
+        glm::vec3 colorA = glm::vec3(0.62f, 0.52f, 0.36f);
+        glm::vec3 colorB = glm::vec3(0.74f, 0.66f, 0.46f);
+        float roughness = 0.9f;
+        glm::vec3 tint = glm::vec3(1.0f);
+        float cover = 0.0f;                                 // 1 = sand on every flat (dune seas)
+        glm::vec2 aridity = glm::vec2(0.35f, 0.65f);        // dryness where beaches and deserts turn to sand
+        glm::vec2 beachHeight = glm::vec2(0.12f, 0.25f);    // sand fades out above this height
+        glm::vec2 desertAridity = glm::vec2(0.45f, 0.75f);  // dryness where the sand texture takes over
+    };
+
+    struct Snow
+    {
+        glm::vec3 colorA = glm::vec3(0.86f, 0.88f, 0.93f);
+        glm::vec3 colorB = glm::vec3(0.97f, 0.98f, 1.0f);
+        float roughness = 0.4f;
+        glm::vec3 tint = glm::vec3(1.0f);
+        float coldLowering = 0.04f; // how far cold climates pull the snow line down
+        float blendBelow = 0.20f;   // snow fades in this far below the line
+        float blendAbove = 0.05f;   // and is full this far above it
+        float polarTemperature = 0.04f; // temperature below which the poles freeze
+        float polarAmount = 0.5f;
+        glm::vec2 slopeShed = glm::vec2(0.55f, 0.85f); // steepness where snow slides off
+        float shedAmount = 0.7f;
+    };
+
+    struct Ground
+    {
+        glm::vec2 lightness = glm::vec2(0.8f, 1.15f); // patchy lightness of the biome colour
+        float roughness = 0.85f;
+        float vegetation = 1.0f;                      // 0 = no grass texture (bare soil)
+        glm::vec2 soilDryness = glm::vec2(0.6f, 0.85f); // dryness where soil replaces grass
+        float soilAmount = 0.6f;
+        float polarSoil = 0.7f;
+    };
+
+    struct Detail
+    {
+        glm::vec2 grain = glm::vec2(0.72f, 1.28f); // fine albedo grain range
+        float grainSnowFade = 0.7f;
+        float mediumFrequency = 0.9f; // patch-scale variation
+        float fineFrequency = 3.0f;   // grain
+        float bumpFrequency = 45.0f;
+        float bumpTilt = 0.012f;
+        float bumpSnowFade = 0.6f;
+        float textureBump = 0.6f;     // tilt from the material normal maps
+        float roughnessFloor = 0.85f;      // ground stays near-matte
+        float matteRoughnessFloor = 0.4f;  // rock and snow keep a little glint
+        float gamma = 0.9f;
+        float temperatureNoise = 0.06f;    // noise on biome borders
+        float moistureNoise = 0.18f;
+        float moistureDetailNoise = 0.12f;
+    };
+
+    // One ground texture layer (rock, grass, sand, snow, soil).
+    struct Texture
+    {
+        float fineTile = 0.07f;   // tile size in radius-10 units
+        float coarseTile = 0.37f;
+        float strength = 1.0f;       // how much the texture changes the colour
+        float normalStrength = 1.0f; // how much it tilts the normal
+    };
+
+    struct Seafloor
+    {
+        glm::vec3 shallowColor = glm::vec3(0.10f, 0.38f, 0.40f);
+        glm::vec3 deepColor = glm::vec3(0.015f, 0.05f, 0.13f);
+        float depthRange = 0.08f;
+    };
+
+    struct Climate
+    {
+        float polarCaps = 0.0f;    // share of each hemisphere under ice, from the pole (0.2 = small caps)
+        float substellar = 0.0f;   // 1 = tidally locked: hot under the sun, frozen on the night side
+        float cityCoverage = 0.0f; // how much land is built up (city lights)
+    };
+
+    static constexpr int TextureCount = 5; // order matches GROUND_* in ground_material.glsl
+
+    Rock rock;
+    Sand sand;
+    Snow snow;
+    Ground ground;
+    Detail detail;
+    Texture textures[TextureCount];
+    Seafloor seafloor;
+    Climate climate;
 };
 
 } // namespace planets::render

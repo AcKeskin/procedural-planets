@@ -15,11 +15,6 @@ const int GROUND_SAND = 2;
 const int GROUND_SNOW = 3;
 const int GROUND_SOIL = 4;
 
-// Tile sizes in matPos units (the planet scaled to radius 10). The fine tile puts about one texel
-// on a pixel at the closest flying height; the coarse one breaks up the repeat.
-const float GROUND_FINE_TILE = 0.07;
-const float GROUND_COARSE_TILE = 0.37;
-
 struct GroundSample
 {
     vec3 albedo;  // multiplier around 1
@@ -66,23 +61,25 @@ float groundScaleWeight(float tile, float footprint)
 }
 
 // Both scales of one material layer; footprint in matPos units per pixel. Each scale fades to
-// neutral (albedo 1, no tilt) as it gets too small to read.
-GroundSample groundLayer(vec3 p, vec3 w, int layer, float footprint)
+// neutral (albedo 1, no tilt) as it gets too small to read. tex = (fine tile, coarse tile, colour
+// strength, normal strength); tiles are in matPos units (the planet scaled to radius 10). The fine
+// tile puts about one texel on a pixel at the closest flying height; the coarse one breaks up the repeat.
+GroundSample groundLayer(vec3 p, vec3 w, int layer, float footprint, vec4 tex)
 {
-    float fineW = groundScaleWeight(GROUND_FINE_TILE, footprint);
-    float coarseW = groundScaleWeight(GROUND_COARSE_TILE, footprint);
+    float fineW = groundScaleWeight(tex.x, footprint);
+    float coarseW = groundScaleWeight(tex.y, footprint);
     GroundSample s = GroundSample(vec3(1.0), vec3(0.0));
     if (fineW > 0.0)
     {
-        GroundSample fine = groundPlanar(p, w, float(layer), GROUND_FINE_TILE, vec2(0.0));
-        s.albedo *= mix(vec3(1.0), fine.albedo, fineW * 0.7);
-        s.normal += fine.normal * fineW;
+        GroundSample fine = groundPlanar(p, w, float(layer), tex.x, vec2(0.0));
+        s.albedo *= mix(vec3(1.0), fine.albedo, fineW * 0.7 * tex.z);
+        s.normal += fine.normal * fineW * tex.w;
     }
     if (coarseW > 0.0)
     {
-        GroundSample coarse = groundPlanar(p, w, float(layer), GROUND_COARSE_TILE, vec2(0.31, 0.67));
-        s.albedo *= mix(vec3(1.0), coarse.albedo, coarseW * 0.5);
-        s.normal += coarse.normal * coarseW * 0.5;
+        GroundSample coarse = groundPlanar(p, w, float(layer), tex.y, vec2(0.31, 0.67));
+        s.albedo *= mix(vec3(1.0), coarse.albedo, coarseW * 0.5 * tex.z);
+        s.normal += coarse.normal * coarseW * 0.5 * tex.w;
     }
     return s;
 }

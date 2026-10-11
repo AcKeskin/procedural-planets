@@ -110,6 +110,7 @@ private:
     PostProcessor _postProcessor;
 
     Shader _planetShader;
+    unsigned int _surfaceUbo = 0; // SurfaceBlock for the surface shader
     Shader _spaceShader;
     Shader _passthroughShader;
 

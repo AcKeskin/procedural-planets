@@ -115,24 +115,24 @@ bool SurfacePanel::DrawPlanetType(BodyRuntime& body, SurfaceSettings& surface)
     if (ImGui::CollapsingHeader("Planet Type"))
     {
         ImGui::Text("Materials");
-        ImGui::ColorEdit3("Rock Tint", &surface.rockTint.x);
+        ImGui::ColorEdit3("Rock Tint", &surface.rock.tint.x);
         ImGui::SetItemTooltip("Multiplies the rock on slopes (1 = Earth)");
-        ImGui::ColorEdit3("Sand Tint", &surface.sandTint.x);
+        ImGui::ColorEdit3("Sand Tint", &surface.sand.tint.x);
         ImGui::SetItemTooltip("Multiplies beaches, deserts and dunes (1 = Earth)");
-        ImGui::ColorEdit3("Snow Tint", &surface.snowTint.x);
+        ImGui::ColorEdit3("Snow Tint", &surface.snow.tint.x);
         ImGui::SetItemTooltip("Multiplies snow and ice caps (1 = Earth)");
-        ImGui::SliderFloat("Vegetation", &surface.vegetation, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Vegetation", &surface.ground.vegetation, 0.0f, 1.0f, "%.2f");
         ImGui::SetItemTooltip("Grass texture on the flats: 0 = bare soil (dead worlds), 1 = Earth");
-        ImGui::SliderFloat("Sand Cover", &surface.sandCover, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Sand Cover", &surface.sand.cover, 0.0f, 1.0f, "%.2f");
         ImGui::SetItemTooltip("Sand on every flat: 1 = dune sea");
 
         ImGui::Separator();
         ImGui::Text("Climate");
-        ImGui::SliderFloat("Polar Caps", &surface.polarCaps, 0.0f, 0.8f, "%.2f");
+        ImGui::SliderFloat("Polar Caps", &surface.climate.polarCaps, 0.0f, 0.8f, "%.2f");
         ImGui::SetItemTooltip("Ice caps from each pole, also on hot worlds (0 = Earth's climate only)");
-        ImGui::SliderFloat("Tidally Locked", &surface.substellar, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Tidally Locked", &surface.climate.substellar, 0.0f, 1.0f, "%.2f");
         ImGui::SetItemTooltip("1 = eye world: hot desert under the sun, a living ring, frozen night side");
-        ImGui::SliderFloat("City Coverage", &surface.cityCoverage, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("City Coverage", &surface.climate.cityCoverage, 0.0f, 1.0f, "%.2f");
         ImGui::SetItemTooltip("How much land is built up: low = separate cities, 1 = one planet-wide city "
                               "(Scene > Night Lights sets the brightness)");
 

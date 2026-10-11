@@ -41,6 +41,96 @@ const json& Block(const json& j, const char* key)
     return j.contains(key) && j[key].is_object() ? j[key] : empty;
 }
 
+void Read(const json& j, const char* key, glm::vec2& out)
+{
+    if (j.contains(key) && j[key].is_array() && j[key].size() == 2 && j[key][0].is_number() && j[key][1].is_number())
+        out = glm::vec2(j[key][0].get<float>(), j[key][1].get<float>());
+}
+
+// render.surface: every rule of the surface shader, grouped like SurfaceSettings.
+void ReadSurface(const json& j, SurfaceSettings& s)
+{
+    const json& r = Block(j, "rock");
+    Read(r, "colorA", s.rock.colorA);
+    Read(r, "colorB", s.rock.colorB);
+    Read(r, "roughnessA", s.rock.roughnessA);
+    Read(r, "roughnessB", s.rock.roughnessB);
+    Read(r, "streakColor", s.rock.streakColor);
+    Read(r, "streakAmount", s.rock.streakAmount);
+    Read(r, "tint", s.rock.tint);
+    Read(r, "slope", s.rock.slope);
+    Read(r, "slopeNoise", s.rock.slopeNoise);
+    Read(r, "softness", s.rock.softness);
+
+    const json& a = Block(j, "sand");
+    Read(a, "colorA", s.sand.colorA);
+    Read(a, "colorB", s.sand.colorB);
+    Read(a, "roughness", s.sand.roughness);
+    Read(a, "tint", s.sand.tint);
+    Read(a, "cover", s.sand.cover);
+    Read(a, "aridity", s.sand.aridity);
+    Read(a, "beachHeight", s.sand.beachHeight);
+    Read(a, "desertAridity", s.sand.desertAridity);
+
+    const json& n = Block(j, "snow");
+    Read(n, "colorA", s.snow.colorA);
+    Read(n, "colorB", s.snow.colorB);
+    Read(n, "roughness", s.snow.roughness);
+    Read(n, "tint", s.snow.tint);
+    Read(n, "coldLowering", s.snow.coldLowering);
+    Read(n, "blendBelow", s.snow.blendBelow);
+    Read(n, "blendAbove", s.snow.blendAbove);
+    Read(n, "polarTemperature", s.snow.polarTemperature);
+    Read(n, "polarAmount", s.snow.polarAmount);
+    Read(n, "slopeShed", s.snow.slopeShed);
+    Read(n, "shedAmount", s.snow.shedAmount);
+
+    const json& g = Block(j, "ground");
+    Read(g, "lightness", s.ground.lightness);
+    Read(g, "roughness", s.ground.roughness);
+    Read(g, "vegetation", s.ground.vegetation);
+    Read(g, "soilDryness", s.ground.soilDryness);
+    Read(g, "soilAmount", s.ground.soilAmount);
+    Read(g, "polarSoil", s.ground.polarSoil);
+
+    const json& d = Block(j, "detail");
+    Read(d, "grain", s.detail.grain);
+    Read(d, "grainSnowFade", s.detail.grainSnowFade);
+    Read(d, "mediumFrequency", s.detail.mediumFrequency);
+    Read(d, "fineFrequency", s.detail.fineFrequency);
+    Read(d, "bumpFrequency", s.detail.bumpFrequency);
+    Read(d, "bumpTilt", s.detail.bumpTilt);
+    Read(d, "bumpSnowFade", s.detail.bumpSnowFade);
+    Read(d, "textureBump", s.detail.textureBump);
+    Read(d, "roughnessFloor", s.detail.roughnessFloor);
+    Read(d, "matteRoughnessFloor", s.detail.matteRoughnessFloor);
+    Read(d, "gamma", s.detail.gamma);
+    Read(d, "temperatureNoise", s.detail.temperatureNoise);
+    Read(d, "moistureNoise", s.detail.moistureNoise);
+    Read(d, "moistureDetailNoise", s.detail.moistureDetailNoise);
+
+    const json& t = Block(j, "textures");
+    const char* layers[SurfaceSettings::TextureCount] = {"rock", "grass", "sand", "snow", "soil"};
+    for (int i = 0; i < SurfaceSettings::TextureCount; ++i)
+    {
+        const json& l = Block(t, layers[i]);
+        Read(l, "fineTile", s.textures[i].fineTile);
+        Read(l, "coarseTile", s.textures[i].coarseTile);
+        Read(l, "strength", s.textures[i].strength);
+        Read(l, "normalStrength", s.textures[i].normalStrength);
+    }
+
+    const json& f = Block(j, "seafloor");
+    Read(f, "shallowColor", s.seafloor.shallowColor);
+    Read(f, "deepColor", s.seafloor.deepColor);
+    Read(f, "depthRange", s.seafloor.depthRange);
+
+    const json& c = Block(j, "climate");
+    Read(c, "polarCaps", s.climate.polarCaps);
+    Read(c, "substellar", s.climate.substellar);
+    Read(c, "cityCoverage", s.climate.cityCoverage);
+}
+
 std::string Name(const json& j, const char* key)
 {
     return j.contains(key) && j[key].is_string() ? j[key].get<std::string>() : std::string();
@@ -152,16 +242,19 @@ BodyLook ParseBodyLook(const json& body)
     Read(l, "hazeStrength", look.lighting.hazeStrength);
 
     const json& m = Block(render, "materials");
-    Read(m, "rockTint", look.surface.rockTint);
-    Read(m, "sandTint", look.surface.sandTint);
-    Read(m, "snowTint", look.surface.snowTint);
-    Read(m, "vegetation", look.surface.vegetation);
-    Read(m, "sandCover", look.surface.sandCover);
+    // Older keys from the planet-types render block; render.surface (below) wins.
+    Read(m, "rockTint", look.surface.rock.tint);
+    Read(m, "sandTint", look.surface.sand.tint);
+    Read(m, "snowTint", look.surface.snow.tint);
+    Read(m, "vegetation", look.surface.ground.vegetation);
+    Read(m, "sandCover", look.surface.sand.cover);
 
     const json& k = Block(render, "climate");
-    Read(k, "polarCaps", look.surface.polarCaps);
-    Read(k, "substellar", look.surface.substellar);
-    Read(k, "cityCoverage", look.surface.cityCoverage);
+    Read(k, "polarCaps", look.surface.climate.polarCaps);
+    Read(k, "substellar", look.surface.climate.substellar);
+    Read(k, "cityCoverage", look.surface.climate.cityCoverage);
+
+    ReadSurface(Block(render, "surface"), look.surface);
 
     if (render.contains("palette") && render["palette"].is_array())
     {

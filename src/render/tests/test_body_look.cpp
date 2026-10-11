@@ -46,9 +46,9 @@ TEST_CASE("body_look: palette and material tints", "[body_look]")
         "render": {"palette": [[1, 0, 1], [0, 1, 1], [9]], "materials": {"rockTint": [0.2, 0.2, 0.2]}}})"));
     REQUIRE(look.palette.size() == 2); // the malformed entry is skipped
     CHECK(look.palette[0] == glm::vec3(1.0f, 0.0f, 1.0f));
-    CHECK(look.surface.rockTint == glm::vec3(0.2f));
-    CHECK(look.surface.sandTint == glm::vec3(1.0f));
-    CHECK(look.surface.vegetation == 1.0f);
+    CHECK(look.surface.rock.tint == glm::vec3(0.2f));
+    CHECK(look.surface.sand.tint == glm::vec3(1.0f));
+    CHECK(look.surface.ground.vegetation == 1.0f);
 }
 
 TEST_CASE("body_look: weather and star class fill in values the blocks can override", "[body_look]")
@@ -70,10 +70,10 @@ TEST_CASE("body_look: climate block sets polar caps, substellar and city coverag
 {
     const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({
         "render": {"climate": {"polarCaps": 0.2, "substellar": 1.0, "cityCoverage": 0.9}}})"));
-    CHECK_THAT(look.surface.polarCaps, WithinAbs(0.2, 1e-6));
-    CHECK_THAT(look.surface.substellar, WithinAbs(1.0, 1e-6));
-    CHECK_THAT(look.surface.cityCoverage, WithinAbs(0.9, 1e-6));
-    CHECK(types::ParseBodyLook(nlohmann::json::object()).surface.polarCaps == 0.0f);
+    CHECK_THAT(look.surface.climate.polarCaps, WithinAbs(0.2, 1e-6));
+    CHECK_THAT(look.surface.climate.substellar, WithinAbs(1.0, 1e-6));
+    CHECK_THAT(look.surface.climate.cityCoverage, WithinAbs(0.9, 1e-6));
+    CHECK(types::ParseBodyLook(nlohmann::json::object()).surface.climate.polarCaps == 0.0f);
 }
 
 TEST_CASE("body_look: wrong types are ignored", "[body_look]")
