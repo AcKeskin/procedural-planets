@@ -1,6 +1,8 @@
 #pragma once
 
 #include "SurfaceSettings.h"
+#include "AtmosphereSettings.h"
+#include <cmath>
 #include <glm/glm.hpp>
 
 namespace planets::render
@@ -30,6 +32,29 @@ static_assert(sizeof(SurfaceBlock) == 44 * 16, "SurfaceBlock must match the std1
 
 // Uniform buffer binding point of SurfaceBlock (separate namespace from the SSBO bindings).
 inline constexpr unsigned int SurfaceBlockBindingPoint = 5;
+
+// Colour of the sky light from the atmosphere's Rayleigh scattering, brightness about 1. Softened
+// (square root) because shadows see the whole sky, not only its deepest blue.
+inline glm::vec3 SkyFillTint(const effects::AtmosphereSettings& atmosphere)
+{
+    const glm::vec3 scatter = glm::pow(glm::vec3(400.0f) / atmosphere.wavelengths, glm::vec3(4.0f));
+    const glm::vec3 soft = glm::sqrt(scatter);
+    const float luma = glm::dot(soft, glm::vec3(0.2126f, 0.7152f, 0.0722f));
+    return luma > 0.0f ? soft / luma : glm::vec3(1.0f);
+}
+
+// The surface settings as drawn: sky ambient follows the atmosphere when asked, and an airless
+// body has no sky to fill its shadows.
+inline SurfaceSettings ResolveSkyAmbient(SurfaceSettings s, const effects::AtmosphereSettings* atmosphere)
+{
+    if (!atmosphere || !atmosphere->enabled)
+    {
+        s.skyAmbient.strength = 0.0f;
+        return s;
+    }
+    s.skyAmbient.skyColor = glm::mix(s.skyAmbient.skyColor, SkyFillTint(*atmosphere), s.skyAmbient.fromSky);
+    return s;
+}
 
 inline SurfaceBlock PackSurfaceBlock(const SurfaceSettings& s)
 {

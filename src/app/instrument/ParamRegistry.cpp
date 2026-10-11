@@ -304,6 +304,7 @@ const std::unordered_map<std::string, Entry>& Table()
         {"surface.skyAmbient.strength", {false, SURF_FLOAT(t.surface->skyAmbient.strength)}},
         {"surface.skyAmbient.skyColor", {false, SURF_VEC3(t.surface->skyAmbient.skyColor)}},
         {"surface.skyAmbient.groundColor", {false, SURF_VEC3(t.surface->skyAmbient.groundColor)}},
+        {"surface.skyAmbient.fromSky", {false, SURF_FLOAT(t.surface->skyAmbient.fromSky)}},
         {"surface.cover.strength", {false, SURF_FLOAT(t.surface->cover.strength)}},
         {"surface.cover.color", {false, SURF_VEC3(t.surface->cover.color)}},
         {"surface.cover.roughness", {false, SURF_FLOAT(t.surface->cover.roughness)}},

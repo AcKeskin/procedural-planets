@@ -161,6 +161,7 @@ struct SurfaceSettings
         float strength = 0.0f; // how much the ambient takes the sky and ground colours
         glm::vec3 skyColor = glm::vec3(0.75f, 0.9f, 1.25f); // tint from the sky (about 1 in brightness)
         glm::vec3 groundColor = glm::vec3(1.0f, 0.9f, 0.75f); // tint bounced from the ground
+        float fromSky = 0.0f; // 1 = sky fill takes its colour from the atmosphere instead of skyColor
     };
 
     static constexpr int TextureCount = 5; // order matches GROUND_* in ground_material.glsl

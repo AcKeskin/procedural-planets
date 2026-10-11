@@ -114,6 +114,22 @@ TEST_CASE("surface: skyAmbient is off by default and read from render.surface.sk
     CHECK(PackSurfaceBlock(look.surface).amb0.w == 0.6f);
 }
 
+TEST_CASE("surface: sky ambient follows the atmosphere and is off without one", "[surface]")
+{
+    SurfaceSettings s;
+    s.skyAmbient.strength = 1.0f;
+    s.skyAmbient.fromSky = 1.0f;
+    effects::AtmosphereSettings earthAir; // 680/550/440 nm: blue sky
+    const glm::vec3 tint = ResolveSkyAmbient(s, &earthAir).skyAmbient.skyColor;
+    CHECK(tint.b > tint.g);
+    CHECK(tint.g > tint.r);
+
+    effects::AtmosphereSettings none;
+    none.enabled = false;
+    CHECK(ResolveSkyAmbient(s, &none).skyAmbient.strength == 0.0f);
+    CHECK(ResolveSkyAmbient(s, nullptr).skyAmbient.strength == 0.0f);
+}
+
 TEST_CASE("surface: wrong types are ignored", "[surface]")
 {
     const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({"render": {"surface": {

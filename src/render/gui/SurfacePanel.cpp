@@ -316,6 +316,7 @@ void SurfacePanel::DrawSurfaceRules(SurfaceSettings& s)
         value("Sky Ambient", s.skyAmbient.strength, 0.0f, 1.0f, "Shadows take the sky colour from above and the ground colour from below: 0 = plain grey ambient");
         color("Sky Fill", s.skyAmbient.skyColor, "Tint the sky adds to shadows (keep it near 1 in brightness)");
         color("Ground Bounce", s.skyAmbient.groundColor, "Tint bounced up from the ground onto overhangs and steep faces");
+        value("From Sky", s.skyAmbient.fromSky, 0.0f, 1.0f, "1 = the sky fill takes its colour from the atmosphere");
         ImGui::TreePop();
     }
     if (ImGui::TreeNode("Seafloor"))

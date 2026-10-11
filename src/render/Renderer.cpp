@@ -232,7 +232,8 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
         if (ctx.clouds)
             _clouds.SetLayerUniforms(_planetShader, *ctx.clouds, CloudLayer(ctx));
         _planetShader.SetFloat("uCloudShadowStrength", cloudsOn ? ctx.clouds->shadowStrength : 0.0f);
-        const SurfaceBlock block = PackSurfaceBlock(ctx.surface ? *ctx.surface : SurfaceSettings{});
+        const SurfaceBlock block =
+            PackSurfaceBlock(ResolveSkyAmbient(ctx.surface ? *ctx.surface : SurfaceSettings{}, ctx.atmosphere));
         glBindBuffer(GL_UNIFORM_BUFFER, _surfaceUbo);
         glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(block), &block);
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
