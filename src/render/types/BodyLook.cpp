@@ -155,6 +155,8 @@ BodyLook ParseBodyLook(const json& body)
     Read(m, "rockTint", look.surface.rockTint);
     Read(m, "sandTint", look.surface.sandTint);
     Read(m, "snowTint", look.surface.snowTint);
+    Read(m, "vegetation", look.surface.vegetation);
+    Read(m, "sandCover", look.surface.sandCover);
 
     const json& k = Block(render, "climate");
     Read(k, "polarCaps", look.surface.polarCaps);

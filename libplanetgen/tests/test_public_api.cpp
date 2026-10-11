@@ -71,8 +71,8 @@ TEST_CASE("A non-Earth body loads through the composable JSON path and generates
     REQUIRE(ctx != nullptr);
 
     // Earth is just one config; a non-Earth body must load + generate with no
-    // Earth-specific obligations. volcanic.json exercises a different block set.
-    PgBody body = pg_body_create_from_json(ctx, BodyJson("volcanic.json").c_str());
+    // Earth-specific obligations. barren.json (no tectonics, craters) exercises a different block set.
+    PgBody body = pg_body_create_from_json(ctx, BodyJson("barren.json").c_str());
     REQUIRE(body != nullptr);
     REQUIRE(pg_context_get_error(ctx) == PG_SUCCESS);
 

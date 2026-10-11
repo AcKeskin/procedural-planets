@@ -328,12 +328,11 @@ bool Application::RunGenerationShowcase(const CaptureRequest& request)
     int frameIndex = 0;
     for (int p = 0; p < planets; ++p)
     {
-        // Each segment: switch to the next body type. Earth segments get randomized for
-        // variety; volcanic/crystalline keep their authored identity. SwitchBody resets
-        // the camera + radius, so re-seat the orbit afterwards.
+        // Each segment: switch to the next body type. SwitchBody resets the camera + radius,
+        // so re-seat the orbit afterwards.
         const int type = p % typeCount;
         // Earth segments use the authored earth.json with a stepped seed (reliably
-        // land-facing, like the hero still). Volcanic/crystalline keep their identity.
+        // land-facing, like the hero still). Other types roll their variety from the seed.
         // Random earths placed their land on the back/poles too often to use here.
         if (type == 0)
             _genConfig.seed = _capture.seed + static_cast<uint32_t>(p);

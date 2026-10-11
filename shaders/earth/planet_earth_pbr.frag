@@ -35,6 +35,8 @@ uniform float uCloudShadowStrength;
 uniform vec3 uRockTint;
 uniform vec3 uSandTint;
 uniform vec3 uSnowTint;
+uniform float uVegetation; // 1 = Earth grass texture on the flats, 0 = bare soil
+uniform float uSandCover;  // 1 = sand on every flat
 // Planet type climate traits (0 = Earth).
 uniform float uPolarCaps;
 uniform float uSubstellar;
@@ -42,6 +44,7 @@ uniform float uCityCoverage;
 
 uniform vec3  uCameraPos;
 uniform float uSeaLevel;
+uniform int   uHasSea;          // 0 = dry world: ground below sea level is land (basins, salt flats)
 uniform vec2  uHeightMinMax;
 uniform float uSnowLine;
 
@@ -174,7 +177,7 @@ void main()
     float camDist = length(uCameraPos - vWorldPos);
 
     // ---- ocean: simple PBR water, fresnel-tinted ----
-    if (vHeight < uSeaLevel)
+    if (uHasSea != 0 && vHeight < uSeaLevel)
     {
         float depth = clamp((uSeaLevel - vHeight) / 0.08, 0.0, 1.0);
         vec3 waterAlbedo = mix(COASTAL, DEEP_OCEAN, depth);
@@ -217,7 +220,7 @@ void main()
         // Tidally locked: temperature follows the sun height, not the latitude. The terrain stays
         // in the same place under the sun, so the hot eye and the frozen back never move.
         float sunHeight = dot(sphereNormal, -normalize(uLightDir));
-        float eyeTemp = clamp(0.32 + 0.7 * sunHeight + (vShadingData.w - 0.5) * 0.12 - h * 0.25, 0.0, 1.0);
+        float eyeTemp = clamp(0.12 + 0.88 * sunHeight + (vShadingData.w - 0.5) * 0.12 - h * 0.25, 0.0, 1.0);
         temperature = mix(temperature, eyeTemp, uSubstellar);
     }
     float moisture    = clamp(vShadingData.y + (vMedium - 0.5) * 0.18 + (vShadingData.z - 0.5) * 0.12, 0.0, 1.0);
@@ -238,6 +241,7 @@ void main()
     // Flats: the biome colour; beaches (dry, warm, low) blend to sand.
     float aridity = (1.0 - moisture) * smoothstep(0.35, 0.7, temperature);
     float sandW = smoothstep(0.35, 0.65, aridity) * (1.0 - smoothstep(0.12, 0.25, h));
+    sandW = max(sandW, uSandCover);
     Material flatMat = flatGroundMaterial(biome.color, vMedium);
     flatMat.albedo    = mix(flatMat.albedo, sand.albedo, sandW);
     flatMat.roughness = mix(flatMat.roughness, sand.roughness, sandW);
@@ -277,8 +281,9 @@ void main()
     layerW[GROUND_ROCK]  = rockW * (1.0 - snowW);
     layerW[GROUND_SNOW]  = snowW;
     layerW[GROUND_SAND]  = flatW * sandW;
-    layerW[GROUND_SOIL]  = flatW * (1.0 - sandW) * soilShare;
-    layerW[GROUND_GRASS] = flatW * (1.0 - sandW) * (1.0 - soilShare);
+    float grassShare = (1.0 - soilShare) * uVegetation;
+    layerW[GROUND_SOIL]  = flatW * (1.0 - sandW) * (1.0 - grassShare);
+    layerW[GROUND_GRASS] = flatW * (1.0 - sandW) * grassShare;
 
     vec3 tw = groundTriplanarWeights(geoN);
     vec3 texAlbedo = vec3(0.0);
@@ -351,8 +356,10 @@ void main()
                        * smoothstep(0.2, 0.5, moisture)
                        * (1.0 - smoothstep(0.3, 0.6, h))   // low elevation
                        * (1.0 - snowW);
-    habitability = mix(habitability, uNightLightStrength * (1.0 - snowW), uCityCoverage);
     color += nightLights(normalize(vWorldPos), day, habitability, vec3(1.0, 0.8, 0.45));
+    if (uCityCoverage > 0.0)
+        color += cityLights(normalize(vWorldPos), day, uNightLightStrength * uCityCoverage * (1.0 - snowW),
+                            vec3(1.0, 0.8, 0.45));
 
     // Mild gamma lift so shadows and midtones don't go muddy; no roll-off, the scene is HDR and
     // tonemap.glsl rolls highlights off once, at the end.

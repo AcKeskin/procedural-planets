@@ -48,6 +48,7 @@ TEST_CASE("body_look: palette and material tints", "[body_look]")
     CHECK(look.palette[0] == glm::vec3(1.0f, 0.0f, 1.0f));
     CHECK(look.surface.rockTint == glm::vec3(0.2f));
     CHECK(look.surface.sandTint == glm::vec3(1.0f));
+    CHECK(look.surface.vegetation == 1.0f);
 }
 
 TEST_CASE("body_look: weather and star class fill in values the blocks can override", "[body_look]")

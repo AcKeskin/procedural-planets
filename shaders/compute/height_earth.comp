@@ -464,7 +464,7 @@ float applyTerrainStyle(vec3 dir, float elevation, float landMask)
 
     if (styleSpires > 0.0)
     {
-        float n = snoise(dir * 120.0 * globalFrequency, seed + 95u);
+        float n = snoise(dir * 60.0 * globalFrequency, seed + 95u);
         float field = smoothstep(-0.3, 0.2, fbm(dir, vec3(8555.0), 2, 4.0 * globalFrequency, 0.5, 2.0, 1.0, seed + 96u));
         e += styleSpires * 1.4 * pow(max(n - 0.55, 0.0) / 0.45, 2.0) * field * landMask;
     }

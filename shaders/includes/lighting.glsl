@@ -80,6 +80,32 @@ vec3 nightLights(vec3 worldDir, float day, float habitability, vec3 lightColor)
     return lightColor * intensity;
 }
 
+// City world: lit everywhere it is land, at three cell scales so it reads as a dense network from
+// orbit and as separate lights up close. Same hard night gate as nightLights.
+vec3 cityLights(vec3 worldDir, float day, float strength, vec3 lightColor)
+{
+    float night = 1.0 - smoothstep(0.0, 0.12, day);
+    if (night < 0.002 || strength < 0.002)
+        return vec3(0.0);
+
+    float glow = 0.0;
+    float cells = 90.0;
+    float weight = 0.35; // coarse cells are districts: dimmer, so they do not read as blobs up close
+    for (int i = 0; i < 3; ++i)
+    {
+        vec3 h = nightHash3(floor(worldDir * cells) + float(i) * 17.0);
+        if (h.z > 0.62)
+        {
+            float d = length((fract(worldDir * cells) - h).xy * 1.4);
+            float dot_ = smoothstep(0.5, 0.0, d);
+            glow += dot_ * dot_ * weight;
+        }
+        cells *= 5.0;
+        weight = 1.0;
+    }
+    return lightColor * (glow + 0.02) * strength * night;
+}
+
 // Blinn-Phong specular term
 float calcSpecular(vec3 normal, vec3 lightDir, vec3 viewDir, float power, float strength)
 {

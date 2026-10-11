@@ -133,6 +133,21 @@ TEST_CASE("terrain_style: craters work on an airless body without land mask or o
     pg_context_destroy(ctx);
 }
 
+TEST_CASE("terrain_style: land styles still apply without tectonics", "[gpu][terrain_style]")
+{
+    PgContext ctx = MakeCtx();
+    REQUIRE(ctx != nullptr);
+    {
+        const auto verts = SphereVertices(4096);
+        auto cfg = LoadEarth();
+        cfg.tectonics.enabled = false;
+        const auto plain = Heights(ctx, cfg, verts);
+        cfg.terrainStyle.dunes = 1.0f;
+        CHECK(CountDifferent(Heights(ctx, cfg, verts), plain) > 40);
+    }
+    pg_context_destroy(ctx);
+}
+
 TEST_CASE("terrain_style: json round trip keeps the style block", "[terrain_style]")
 {
     planetgen::BodyConfig cfg;
