@@ -60,6 +60,15 @@ TEST_CASE("surface: a variety rule on render.surface rolls a value inside its ra
     }
 }
 
+TEST_CASE("surface: strata is off by default and read from render.surface.strata", "[surface]")
+{
+    CHECK(SurfaceSettings{}.strata.strength == 0.0f);
+    const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({"render": {"surface": {
+        "strata": {"strength": 0.8}}}})"));
+    CHECK(look.surface.strata.strength == 0.8f);
+    CHECK(PackSurfaceBlock(look.surface).strata0.w == 0.8f);
+}
+
 TEST_CASE("surface: wrong types are ignored", "[surface]")
 {
     const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({"render": {"surface": {

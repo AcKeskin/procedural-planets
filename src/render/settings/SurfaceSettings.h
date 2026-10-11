@@ -102,6 +102,16 @@ struct SurfaceSettings
         float cityCoverage = 0.0f; // how much land is built up (city lights)
     };
 
+    // Rock layers: colour bands by height on steep rock (cliffs, crater walls). Strength 0 = off.
+    struct Strata
+    {
+        float strength = 0.0f; // how much the bands replace the rock colour
+        float bands = 40.0f; // bands over the land height range
+        float warp = 0.5f; // how far the layers bend, in bands
+        glm::vec3 colorA = glm::vec3(0.52f, 0.44f, 0.34f); // light layer
+        glm::vec3 colorB = glm::vec3(0.3f, 0.26f, 0.22f); // dark layer
+    };
+
     static constexpr int TextureCount = 5; // order matches GROUND_* in ground_material.glsl
 
     Rock rock;
@@ -112,6 +122,7 @@ struct SurfaceSettings
     Texture textures[TextureCount];
     Seafloor seafloor;
     Climate climate;
+    Strata strata;
 };
 
 } // namespace planets::render

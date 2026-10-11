@@ -263,6 +263,15 @@ void SurfacePanel::DrawSurfaceRules(SurfaceSettings& s)
         }
         ImGui::TreePop();
     }
+    if (ImGui::TreeNode("Strata"))
+    {
+        value("Strata Strength", s.strata.strength, 0.0f, 1.0f, "Rock layers on cliffs and crater walls: 0 = off");
+        value("Bands", s.strata.bands, 2.0f, 200.0f, "Number of layers over the land height: higher = thinner layers");
+        value("Warp", s.strata.warp, 0.0f, 3.0f, "How much the layers bend and wander along the cliff");
+        color("Light Layer", s.strata.colorA, "Colour of the light rock layers");
+        color("Dark Layer", s.strata.colorB, "Colour of the dark rock layers");
+        ImGui::TreePop();
+    }
     if (ImGui::TreeNode("Seafloor"))
     {
         color("Shallow Floor", s.seafloor.shallowColor, "Ground colour just below sea level");

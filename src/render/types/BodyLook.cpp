@@ -125,6 +125,13 @@ void ReadSurface(const json& j, SurfaceSettings& s)
     Read(f, "deepColor", s.seafloor.deepColor);
     Read(f, "depthRange", s.seafloor.depthRange);
 
+    const json& strataJ = Block(j, "strata");
+    Read(strataJ, "strength", s.strata.strength);
+    Read(strataJ, "bands", s.strata.bands);
+    Read(strataJ, "warp", s.strata.warp);
+    Read(strataJ, "colorA", s.strata.colorA);
+    Read(strataJ, "colorB", s.strata.colorB);
+
     const json& c = Block(j, "climate");
     Read(c, "polarCaps", s.climate.polarCaps);
     Read(c, "substellar", s.climate.substellar);
