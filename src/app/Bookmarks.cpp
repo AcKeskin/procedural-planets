@@ -1,5 +1,6 @@
 #include "Bookmarks.h"
 #include <nlohmann/json.hpp>
+#include <cmath>
 #include <fstream>
 #include <sstream>
 
@@ -13,7 +14,7 @@ nlohmann::json ToJson(const glm::vec3& v)
     return nlohmann::json::array({v.x, v.y, v.z});
 }
 
-// Numbers only. A wrong type must not throw, so check before get<float>().
+// Numbers only, all finite. A wrong type must not throw, so check before get<float>().
 bool ReadVec3(const nlohmann::json& j, const char* key, glm::vec3& out)
 {
     const auto it = j.find(key);
@@ -25,9 +26,23 @@ bool ReadVec3(const nlohmann::json& j, const char* key, glm::vec3& out)
         if (!(*it)[i].is_number())
             return false;
         v[i] = (*it)[i].get<float>();
+        if (!std::isfinite(v[i]))
+            return false;
     }
     out = v;
     return true;
+}
+
+// The camera cannot build a view from a zero axis or from forward parallel to up.
+bool IsUsablePose(const core::CameraPose& pose)
+{
+    constexpr float MinLength = 1e-4f;
+    constexpr float MinCross = 1e-3f;
+    const float f = glm::length(pose.forward);
+    const float u = glm::length(pose.up);
+    if (!(f > MinLength) || !(u > MinLength))
+        return false;
+    return glm::length(glm::cross(pose.forward / f, pose.up / u)) > MinCross;
 }
 } // namespace
 
@@ -63,10 +78,13 @@ void Bookmarks::LoadFromJson(const std::string& text)
             continue;
         Bookmark b;
         if (!ReadVec3(entry, "position", b.pose.position) || !ReadVec3(entry, "forward", b.pose.forward) ||
-            !ReadVec3(entry, "up", b.pose.up))
+            !ReadVec3(entry, "up", b.pose.up) || !IsUsablePose(b.pose))
             continue;
 
-        ReadVec3(entry, "sunDir", b.sunDir);
+        // A bad or zero sunDir keeps the default light instead of dropping the bookmark.
+        glm::vec3 sun;
+        if (ReadVec3(entry, "sunDir", sun) && glm::length(sun) > 1e-4f)
+            b.sunDir = sun;
 
         const auto mode = entry.find("mode");
         if (mode != entry.end() && !mode->is_string())

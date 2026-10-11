@@ -54,6 +54,27 @@ TEST_CASE("a bad entry does not hide a good one", "[bookmarks]")
     REQUIRE(b.Get(2).used);
 }
 
+TEST_CASE("degenerate vectors are skipped", "[bookmarks]")
+{
+    REQUIRE_FALSE(Loads(Entry("[1,2,3]", "[0,0,0]")));
+    REQUIRE_FALSE(Loads(Entry("[1,2,3]", "[0,0,-1]", "[0,0,0]")));
+    REQUIRE_FALSE(Loads(Entry("[1,2,3]", "[0,1,0]", "[0,1,0]")));
+    REQUIRE_FALSE(Loads(Entry("[1,2,3]", "[0,1,0]", "[0,-5,0]")));
+    REQUIRE_FALSE(Loads(Entry("[1e999,2,3]")));
+    REQUIRE_FALSE(Loads(Entry("[1,2,3]", "[1e39,0,0]")));
+}
+
+TEST_CASE("a zero or bad sunDir gets the default", "[bookmarks]")
+{
+    for (const char* sun : {"[0,0,0]", "[\"a\",0,0]", "[1,2]"})
+    {
+        Bookmarks b;
+        b.LoadFromJson(Entry("[1,2,3]", "[0,0,-1]", "[0,1,0]", "\"orbit\"", sun));
+        REQUIRE(b.Get(1).used);
+        REQUIRE(b.Get(1).sunDir == Bookmark{}.sunDir);
+    }
+}
+
 TEST_CASE("helpSeen reads only a true boolean", "[help]")
 {
     using nlohmann::json;
