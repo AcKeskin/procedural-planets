@@ -21,8 +21,16 @@ using types::LookUnit;
 
 const char* LockTip(LookUnit unit)
 {
-    return unit == LookUnit::Terrain ? "Reroll keeps these values. The land shape still follows the seed."
-                                     : "Reroll and a type switch keep these values.";
+    // Only a locked Light tab survives a type switch; the rest belongs to the type.
+    switch (unit)
+    {
+    case LookUnit::Terrain:
+        return "Reroll keeps these values. The land shape still follows the seed. A type switch resets them.";
+    case LookUnit::Light:
+        return "Reroll and a type switch keep these values.";
+    default:
+        return "Reroll keeps these values. A type switch resets them.";
+    }
 }
 } // namespace
 
