@@ -163,6 +163,11 @@ void ReadSurface(const json& j, SurfaceSettings& s)
     Read(coverJ, "sunFollow", s.cover.sunFollow);
     Read(coverJ, "patchiness", s.cover.patchiness);
 
+    const json& skyAmbientJ = Block(j, "skyAmbient");
+    Read(skyAmbientJ, "strength", s.skyAmbient.strength);
+    Read(skyAmbientJ, "skyColor", s.skyAmbient.skyColor);
+    Read(skyAmbientJ, "groundColor", s.skyAmbient.groundColor);
+
     const json& c = Block(j, "climate");
     Read(c, "polarCaps", s.climate.polarCaps);
     Read(c, "substellar", s.climate.substellar);

@@ -311,6 +311,13 @@ void SurfacePanel::DrawSurfaceRules(SurfaceSettings& s)
         value("Cover Patchiness", s.cover.patchiness, 0.0f, 1.0f, "0 = an even sheet, 1 = broken patches");
         ImGui::TreePop();
     }
+    if (ImGui::TreeNode("Sky Ambient"))
+    {
+        value("Sky Ambient", s.skyAmbient.strength, 0.0f, 1.0f, "Shadows take the sky colour from above and the ground colour from below: 0 = plain grey ambient");
+        color("Sky Fill", s.skyAmbient.skyColor, "Tint the sky adds to shadows (keep it near 1 in brightness)");
+        color("Ground Bounce", s.skyAmbient.groundColor, "Tint bounced up from the ground onto overhangs and steep faces");
+        ImGui::TreePop();
+    }
     if (ImGui::TreeNode("Seafloor"))
     {
         color("Shallow Floor", s.seafloor.shallowColor, "Ground colour just below sea level");

@@ -105,6 +105,15 @@ TEST_CASE("surface: cover is off by default and read from render.surface.cover",
     CHECK(PackSurfaceBlock(look.surface).cover0.w == 0.5f);
 }
 
+TEST_CASE("surface: skyAmbient is off by default and read from render.surface.skyAmbient", "[surface]")
+{
+    CHECK(SurfaceSettings{}.skyAmbient.strength == 0.0f);
+    const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({"render": {"surface": {
+        "skyAmbient": {"strength": 0.6}}}})"));
+    CHECK(look.surface.skyAmbient.strength == 0.6f);
+    CHECK(PackSurfaceBlock(look.surface).amb0.w == 0.6f);
+}
+
 TEST_CASE("surface: wrong types are ignored", "[surface]")
 {
     const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({"render": {"surface": {

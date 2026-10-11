@@ -388,6 +388,12 @@ void main()
 
     vec3 lit = cookTorrance(mat.albedo, 0.0, roughness, N, viewDir, lightDir, sunRadiance);
     vec3 ambient = mat.albedo * uAmbientLight * ao;
+    if (sAmb0.w > 0.0)
+    {
+        // Hemisphere: faces turned up see the sky, faces turned away see the ground.
+        float up = 0.5 + 0.5 * dot(N, sphereNormal);
+        ambient *= mix(vec3(1.0), mix(sAmb1.rgb, sAmb0.rgb, up), sAmb0.w);
+    }
     vec3 color = lit + ambient;
 
     color += calcFresnel(vWorldPos, uCameraPos, sphereNormal,
