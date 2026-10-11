@@ -2,7 +2,6 @@
 add_library(render STATIC
     Window.cpp
     Shader.cpp
-    ComputeShader.cpp
     gui/GuiManager.cpp
     gui/ScenePanel.cpp
     gui/TerrainPanel.cpp
@@ -41,7 +40,6 @@ add_library(render STATIC
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/model/PaletteRegistry.cpp
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/materials/GroundMaterials.cpp
     ${CMAKE_SOURCE_DIR}/libplanetgen/src/materials/CloudNoise.cpp
-    ${CMAKE_SOURCE_DIR}/libplanetgen/src/backend/ParamMappers.cpp
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
