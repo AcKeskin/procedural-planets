@@ -64,8 +64,8 @@ public:
     // Orbit controls
     void SetOrbitTarget(const glm::vec3& target);
     void OrbitRotate(float yawDelta, float pitchDelta);
-    // Like OrbitRotate, but turns about the camera's own up and right: no pitch limit, so a drag
-    // carries on over the poles without a flip.
+    // Like OrbitRotate, but with no pitch limit: yaw turns about world Y and pitch about the
+    // camera's right, so a drag carries on over the poles without a flip or a roll.
     void OrbitTumble(float yawDelta, float pitchDelta);
     void OrbitZoom(float amount);
     void SetOrbitDistance(float distance);

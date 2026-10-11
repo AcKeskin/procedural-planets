@@ -171,6 +171,32 @@ TEST_CASE("OrbitTumble moves like OrbitRotate away from the poles", "[camera]")
     REQUIRE(glm::dot(a.GetForward(), b.GetForward()) > 0.9999f);
 }
 
+TEST_CASE("A sideways orbit drag after a vertical one keeps the pole upright", "[camera]")
+{
+    Camera cam;
+    cam.SetMode(CameraMode::Orbit);
+    cam.SetPosition(glm::vec3(0.0f, 0.0f, 20.0f));
+    cam.SetOrbitTarget(glm::vec3(0.0f));
+    cam.SetOrbitAngles(90.0f, 0.0f);
+    const glm::vec3 worldY(0.0f, 1.0f, 0.0f);
+
+    cam.OrbitTumble(0.0f, 45.0f);
+    for (int i = 0; i < 90; ++i)
+    {
+        cam.OrbitTumble(1.0f, 0.0f);
+        REQUIRE_THAT(glm::dot(cam.GetRight(), worldY), WithinAbs(0.0, 1e-4));
+    }
+    REQUIRE_THAT(glm::length(cam.GetPosition()), WithinAbs(20.0, 1e-3));
+
+    // Upside down past the pole, the same drag must still run the same way on screen.
+    cam.OrbitTumble(0.0f, 100.0f);
+    REQUIRE(cam.GetUp().y < 0.0f);
+    const glm::vec3 before = cam.GetPosition();
+    cam.OrbitTumble(10.0f, 0.0f);
+    REQUIRE(glm::dot(cam.GetPosition() - before, cam.GetRight()) < 0.0f);
+    REQUIRE_THAT(glm::dot(cam.GetRight(), worldY), WithinAbs(0.0, 1e-4));
+}
+
 TEST_CASE("A long vertical orbit drag carries on over the pole without a flip", "[camera]")
 {
     Camera cam;

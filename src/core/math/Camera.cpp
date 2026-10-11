@@ -125,9 +125,12 @@ void Camera::OrbitRotate(float yawDelta, float pitchDelta)
 
 void Camera::OrbitTumble(float yawDelta, float pitchDelta)
 {
+    // Yaw turns about the planet's axis, flipped when upside down so the screen direction holds.
+    // Pitch turns about the camera's right, which stays horizontal, so no roll builds up.
     // Negative angles match OrbitRotate: +yaw moves from +x toward +z, +pitch moves up.
-    const glm::quat turn =
-        glm::angleAxis(glm::radians(-yawDelta), _up) * glm::angleAxis(glm::radians(-pitchDelta), _right);
+    const float side = _up.y < -1e-4f ? -1.0f : 1.0f;
+    const glm::quat turn = glm::angleAxis(glm::radians(-yawDelta * side), glm::vec3(0.0f, 1.0f, 0.0f)) *
+                           glm::angleAxis(glm::radians(-pitchDelta), _right);
     const glm::vec3 offset = turn * (_position - _orbitTarget);
     _position = _orbitTarget + offset;
     _forward = glm::normalize(-offset);
