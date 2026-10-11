@@ -153,4 +153,58 @@ bool GenerationPipeline::GeneratePatch(const BodyConfig& config,
     return true;
 }
 
+HeightBuffers GenerationPipeline::GenerateHeights(const BodyConfig& config,
+                                                  const float* vertices,
+                                                  uint32_t vertexCount,
+                                                  uint32_t seed,
+                                                  MaskCache mask,
+                                                  MacroCache macro)
+{
+    if (!vertices || vertexCount == 0)
+        return {};
+
+    StrategyContext sc{ _backend, _registry, vertexCount, seed };
+    sc.continentMask = ResolveMask(_backend, _registry, config, seed, mask);
+    sc.macroField = ResolveMacro(_backend, _registry, config, seed, sc.continentMask, macro);
+
+    const size_t vertexBytes = vertexCount * 3 * sizeof(float);
+    const GpuBufferHandle vertexBuf = _backend.CreateBuffer(vertexBytes);
+    _backend.UploadBuffer(vertexBuf, vertices, vertexBytes);
+
+    const HeightBuffers hb = _height.Run(sc, ProjectToBodyDesc(config), vertexBuf);
+
+    _backend.DestroyBuffer(vertexBuf);
+    return hb;
+}
+
+GpuBufferHandle GenerationPipeline::GenerateShading(const BodyConfig& config,
+                                                    const PgShadingDesc& desc,
+                                                    const float* vertices,
+                                                    const float* heights,
+                                                    uint32_t vertexCount,
+                                                    uint32_t seed,
+                                                    MaskCache mask,
+                                                    MacroCache macro)
+{
+    if (!vertices || !heights || vertexCount == 0)
+        return 0;
+
+    StrategyContext sc{ _backend, _registry, vertexCount, seed };
+    sc.continentMask = ResolveMask(_backend, _registry, config, seed, mask);
+    sc.macroField = ResolveMacro(_backend, _registry, config, seed, sc.continentMask, macro);
+
+    const size_t vertexBytes = vertexCount * 3 * sizeof(float);
+    const size_t heightBytes = vertexCount * sizeof(float);
+    const GpuBufferHandle vertexBuf = _backend.CreateBuffer(vertexBytes);
+    const GpuBufferHandle heightBuf = _backend.CreateBuffer(heightBytes);
+    _backend.UploadBuffer(vertexBuf, vertices, vertexBytes);
+    _backend.UploadBuffer(heightBuf, heights, heightBytes);
+
+    const GpuBufferHandle shading = _shading.Run(sc, desc, vertexBuf, heightBuf);
+
+    _backend.DestroyBuffer(vertexBuf);
+    _backend.DestroyBuffer(heightBuf);
+    return shading;
+}
+
 } // namespace planetgen
