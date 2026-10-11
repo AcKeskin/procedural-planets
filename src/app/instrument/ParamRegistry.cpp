@@ -306,6 +306,15 @@ const std::unordered_map<std::string, Entry>& Table()
         {"body.erosion.iterations", {true, BODY_INT(t.body->erosion.iterations)}},
 
         // ---- body.macroWorld.* (needs regen; re-bakes the macro field) ----
+        // ---- body.terrainStyle.* (needs regen) ----
+        {"body.terrainStyle.dunes", {true, BODY_FLOAT(t.body->terrainStyle.dunes)}},
+        {"body.terrainStyle.duneScale", {true, BODY_FLOAT(t.body->terrainStyle.duneScale)}},
+        {"body.terrainStyle.craters", {true, BODY_FLOAT(t.body->terrainStyle.craters)}},
+        {"body.terrainStyle.craterScale", {true, BODY_FLOAT(t.body->terrainStyle.craterScale)}},
+        {"body.terrainStyle.terraces", {true, BODY_FLOAT(t.body->terrainStyle.terraces)}},
+        {"body.terrainStyle.terraceSteps", {true, BODY_FLOAT(t.body->terrainStyle.terraceSteps)}},
+        {"body.terrainStyle.canyons", {true, BODY_FLOAT(t.body->terrainStyle.canyons)}},
+        {"body.terrainStyle.spires", {true, BODY_FLOAT(t.body->terrainStyle.spires)}},
         {"body.macroWorld.enabled", {true, BODY_BOOL(t.body->macroWorld.enabled)}},
         {"body.macroWorld.resolution", {true, BODY_INT(t.body->macroWorld.resolution)}},
         {"body.macroWorld.convergentThreshold", {true, BODY_FLOAT(t.body->macroWorld.convergentThreshold)}},

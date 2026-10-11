@@ -240,6 +240,22 @@ struct ShaderPathsBlock
 };
 
 // ============================================================================
+// TerrainStyle — extra landforms for planet types. Every strength 0 = off (Earth).
+// ============================================================================
+
+struct TerrainStyleBlock
+{
+    float dunes        = 0.0f; // sand dune ridges on low land
+    float duneScale    = 1.0f; // higher = smaller, denser dunes
+    float craters      = 0.0f; // impact craters everywhere (bowls with raised rims)
+    float craterScale  = 1.0f; // higher = smaller, more numerous craters
+    float terraces     = 0.0f; // stepped land: flat mesa tops, steep cliffs
+    float terraceSteps = 6.0f; // number of steps over the land height range
+    float canyons      = 0.0f; // narrow carved channels and sinkholes
+    float spires       = 0.0f; // tall pointed rock spikes
+};
+
+// ============================================================================
 // Root config — one object per body
 // ============================================================================
 
@@ -253,6 +269,7 @@ struct BodyConfig
     ShadingBlock    shading;
     ErosionBlock    erosion;
     MacroWorldBlock macroWorld;
+    TerrainStyleBlock terrainStyle;
     PaletteRefBlock paletteRef;
     ShaderPathsBlock shaderPaths;
 

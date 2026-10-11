@@ -26,6 +26,8 @@ enum class BuiltinProgram : int
     MacroClimate = 12,
     HeightMacro = 13,
     ShadingEarthMacro = 14,
+    HeightStyle = 15,
+    HeightMacroStyle = 16,
 };
 
 // Converts a BuiltinProgram id to its canonical string key
@@ -48,6 +50,8 @@ inline std::string BuiltinKey(BuiltinProgram id)
     case BuiltinProgram::MacroClimate:         return "__builtin_macro_climate";
     case BuiltinProgram::HeightMacro:          return "__builtin_height_macro";
     case BuiltinProgram::ShadingEarthMacro:    return "__builtin_shading_earth_macro";
+    case BuiltinProgram::HeightStyle:          return "__builtin_height_style";
+    case BuiltinProgram::HeightMacroStyle:     return "__builtin_height_macro_style";
     }
     return "";
 }

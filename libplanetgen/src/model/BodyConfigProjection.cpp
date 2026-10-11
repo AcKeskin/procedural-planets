@@ -76,6 +76,16 @@ PgBodyDesc ProjectToBodyDesc(const BodyConfig& cfg)
     d.detail_lacunarity     = h.detailLacunarity;
     d.perturb_scale         = h.perturbScale;
 
+    const auto& ts = cfg.terrainStyle;
+    d.style_dunes         = ts.dunes;
+    d.style_dune_scale    = ts.duneScale;
+    d.style_craters       = ts.craters;
+    d.style_crater_scale  = ts.craterScale;
+    d.style_terraces      = ts.terraces;
+    d.style_terrace_steps = ts.terraceSteps;
+    d.style_canyons       = ts.canyons;
+    d.style_spires        = ts.spires;
+
     return d;
 }
 

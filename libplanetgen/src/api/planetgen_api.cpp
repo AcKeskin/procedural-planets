@@ -133,6 +133,11 @@ PgContext pg_context_create(const PgContextDesc* desc)
     reg(BP::Height,          planetgen::shaders::height_earth_comp,       "height");
     reg(BP::HeightMacro,     planetgen::WithDefine(planetgen::shaders::height_earth_comp, "MACRO_WORLD"),
         "height_macro");
+    reg(BP::HeightStyle,     planetgen::WithDefine(planetgen::shaders::height_earth_comp, "TERRAIN_STYLE"),
+        "height_style");
+    reg(BP::HeightMacroStyle,
+        planetgen::WithDefine(planetgen::WithDefine(planetgen::shaders::height_earth_comp, "MACRO_WORLD"), "TERRAIN_STYLE"),
+        "height_macro_style");
     reg(BP::ShadingEarth,    planetgen::shaders::shading_earth_comp,      "shading_earth");
     reg(BP::ShadingEarthMacro, planetgen::WithDefine(planetgen::shaders::shading_earth_comp, "MACRO_WORLD"),
         "shading_earth_macro");

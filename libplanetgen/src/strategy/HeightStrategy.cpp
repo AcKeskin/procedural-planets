@@ -19,9 +19,13 @@ HeightBuffers HeightStrategy::Run(const StrategyContext& sc,
 {
     auto& gpu = sc.backend;
 
-    // The macro layer has its own program variant (see height_earth.comp).
-    const uint32_t program = sc.registry.Resolve(sc.macroField != 0 ? BuiltinProgram::HeightMacro
-                                                                     : BuiltinProgram::Height);
+    // The macro layer and the terrain styles have their own program variants (see
+    // height_earth.comp), so a body without them runs exactly the plain program.
+    const bool style = desc.style_dunes > 0.0f || desc.style_craters > 0.0f || desc.style_terraces > 0.0f
+                    || desc.style_canyons > 0.0f || desc.style_spires > 0.0f;
+    const BuiltinProgram id = sc.macroField != 0 ? (style ? BuiltinProgram::HeightMacroStyle : BuiltinProgram::HeightMacro)
+                                                 : (style ? BuiltinProgram::HeightStyle : BuiltinProgram::Height);
+    const uint32_t program = sc.registry.Resolve(id);
     if (!program)
         return {};
 

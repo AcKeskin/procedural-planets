@@ -68,6 +68,14 @@ HeightParams MakeHeightParams(const PgBodyDesc& desc, uint32_t seed, uint32_t ve
     p.abyssalOctaves      = desc.abyssal_octaves;
     p.abyssalScale        = desc.abyssal_scale;
     p.abyssalStrength     = desc.abyssal_strength;
+    p.styleDunes          = desc.style_dunes;
+    p.styleDuneScale      = desc.style_dune_scale;
+    p.styleCraters        = desc.style_craters;
+    p.styleCraterScale    = desc.style_crater_scale;
+    p.styleTerraces       = desc.style_terraces;
+    p.styleTerraceSteps   = desc.style_terrace_steps;
+    p.styleCanyons        = desc.style_canyons;
+    p.styleSpires         = desc.style_spires;
     return p;
 }
 
