@@ -67,6 +67,7 @@ inline constexpr Key MoveDown = Key::Q;
 inline constexpr Key MoveUp = Key::E;
 inline constexpr Key Faster = Key::LeftShift;
 inline constexpr Key Slower = Key::LeftControl;
+inline constexpr Key RightCtrl = static_cast<Key>(345); // GLFW_KEY_RIGHT_CONTROL
 
 inline constexpr float FasterFactor = 4.0f;
 inline constexpr float SlowerFactor = 0.25f;
@@ -118,24 +119,44 @@ constexpr const char* GroupName(KeyGroup group)
     return "";
 }
 
-// Ctrl must match the row exactly, so Ctrl+1 never fires the plain 1 action.
-inline bool ModifierMatches(const Input& input, Modifier modifier)
+// True when another row has the same key with Ctrl (digits: plain recalls, Ctrl saves).
+constexpr bool HasCtrlTwin(const KeyBind& row)
 {
-    return input.IsKeyDown(Slower) == (modifier == Modifier::Ctrl);
+    if (row.key == Key::None || row.modifier == Modifier::Ctrl)
+        return false;
+    for (const KeyBind& other : Table)
+        if (other.key == row.key && other.modifier == Modifier::Ctrl)
+            return true;
+    return false;
+}
+
+// Ctrl is also the slow-fly key, so only rows that need it look at it: a Ctrl row wants it
+// down, a row with a Ctrl twin wants it up, any other row ignores it.
+constexpr bool ModifierMatches(bool ctrlDown, Modifier modifier, bool hasCtrlTwin)
+{
+    if (modifier == Modifier::Ctrl)
+        return ctrlDown;
+    return !(hasCtrlTwin && ctrlDown);
+}
+
+inline bool ModifierMatches(const Input& input, const KeyBind& row)
+{
+    const bool ctrlDown = input.IsKeyDown(Slower) || input.IsKeyDown(RightCtrl);
+    return ModifierMatches(ctrlDown, row.modifier, HasCtrlTwin(row));
 }
 
 // True on the frame the row's key goes down with its modifier.
 inline bool Pressed(const Input& input, Action action)
 {
     const KeyBind& row = Find(action);
-    return row.key != Key::None && ModifierMatches(input, row.modifier) && input.IsKeyPressed(row.key);
+    return row.key != Key::None && ModifierMatches(input, row) && input.IsKeyPressed(row.key);
 }
 
 // 1..9 for the digit rows (RecallBookmark, SaveBookmark); 0 when none went down.
 inline int DigitPressed(const Input& input, Action action)
 {
     const KeyBind& row = Find(action);
-    if (!ModifierMatches(input, row.modifier))
+    if (!ModifierMatches(input, row))
         return 0;
     for (int i = 0; i < 9; ++i)
         if (input.IsKeyPressed(static_cast<Key>(static_cast<int>(row.key) + i)))

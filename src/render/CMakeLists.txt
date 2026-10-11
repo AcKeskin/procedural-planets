@@ -74,6 +74,7 @@ add_executable(render_tests
     tests/test_look_units.cpp
     tests/test_camera_controller.cpp
     tests/test_bookmarks.cpp
+    tests/test_keybinds.cpp
     ../app/Bookmarks.cpp
     ../app/HelpOverlay.cpp
 )
