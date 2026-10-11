@@ -16,9 +16,9 @@
 #include "planetgen/planetgen.h"
 #include "../backend/IComputeBackend.h"
 #include "../backend/ShaderRegistry.h"
-#include "../model/PaletteRegistry.h"
 
 #include <cstdint>
+#include <memory>
 
 namespace planetgen
 {
@@ -105,14 +105,13 @@ public:
                                 GpuBufferHandle heights) = 0;
 };
 
-// IPaletteProvider — resolves the body's palette by id. Pure lookup, no GPU work.
-class IPaletteProvider
+// The stage implementations a GenerationPipeline runs. A null slot means the
+// built-in one, so a caller replaces only the stages it cares about.
+struct GenerationStrategies
 {
-public:
-    virtual ~IPaletteProvider() = default;
-
-    virtual const Palette& Resolve(const PaletteRegistry& registry,
-                                   const std::string& paletteId) const = 0;
+    std::unique_ptr<IHeightStrategy>  height;
+    std::unique_ptr<IErosionStrategy> erosion;
+    std::unique_ptr<IShadingStrategy> shading;
 };
 
 } // namespace planetgen

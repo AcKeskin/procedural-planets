@@ -1,4 +1,4 @@
-#include "BodyConfigProjection.h"
+#include "planetgen/model/BodyConfigProjection.h"
 #include <cstring>
 
 namespace planetgen

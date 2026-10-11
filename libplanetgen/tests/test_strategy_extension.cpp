@@ -14,6 +14,10 @@
 #include "planetgen/planetgen.h"
 #include "api/InternalTypes.h"
 #include "strategy/IGenerationStrategy.h"
+#include "strategy/GenerationPipeline.h"
+#include "planetgen/model/BodyConfig.h"
+
+#include <cmath>
 
 #include <vector>
 
@@ -81,5 +85,32 @@ TEST_CASE("A new IHeightStrategy composes through the seam with zero core edits"
 
     gpu.DestroyBuffer(hb.heights);
     gpu.DestroyBuffer(hb.normals);
+    pg_context_destroy(ctx);
+}
+
+TEST_CASE("GenerationPipeline runs an injected height strategy", "[gpu][strategy][extension]")
+{
+    PgContext ctx = MakeHeadlessCtx();
+    REQUIRE(ctx != nullptr);
+
+    planetgen::GenerationStrategies strategies;
+    strategies.height = std::make_unique<ConstantHeightStrategy>(0.25f);
+    planetgen::GenerationPipeline pipeline(*ctx->backend, ctx->registry, ctx->palettes, std::move(strategies));
+
+    std::vector<float> vertices;
+    for (int i = 0; i < 64; ++i)
+    {
+        const float a = 0.1f * static_cast<float>(i);
+        vertices.insert(vertices.end(), { std::cos(a), std::sin(a), 0.0f });
+    }
+
+    planetgen::BodyConfig config;
+    config.erosion.enabled = false;
+    const auto result = pipeline.Generate(config, vertices.data(), 64, 1u);
+    REQUIRE(result.count == 64);
+    for (float h : result.heights)
+        REQUIRE(h == 0.25f);
+    REQUIRE(result.shading.size() == 64 * 4); // built-in shading still ran
+
     pg_context_destroy(ctx);
 }

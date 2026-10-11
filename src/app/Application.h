@@ -29,7 +29,7 @@
 #include "gui/CinematicPanel.h"
 #include "math/Camera.h"
 #include "CaptureRequest.h"
-#include <model/PaletteRegistry.h>
+#include "planetgen/model/PaletteRegistry.h"
 
 namespace planets::app
 {
@@ -70,33 +70,40 @@ public:
     Application& operator=(const Application&) = delete;
 
     bool Initialize();
-    void Run();
+    void Run(); // the interactive main loop, until the window closes
     void Shutdown();
 
-    // Headless capture: boot with overrides, render warm-up frames, write one PNG, return.
-    // Returns true on a successful capture.
-    bool RunCapture(const CaptureRequest& request);
+    // Frame and scene controls the run modes (src/app/modes) drive the app with.
 
-    // Headless cinematic: boot, warm up the LOD, then drive the turntable over
-    // request.cinematicFrames frames at a fixed dt, writing a numbered PNG sequence.
-    bool RunCinematicCapture(const CaptureRequest& request);
+    // Initialize with CLI overrides (window size, seed, body, light, camera framing).
+    bool Boot(const CaptureRequest& request);
+    bool ShouldClose() const;
+    // Poll events and input, move the camera, keep the framebuffer at the window size.
+    void BeginInteractiveFrame();
+    void PresentFrame(); // render + swap
+    // Render one frame and write it as a PNG (to path, or the request's output path).
+    // True when the capture ran.
+    bool CaptureFrame(const std::string& path = {});
 
-    // Headless generation showcase: orbit continuously while regenerating the planet
-    // (new random world) every request.holdFrames frames, across request.planets worlds.
-    bool RunGenerationShowcase(const CaptureRequest& request);
+    // Render frames until the LOD scheduler has no pending/in-flight work, so a capture
+    // never shoots a half-generated patch. minFrames forces a settle floor; maxFrames caps
+    // the wait so a stuck queue can't hang. Returns true if it drained before the cap.
+    bool DrainGeneration(int minFrames, int maxFrames);
 
-    // Command-driven instrument: boot, then execute a JSON command timeline (camera, live
-    // params, frame bursts) deterministically at a fixed dt. The drivable instrument mode.
-    bool RunScript(const CaptureRequest& request);
+    render::TurntableSettings& Turntable() { return _cinematicSettings.turntable; }
+    void StartCinematic();
+    void StopCinematic();
+    // Advance the turntable by a fixed dt (deterministic captures), with the follow light.
+    void StepCinematic(float dt);
 
-    // Live instrument: boot a visible window and a localhost command server, then run an
-    // interactive loop that applies commands as they arrive (one JSON command per line) and
-    // renders continuously. Captures-on-demand reply with the written PNG path. Runs until
-    // the window closes.
-    bool RunLive(const CaptureRequest& request);
+    const std::vector<render::types::BodyEntry>& Bodies() const { return _bodies; }
+    const std::string& ActiveBodyId() const { return _activeBodyId; }
+    // Switches to a planet type from the registry; false (and a log line) when the id is unknown.
+    bool SwitchBodyById(const std::string& id);
+    void SetSeed(uint32_t seed) { _genConfig.seed = seed; }
 
-    // Apply CLI overrides before window/scene creation (size, vsync, seed, camera).
-    void ApplyCaptureOverrides(const CaptureRequest& request);
+    // Pin capture-mode lighting exposure (re-applied after a showcase regenerate).
+    void ApplyCaptureExposure();
 
 private:
     void ProcessInput(float deltaTime);
@@ -107,29 +114,17 @@ private:
     // New world: a planet type with a variety block rolls a new seed; others (Earth) shuffle
     // their generation parameters.
     void ShuffleTerrain();
-    void StartCinematic();
-    void StopCinematic();
 
     // Resize the renderer's framebuffer to the current window size if they differ (cheap
     // no-op when unchanged). Must run before any render that may be captured in live mode.
     void SyncFramebufferToWindow();
 
-    // Render frames until the LOD scheduler has no pending/in-flight work, so a capture
-    // never shoots a half-generated patch. minFrames forces a settle floor; maxFrames caps
-    // the wait so a stuck queue can't hang. Returns true if it drained before the cap.
-    bool DrainGeneration(int minFrames, int maxFrames);
-
     // Aim the world light from over the camera's shoulder so the lit hemisphere faces the
     // viewer (used per-frame in the cinematic when lightFollow is on).
     void UpdateFollowLight();
 
-    // Pin capture-mode lighting exposure (re-applied after a showcase regenerate).
-    void ApplyCaptureExposure();
-
     // Makes this body active and applies its look (sky, clouds, ocean, star).
     void SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look = {}, bool resetCamera = true);
-    // Switches to a planet type from the registry; false (and a log line) when the id is unknown.
-    bool SwitchBodyById(const std::string& id);
     // Switches to the body JSON at path, its variety rolled with the current seed.
     bool SwitchBodyByPath(const std::string& path, bool resetCamera = true);
     // After a seed change: rolls the active type's variety again. False when it has none.
@@ -137,6 +132,7 @@ private:
 
     // Build QuadTreeConfig from current LodConfig
     render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
+    float PlanetRadius() const; // the active body's (its config owns it)
 
     // Core systems
     render::Window _window;
@@ -196,7 +192,6 @@ private:
 
     // Frame state
     float _lastTime;
-    float _deltaTime = 0.0f;
     int _previousWidth;
     int _previousHeight;
 
@@ -204,7 +199,7 @@ private:
     CaptureRequest _capture;
     bool _headlessCaptureRequested = false;
 
-    // The instrument runner is an extension of the headless modes; it mutates the private
+    // The instrument runner is an extension of the run modes; it mutates the private
     // settings members + drives Render/Drain/Regenerate directly rather than widening the
     // public surface for every tunable.
     friend class instrument::ScriptRunner;

@@ -2,10 +2,10 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-#include "model/BodyConfig.h"
-#include "model/BodyConfigProjection.h"
-#include "model/BodyConfigJson.h"
-#include "model/PaletteRegistry.h"
+#include "planetgen/model/BodyConfig.h"
+#include "planetgen/model/BodyConfigProjection.h"
+#include "planetgen/model/BodyConfigJson.h"
+#include "planetgen/model/PaletteRegistry.h"
 #include "backend/ParamBlocks.h"
 #include "planetgen/planetgen.h"
 

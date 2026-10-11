@@ -2,7 +2,7 @@
 #include "AtmosphereRenderer.h"
 #include "../PostProcessor.h"
 #include <GL/gl3w.h>
-#include <materials/CloudNoise.h>
+#include "materials/CloudNoise.h"
 #include <algorithm>
 #include <cmath>
 #include <chrono>
@@ -103,9 +103,9 @@ void CloudVolume::Generate(uint32_t seed)
         return;
     ReleaseNoise();
     const auto start = std::chrono::steady_clock::now();
-    _shape = CreateVolume(planetgen::GenerateCloudShapeNoise(seed, ShapeSize), ShapeSize);
-    _detail = CreateVolume(planetgen::GenerateCloudDetailNoise(seed, DetailSize), DetailSize);
-    _weather = CreateWeather(planetgen::GenerateCloudWeather(seed, WeatherFaceSize), WeatherFaceSize);
+    _shape = CreateVolume(GenerateCloudShapeNoise(seed, ShapeSize), ShapeSize);
+    _detail = CreateVolume(GenerateCloudDetailNoise(seed, DetailSize), DetailSize);
+    _weather = CreateWeather(GenerateCloudWeather(seed, WeatherFaceSize), WeatherFaceSize);
     _seed = seed;
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     std::cout << "[CloudVolume] Generated cloud noise in " << ms << " ms" << std::endl;

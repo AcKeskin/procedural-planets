@@ -4,6 +4,7 @@
 // embedded at init. No filesystem access in the contract — consumers call Register()
 // with pre-loaded data; the registry does lookups only.
 
+#include "planetgen/planetgen.h"
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
@@ -27,7 +28,7 @@ struct Palette
     bool IsValid() const { return !entries.empty(); }
 };
 
-class PaletteRegistry
+class PG_API PaletteRegistry
 {
 public:
     PaletteRegistry();

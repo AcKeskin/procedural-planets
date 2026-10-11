@@ -7,7 +7,7 @@
 
 #include "../backend/IComputeBackend.h"
 #include "../backend/ShaderRegistry.h"
-#include "../model/BodyConfig.h"
+#include "planetgen/model/BodyConfig.h"
 
 #include <cstdint>
 

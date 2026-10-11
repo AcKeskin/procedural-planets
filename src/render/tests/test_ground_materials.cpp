@@ -8,8 +8,8 @@
 #include <stdexcept>
 #include <vector>
 
-using planetgen::GenerateGroundMaterials;
-using planetgen::GroundMaterialCount;
+using planets::render::GenerateGroundMaterials;
+using planets::render::GroundMaterialCount;
 
 namespace
 {

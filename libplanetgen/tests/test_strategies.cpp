@@ -12,11 +12,10 @@
 #include "strategy/HeightStrategy.h"
 #include "strategy/ShadingStrategy.h"
 #include "strategy/ErosionStrategy.h"
-#include "strategy/PaletteProvider.h"
 #include "strategy/GenerationPipeline.h"
-#include "model/BodyConfig.h"
-#include "model/BodyConfigProjection.h"
-#include "model/PaletteRegistry.h"
+#include "planetgen/model/BodyConfig.h"
+#include "planetgen/model/BodyConfigProjection.h"
+#include "planetgen/model/PaletteRegistry.h"
 
 #include <vector>
 #include <cstring>
@@ -144,17 +143,16 @@ TEST_CASE("ShadingStrategy yields byte-exact shading across two runs", "[gpu][st
     pg_context_destroy(ctx);
 }
 
-TEST_CASE("PaletteProvider resolves the earth palette", "[strategy]")
+TEST_CASE("PaletteRegistry resolves the earth palette", "[strategy]")
 {
     planetgen::PaletteRegistry registry; // built-ins registered in ctor
-    planetgen::PaletteProvider provider;
 
-    const planetgen::Palette& earth = provider.Resolve(registry, planetgen::PaletteRegistry::IdEarth);
+    const planetgen::Palette& earth = registry.Resolve(planetgen::PaletteRegistry::IdEarth);
     REQUIRE(earth.IsValid());
     REQUIRE_FALSE(earth.entries.empty());
 
     // Unknown id resolves to the empty palette, not a crash.
-    const planetgen::Palette& missing = provider.Resolve(registry, "__no_such_palette__");
+    const planetgen::Palette& missing = registry.Resolve("__no_such_palette__");
     REQUIRE_FALSE(missing.IsValid());
 }
 

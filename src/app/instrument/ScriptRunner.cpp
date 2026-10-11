@@ -3,8 +3,8 @@
 #include "ParamRegistry.h"
 #include "../Application.h"
 
-#include <model/BodyConfig.h>
-#include <model/BodyConfigJson.h>
+#include "planetgen/model/BodyConfig.h"
+#include "planetgen/model/BodyConfigJson.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -187,7 +187,7 @@ void ScriptRunner::ReapplyCamera()
 
 float ScriptRunner::CurrentRadius() const
 {
-    return _app._activeBody ? _app._activeBody->Config().metadata.radius : 10.0f;
+    return _app.PlanetRadius();
 }
 
 void ScriptRunner::PumpFrames(int n)

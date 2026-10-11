@@ -4,6 +4,7 @@
 // PgBodyDesc/PgShadingDesc/PgErosionDesc are projections from this; they carry no
 // independent defaults. Pure data: no GPU, JSON, or strategy knowledge.
 
+#include "planetgen/planetgen.h"
 #include <string>
 #include <glm/glm.hpp>
 
@@ -226,15 +227,12 @@ struct PaletteRefBlock
 };
 
 // ============================================================================
-// Shader path override block — body-type-specific paths
-// Defaults target the Earth shaders; generic bodies override as needed.
+// Shader path override block — the renderer's planet shaders per body type.
+// (Compute shaders are embedded in the library, so they have no paths here.)
 // ============================================================================
 
 struct ShaderPathsBlock
 {
-    std::string heightShaderPath   = "shaders/compute/height_earth.comp";
-    std::string shadingShaderPath  = "shaders/compute/shading_earth.comp";
-    std::string erosionShaderPath  = "shaders/compute/erosion_earth.comp";
     std::string vertexShaderPath   = "shaders/earth/planet_earth.vert";
     std::string fragmentShaderPath = "shaders/earth/planet_earth.frag";
 };
@@ -274,7 +272,7 @@ struct BodyConfig
     ShaderPathsBlock shaderPaths;
 
     // Validate ranges and enable-consistency; returns empty string on success, reason on failure.
-    std::string Validate() const;
+    PG_API std::string Validate() const;
 };
 
 } // namespace planetgen

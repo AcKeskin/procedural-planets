@@ -1,4 +1,4 @@
-#include "HeadlessGLBackend.h"
+#include "GLBackend.h"
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -6,7 +6,7 @@
 namespace planetgen
 {
 
-HeadlessGLBackend::~HeadlessGLBackend()
+GLBackend::~GLBackend()
 {
     if (_window)
     {
@@ -16,8 +16,19 @@ HeadlessGLBackend::~HeadlessGLBackend()
     }
 }
 
-bool HeadlessGLBackend::Init()
+bool GLBackend::Init()
 {
+    if (!_ownsContext)
+    {
+        // gl3w function pointers are per-module on Windows — must init even when sharing a context
+        if (gl3wInit())
+        {
+            std::cerr << "[planetgen] gl3w init failed (existing context)" << std::endl;
+            return false;
+        }
+        return true;
+    }
+
     if (!glfwInit())
     {
         std::cerr << "[planetgen] GLFW init failed" << std::endl;
@@ -51,118 +62,118 @@ bool HeadlessGLBackend::Init()
     return true;
 }
 
-uint32_t HeadlessGLBackend::CompileShader(const std::string& source)
+uint32_t GLBackend::CompileShader(const std::string& source)
 {
     return _device.CompileProgram(source);
 }
 
-void HeadlessGLBackend::DestroyShader(uint32_t shader)
+void GLBackend::DestroyShader(uint32_t shader)
 {
     _device.DestroyProgram(shader);
 }
 
-void HeadlessGLBackend::BindShader(uint32_t shader)
+void GLBackend::BindShader(uint32_t shader)
 {
     _device.BindProgram(shader);
 }
 
-GpuBufferHandle HeadlessGLBackend::CreateBuffer(size_t sizeBytes)
+GpuBufferHandle GLBackend::CreateBuffer(size_t sizeBytes)
 {
     return _device.CreateBuffer(sizeBytes);
 }
 
-void HeadlessGLBackend::UploadBuffer(GpuBufferHandle buffer, const void* data, size_t sizeBytes)
+void GLBackend::UploadBuffer(GpuBufferHandle buffer, const void* data, size_t sizeBytes)
 {
     _device.UploadBuffer(buffer, data, sizeBytes);
 }
 
-void HeadlessGLBackend::DownloadBuffer(GpuBufferHandle buffer, void* data, size_t sizeBytes)
+void GLBackend::DownloadBuffer(GpuBufferHandle buffer, void* data, size_t sizeBytes)
 {
     _device.DownloadBuffer(buffer, data, sizeBytes);
 }
 
-void HeadlessGLBackend::DestroyBuffer(GpuBufferHandle buffer)
+void GLBackend::DestroyBuffer(GpuBufferHandle buffer)
 {
     _device.DestroyBuffer(buffer);
 }
 
-void HeadlessGLBackend::BindBuffer(GpuBufferHandle buffer, uint32_t bindingPoint)
+void GLBackend::BindBuffer(GpuBufferHandle buffer, uint32_t bindingPoint)
 {
     _device.BindBuffer(buffer, bindingPoint);
 }
 
-GpuBufferHandle HeadlessGLBackend::CreateParamBuffer(size_t sizeBytes)
+GpuBufferHandle GLBackend::CreateParamBuffer(size_t sizeBytes)
 {
     return _device.CreateUBO(sizeBytes);
 }
 
-void HeadlessGLBackend::SetParams(GpuBufferHandle ubo, const void* data, size_t sizeBytes, uint32_t bindingPoint)
+void GLBackend::SetParams(GpuBufferHandle ubo, const void* data, size_t sizeBytes, uint32_t bindingPoint)
 {
     _device.UploadUBO(ubo, data, sizeBytes);
     _device.BindUBO(ubo, bindingPoint);
 }
 
-void HeadlessGLBackend::DestroyParamBuffer(GpuBufferHandle ubo)
+void GLBackend::DestroyParamBuffer(GpuBufferHandle ubo)
 {
     _device.DestroyUBO(ubo);
 }
 
-void HeadlessGLBackend::Dispatch(uint32_t groupsX, uint32_t groupsY, uint32_t groupsZ)
+void GLBackend::Dispatch(uint32_t groupsX, uint32_t groupsY, uint32_t groupsZ)
 {
     _device.Dispatch(groupsX, groupsY, groupsZ);
 }
 
-void HeadlessGLBackend::Barrier()
+void GLBackend::Barrier()
 {
     _device.Barrier();
 }
 
-GpuTextureHandle HeadlessGLBackend::CreateTexture3D_RG32F(uint32_t resolution)
+GpuTextureHandle GLBackend::CreateTexture3D_RG32F(uint32_t resolution)
 {
     return _device.CreateTexture3D_RG32F(resolution);
 }
 
-void HeadlessGLBackend::BindImage3D(GpuTextureHandle texture, uint32_t imageUnit)
+void GLBackend::BindImage3D(GpuTextureHandle texture, uint32_t imageUnit)
 {
     _device.BindImage3D(texture, imageUnit);
 }
 
-void HeadlessGLBackend::BindTexture3D(GpuTextureHandle texture, uint32_t samplerUnit)
+void GLBackend::BindTexture3D(GpuTextureHandle texture, uint32_t samplerUnit)
 {
     _device.BindTexture3D(texture, samplerUnit);
 }
 
-void HeadlessGLBackend::DestroyTexture(GpuTextureHandle texture)
+void GLBackend::DestroyTexture(GpuTextureHandle texture)
 {
     _device.DestroyTexture(texture);
 }
 
-void HeadlessGLBackend::ImageBarrier()
+void GLBackend::ImageBarrier()
 {
     _device.ImageBarrier();
 }
 
-void HeadlessGLBackend::Finish()
+void GLBackend::Finish()
 {
     _device.Finish();
 }
 
-GpuTextureHandle HeadlessGLBackend::CreateTexture2DArray_RGBA32F(uint32_t resolution, uint32_t layers)
+GpuTextureHandle GLBackend::CreateTexture2DArray_RGBA32F(uint32_t resolution, uint32_t layers)
 {
     return _device.CreateTexture2DArray_RGBA32F(resolution, layers);
 }
 
-void HeadlessGLBackend::BindImage2DArray(GpuTextureHandle texture, uint32_t imageUnit)
+void GLBackend::BindImage2DArray(GpuTextureHandle texture, uint32_t imageUnit)
 {
     _device.BindImage2DArray(texture, imageUnit);
 }
 
-void HeadlessGLBackend::BindTexture2DArray(GpuTextureHandle texture, uint32_t samplerUnit)
+void GLBackend::BindTexture2DArray(GpuTextureHandle texture, uint32_t samplerUnit)
 {
     _device.BindTexture2DArray(texture, samplerUnit);
 }
 
-void HeadlessGLBackend::DownloadTexture(GpuTextureHandle texture, void* data, size_t sizeBytes)
+void GLBackend::DownloadTexture(GpuTextureHandle texture, void* data, size_t sizeBytes)
 {
     _device.DownloadTexture(texture, data, sizeBytes);
 }

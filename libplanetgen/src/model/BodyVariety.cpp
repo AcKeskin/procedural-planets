@@ -1,10 +1,10 @@
-#include "BodyVariety.h"
+#include "planetgen/model/BodyVariety.h"
 
 #include <iostream>
 #include <random>
 #include <string>
 
-namespace planets::render::types
+namespace planetgen
 {
 
 namespace
@@ -106,9 +106,9 @@ json RollVariety(const json& body, uint32_t seed)
         if (Roll(rule, rng, value))
             Slot(world, key) = value;
         else
-            std::cerr << "[BodyVariety] Skipping '" << key << "': expected {range|pick|mix: [...]}" << std::endl;
+            std::cerr << "[planetgen] variety: Skipping '" << key << "': expected {range|pick|mix: [...]}" << std::endl;
     }
     return world;
 }
 
-} // namespace planets::render::types
+} // namespace planetgen

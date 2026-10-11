@@ -5,8 +5,8 @@
 #include "strategy/GenerationPipeline.h"
 #include "strategy/ContinentMaskPass.h"
 #include "strategy/MacroWorldPass.h"
-#include "model/BodyConfig.h"
-#include "model/BodyConfigJson.h"
+#include "planetgen/model/BodyConfig.h"
+#include "planetgen/model/BodyConfigJson.h"
 
 #include <algorithm>
 #include <chrono>

@@ -150,6 +150,7 @@ src/                    The showcase app — frame loop, LOD, rendering, GUI
 ├── render/             GPU rendering pipeline
 │   ├── lod/            Icosahedron patch quad-tree (PlanetQuadTree, SpherePatch, PatchPool)
 │   ├── effects/        Atmosphere, clouds, ocean, bloom and ground texture passes
+│   ├── materials/      CPU generators for the ground textures and the cloud noise
 │   ├── settings/       Typed configuration structs
 │   ├── gui/            ImGui panels that edit the active body's config
 │   ├── cinematic/      Turntable controller + screenshot capture
@@ -160,11 +161,10 @@ src/                    The showcase app — frame loop, LOD, rendering, GUI
     └── instrument/     --script / --live command timelines and parameter registry
 
 libplanetgen/           Standalone terrain generation library (DLL)
-├── include/planetgen/  Public C API + C++ RAII wrapper
+├── include/planetgen/  Public C API + C++ RAII wrapper; model/ = C++ body model API (BodyConfig, JSON, variety, palettes)
 ├── src/api/            C API implementation
-├── src/model/          BodyConfig (canonical typed body) + JSON + palette registry
-├── src/strategy/       GenerationPipeline + Height/Erosion/Shading/Palette strategies, macro world bake
-├── src/materials/      CPU generators for the ground textures and the cloud noise
+├── src/model/          Body model implementation
+├── src/strategy/       GenerationPipeline + Height/Erosion/Shading strategies, macro world bake
 ├── src/backend/        Compute backend abstraction
 │   └── opengl/         OpenGL 4.5 compute implementation
 └── cmake/              Shader embedding build tools

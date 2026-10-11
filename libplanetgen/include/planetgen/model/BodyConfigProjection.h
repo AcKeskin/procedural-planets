@@ -11,12 +11,12 @@
 namespace planetgen
 {
 
-PgBodyDesc    ProjectToBodyDesc(const BodyConfig& cfg);
-PgShadingDesc ProjectToShadingDesc(const BodyConfig& cfg);
-PgErosionDesc ProjectToErosionDesc(const BodyConfig& cfg);
+PG_API PgBodyDesc    ProjectToBodyDesc(const BodyConfig& cfg);
+PG_API PgShadingDesc ProjectToShadingDesc(const BodyConfig& cfg);
+PG_API PgErosionDesc ProjectToErosionDesc(const BodyConfig& cfg);
 
 // Every desc field goes into the config; the blocks the desc does not carry keep
 // their defaults. ProjectToBodyDesc(BodyConfigFromDesc(d)) gives d back.
-BodyConfig BodyConfigFromDesc(const PgBodyDesc& d);
+PG_API BodyConfig BodyConfigFromDesc(const PgBodyDesc& d);
 
 } // namespace planetgen

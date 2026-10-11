@@ -12,12 +12,12 @@ namespace planetgen
 
 // Parse a BodyConfig from a JSON string.
 // Returns empty-string error on success; non-empty string with reason on failure.
-std::string BodyConfigFromJson(const std::string& json, BodyConfig& out);
+PG_API std::string BodyConfigFromJson(const std::string& json, BodyConfig& out);
 
 // Serialize a BodyConfig to JSON string (deterministic key ordering).
-std::string BodyConfigToJson(const BodyConfig& cfg);
+PG_API std::string BodyConfigToJson(const BodyConfig& cfg);
 
 // Convenience: load from filesystem path.
-std::string BodyConfigLoadFile(const std::string& path, BodyConfig& out);
+PG_API std::string BodyConfigLoadFile(const std::string& path, BodyConfig& out);
 
 } // namespace planetgen

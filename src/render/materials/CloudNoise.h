@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace planetgen
+namespace planets::render
 {
 
 // Tiling 3D noise volumes, size^3 bytes, x fastest. size must be a power of two >= 8.
@@ -22,4 +22,4 @@ std::vector<uint8_t> GenerateCloudWeather(uint32_t seed, int faceSize);
 // Direction of the centre of a cube-map texel, the same convention GL samples with.
 void CloudWeatherTexelDir(int face, int x, int y, int faceSize, float out[3]);
 
-} // namespace planetgen
+} // namespace planets::render

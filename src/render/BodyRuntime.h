@@ -8,8 +8,8 @@
 #include "BiomePalette.h"
 #include "Shader.h"
 #include <planetgen/planetgen.h>
-#include "model/BodyConfig.h"
-#include "model/PaletteRegistry.h"
+#include "planetgen/model/BodyConfig.h"
+#include "planetgen/model/PaletteRegistry.h"
 #include <string>
 
 namespace planets::render
@@ -31,9 +31,6 @@ public:
     const planetgen::BodyConfig& Config() const { return _config; }
 
     // Shader paths
-    std::string GetHeightShaderPath() const { return _config.shaderPaths.heightShaderPath; }
-    std::string GetShadingShaderPath() const { return _config.shaderPaths.shadingShaderPath; }
-    std::string GetErosionShaderPath() const { return _config.shaderPaths.erosionShaderPath; }
     std::string GetVertexShaderPath() const { return _config.shaderPaths.vertexShaderPath; }
     std::string GetFragmentShaderPath() const { return _config.shaderPaths.fragmentShaderPath; }
 

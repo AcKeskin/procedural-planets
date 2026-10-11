@@ -3,8 +3,8 @@
 #include "planetgen/planetgen.h"
 #include "../backend/IComputeBackend.h"
 #include "../backend/ShaderRegistry.h"
-#include "../model/PaletteRegistry.h"
-#include "../model/BodyConfig.h"
+#include "planetgen/model/PaletteRegistry.h"
+#include "planetgen/model/BodyConfig.h"
 #include <memory>
 #include <string>
 #include <vector>
