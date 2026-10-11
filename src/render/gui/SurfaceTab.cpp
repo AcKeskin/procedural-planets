@@ -110,7 +110,7 @@ bool SurfaceTab::Draw(BodyRuntime& body, SurfaceSettings& s)
         }
         if (ImGui::TreeNode("Strata"))
         {
-            Slider("Strata", s.strata.strength, 0.0f, 1.0f, "%.2f", "Rock layers on cliffs and crater walls. 0 = off.");
+            Slider("Strata##value", s.strata.strength, 0.0f, 1.0f, "%.2f", "Rock layers on cliffs and crater walls. 0 = off.");
             Slider("Bands", s.strata.bands, 2.0f, 200.0f, "%.0f", "Layers over the land height. Higher = thinner.");
             Slider("Warp", s.strata.warp, 0.0f, 3.0f, "%.2f", "How much the layers bend along the cliff.");
             Color("Light Layer", s.strata.colorA, "Colour of the light rock layers.");
@@ -119,7 +119,7 @@ bool SurfaceTab::Draw(BodyRuntime& body, SurfaceSettings& s)
         }
         if (ImGui::TreeNode("Wet Ground"))
         {
-            Slider("Wet Ground", s.wetness.strength, 0.0f, 1.0f, "%.2f",
+            Slider("Wet Ground##value", s.wetness.strength, 0.0f, 1.0f, "%.2f",
                    "Darker, glossier ground at coasts and on wet land. 0 = off.");
             Slider("Shore Width", s.wetness.shoreWidth, 0.0f, 0.4f, "%.2f", "How far above sea level the shore stays wet.");
             Slider("Wet Moisture", s.wetness.moisture, 0.0f, 1.0f, "%.2f", "Moisture above which inland ground is wet.");
@@ -130,7 +130,7 @@ bool SurfaceTab::Draw(BodyRuntime& body, SurfaceSettings& s)
         }
         if (ImGui::TreeNode("Sediment"))
         {
-            Slider("Sediment", s.sediment.strength, 0.0f, 1.0f, "%.2f",
+            Slider("Sediment##value", s.sediment.strength, 0.0f, 1.0f, "%.2f",
                    "Fine fill on low, flat ground: crater floors, basins. 0 = off.");
             Color("Sediment Colour", s.sediment.color, "Colour of the fill: sand, mud, salt, sulfur.");
             Range("Height Range", s.sediment.height, 0.0f, 1.0f, "Full below the first land height, gone above the second.");
@@ -140,7 +140,7 @@ bool SurfaceTab::Draw(BodyRuntime& body, SurfaceSettings& s)
         }
         if (ImGui::TreeNode("Treeline"))
         {
-            Slider("Treeline", s.vegetation.strength, 0.0f, 1.0f, "%.2f",
+            Slider("Treeline##value", s.vegetation.strength, 0.0f, 1.0f, "%.2f",
                    "Vegetation thins on steep and high ground. 0 = off.");
             Range("Slope Limit", s.vegetation.slope, 0.0f, 0.6f, "Vegetation thins out over this steepness range.");
             Range("Height Limit", s.vegetation.treeline, 0.0f, 1.0f, "Vegetation thins out over this land height range.");
@@ -149,7 +149,7 @@ bool SurfaceTab::Draw(BodyRuntime& body, SurfaceSettings& s)
         }
         if (ImGui::TreeNode("Cover"))
         {
-            Slider("Cover", s.cover.strength, 0.0f, 1.0f, "%.2f", "Ash, frost or dust over the ground. 0 = off.");
+            Slider("Cover##value", s.cover.strength, 0.0f, 1.0f, "%.2f", "Ash, frost or dust over the ground. 0 = off.");
             Color("Cover Colour", s.cover.color, "Dark ash, white frost, ochre dust.");
             Slider("Cover Roughness", s.cover.roughness, 0.05f, 1.0f, "%.2f", "Frost glints; ash and dust stay matte.");
             Range("Cover Slope", s.cover.slope, 0.0f, 1.0f, "The cover slides off steep ground over this range.");

@@ -2,6 +2,9 @@
 
 #include "types/LookUnits.h"
 
+#include "planetgen/model/BodyConfigJson.h"
+
+#include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
 
@@ -134,4 +137,165 @@ TEST_CASE("look_units: copying every unit gives the source world", "[look_units]
     CHECK(next.scene.sunColor == w.a.scene.sunColor);
     CHECK(next.surface.strata.strength == w.a.surface.strata.strength);
     CHECK(next.palette == w.a.palette);
+}
+
+TEST_CASE("look_units: a roll over the default scene drops edited exposure unless Light is kept", "[look_units]")
+{
+    const auto body = LoadBody("data/bodies/lava.json");
+    const SceneSettings defaults;
+    SceneSettings edited;
+    edited.exposure = 2.5f;
+    edited.lightDir = glm::normalize(glm::vec3(0.3f, 0.8f, 0.1f));
+
+    LookState fromDefault;
+    LookState fromEdited;
+    REQUIRE(RollLook(body, 5, defaults, fromDefault).empty());
+    REQUIRE(RollLook(body, 5, edited, fromEdited).empty());
+    CHECK(fromDefault.scene.exposure == defaults.exposure);
+    CHECK(fromEdited.scene.exposure == 2.5f);
+    CHECK(fromDefault.scene.lightDir == defaults.lightDir);
+
+    // The live world carries the edit and its baseline does not.
+    LookState live = fromDefault;
+    live.scene = edited;
+
+    const MergedRoll open = MergeRoll(fromDefault, live, fromDefault, AllUnits & ~UnitBit(LookUnit::Light));
+    CHECK(open.next.scene.exposure == defaults.exposure);
+    CHECK(open.baseline.scene.exposure == defaults.exposure);
+
+    const MergedRoll locked = MergeRoll(fromDefault, live, fromDefault, UnitBit(LookUnit::Light));
+    CHECK(locked.next.scene.exposure == 2.5f);
+    CHECK(locked.next.scene.lightDir == edited.lightDir);
+    CHECK(locked.baseline.scene.exposure == defaults.exposure);
+    // Other units still take the roll.
+    CHECK(locked.next.clouds.coverage == fromDefault.clouds.coverage);
+}
+
+namespace
+{
+std::vector<std::filesystem::path> ShippedBodies()
+{
+    std::vector<std::filesystem::path> out;
+    for (const auto& e : std::filesystem::directory_iterator("data/bodies"))
+        if (e.path().extension() == ".json")
+            out.push_back(e.path());
+    return out;
+}
+
+// "render.ocean.crust" -> the nested value in a config JSON; null when absent.
+nlohmann::json ValueAt(const nlohmann::json& root, const std::string& key)
+{
+    const nlohmann::json* node = &root;
+    size_t start = 0;
+    while (start <= key.size())
+    {
+        const size_t dot = key.find('.', start);
+        const std::string part = key.substr(start, dot == std::string::npos ? std::string::npos : dot - start);
+        if (!node->is_object() || !node->contains(part))
+            return nullptr;
+        node = &(*node)[part];
+        if (dot == std::string::npos)
+            break;
+        start = dot + 1;
+    }
+    return *node;
+}
+} // namespace
+
+TEST_CASE("look_units: copying one unit gives that unit of the source, for every shipped body", "[look_units]")
+{
+    const auto bodies = ShippedBodies();
+    REQUIRE(!bodies.empty());
+    for (const auto& path : bodies)
+    {
+        const auto body = LoadBody(path.string().c_str());
+        const LookState a = Roll(body, 11);
+        const LookState b = Roll(body, 22);
+        for (uint32_t u = 0; u < static_cast<uint32_t>(LookUnit::Count); ++u)
+        {
+            const auto unit = static_cast<LookUnit>(u);
+            LookState next = b;
+            CopyUnits(UnitBit(unit), a, next);
+            INFO(path.string() << " unit " << u);
+            CHECK(UnitsEqual(unit, next, a));
+        }
+    }
+}
+
+TEST_CASE("look_units: every config variety key survives a lock on its unit", "[look_units]")
+{
+    for (const auto& path : ShippedBodies())
+    {
+        const auto body = LoadBody(path.string().c_str());
+        if (!body.contains("variety"))
+            continue;
+        const LookState a = Roll(body, 11);
+        const LookState b = Roll(body, 22);
+        const nlohmann::json ja = nlohmann::json::parse(planetgen::BodyConfigToJson(a.config));
+        for (const auto& item : body["variety"].items())
+        {
+            const std::string& key = item.key();
+            // Look keys (render.*) are covered by the unit comparison above.
+            if (key.rfind("render.", 0) == 0)
+                continue;
+            LookState next = b;
+            CopyUnits(UnitBit(UnitOfKey(key)), a, next);
+            const nlohmann::json jn = nlohmann::json::parse(planetgen::BodyConfigToJson(next.config));
+            INFO(path.string() << " " << key);
+            CHECK(ValueAt(jn, key) == ValueAt(ja, key));
+        }
+    }
+}
+
+TEST_CASE("look_units: Terrain copies the metadata a variety key can hit", "[look_units]")
+{
+    CHECK(UnitOfKey("metadata.atmosphereHeight") == LookUnit::Terrain);
+    LookState from;
+    from.config.metadata.atmosphereHeight = 0.2f;
+    from.config.metadata.seaLevel = 1.05f;
+    LookState to;
+    CopyUnits(UnitBit(LookUnit::Terrain), from, to);
+    CHECK(to.config.metadata.atmosphereHeight == 0.2f);
+    CHECK(to.config.metadata.seaLevel == planetgen::MetadataBlock{}.seaLevel);
+}
+
+TEST_CASE("look_units: a merged roll keeps the kept units live and their default old", "[look_units]")
+{
+    const TwoWorlds w;
+    LookState live = w.a;
+    live.ocean.crust = 0.77f;           // edited
+    LookState oldBaseline = w.a;
+    const MergedRoll m = MergeRoll(w.b, live, oldBaseline, UnitBit(LookUnit::Ocean));
+    CHECK(m.next.ocean.crust == 0.77f);
+    CHECK(m.baseline.ocean.crust == w.a.ocean.crust);
+    CHECK(m.next.clouds.coverage == w.b.clouds.coverage);
+    CHECK(m.baseline.clouds.coverage == w.b.clouds.coverage);
+    // No kept unit: the roll is both the world and its baseline.
+    const MergedRoll fresh = MergeRoll(w.b, live, oldBaseline, 0);
+    CHECK(fresh.next.ocean.crust == w.b.ocean.crust);
+    CHECK(fresh.baseline.ocean.crust == w.b.ocean.crust);
+}
+
+TEST_CASE("look_units: ChangedUnits flags only the tab whose value moved", "[look_units]")
+{
+    const TwoWorlds w;
+    CHECK(ChangedUnits(w.a, w.a) == 0u);
+
+    LookState live = w.a;
+    live.scene.lighting.ambientLight += 0.1f;
+    CHECK(ChangedUnits(live, w.a) == UnitBit(LookUnit::Light));
+
+    live = w.a;
+    live.atmosphere.enabled = !live.atmosphere.enabled;
+    CHECK(ChangedUnits(live, w.a) == UnitBit(LookUnit::Sky));
+
+    live = w.a;
+    live.config.metadata.seaLevel += 0.01f;
+    live.surface.seafloor.depthRange += 0.1f;
+    CHECK(ChangedUnits(live, w.a) == UnitBit(LookUnit::Ocean));
+
+    live = w.a;
+    live.surface.rock.slope += 0.1f;
+    live.config.terrainStyle.spires += 0.1f;
+    CHECK(ChangedUnits(live, w.a) == (UnitBit(LookUnit::Surface) | UnitBit(LookUnit::Terrain)));
 }
