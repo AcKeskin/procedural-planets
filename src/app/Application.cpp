@@ -825,6 +825,10 @@ void Application::StartCinematic()
 {
     // The GUI hides during the turntable, so a hidden open help would eat the first Esc.
     _help.Close();
+    // UpdateCamera is skipped while it plays, so drop a held look drag and show the cursor again.
+    _lookDragging = false;
+    _orbitDragging = false;
+    _input.SetCursorEnabled(true);
     _cameraCtl.Cancel(_camera);
     _camera.Hud().autoRotate = false;
     _camera.SetOrbitTarget(glm::vec3(0.0f));
