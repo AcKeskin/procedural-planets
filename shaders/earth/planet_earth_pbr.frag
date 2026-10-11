@@ -265,6 +265,18 @@ void main()
     mat.albedo    = mix(mat.albedo, snow.albedo, snowW);
     mat.roughness = mix(mat.roughness, snow.roughness, snowW);
 
+    // Wet ground: the shore just above the sea and the wettest land, darker and smoother. Not on
+    // snow; half as much on bare rock.
+    float wet = 0.0;
+    if (sWet0.w > 0.0)
+    {
+        float shore = 1.0 - smoothstep(0.0, max(sWet1.x, 1e-4), h);
+        float soaked = smoothstep(sWet1.y, sWet1.y + 0.15, moisture) * 0.7;
+        wet = max(shore, soaked) * (1.0 - snowW) * (1.0 - rockW * 0.5) * sWet0.w;
+        mat.albedo = mix(mat.albedo, mat.albedo * sWet0.rgb * (1.0 - sWet1.z), wet);
+        mat.roughness = mix(mat.roughness, sWet1.w, wet);
+    }
+
     // Fine grain on every material (grass took none before), weaker on snow.
     mat.albedo *= mix(1.0, mix(sDetail0.x, sDetail0.y, vFine), 1.0 - snowW * sDetail0.z);
 
@@ -315,7 +327,7 @@ void main()
     // Ground (grass/soil/sand) is near-matte: real surfaces have almost no specular lobe, and a
     // tight lobe over the bumped normal is exactly what rings. Floor roughness high on non-rock so
     // the specular highlight stays broad and faint. Snow/wet rock keep a little more glint.
-    float matte = max(rockW, snowW);
+    float matte = max(max(rockW, snowW), wet); // wet ground may be glossier than the dry floor
     float roughness = clamp(mat.roughness, mix(sDetail2.x, sDetail2.y, matte), 1.0);
     float ao = calcSphericalAO(N, sphereNormal, uAOStrength);
 

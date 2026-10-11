@@ -132,6 +132,14 @@ void ReadSurface(const json& j, SurfaceSettings& s)
     Read(strataJ, "colorA", s.strata.colorA);
     Read(strataJ, "colorB", s.strata.colorB);
 
+    const json& wetnessJ = Block(j, "wetness");
+    Read(wetnessJ, "strength", s.wetness.strength);
+    Read(wetnessJ, "shoreWidth", s.wetness.shoreWidth);
+    Read(wetnessJ, "moisture", s.wetness.moisture);
+    Read(wetnessJ, "darkening", s.wetness.darkening);
+    Read(wetnessJ, "roughness", s.wetness.roughness);
+    Read(wetnessJ, "tint", s.wetness.tint);
+
     const json& c = Block(j, "climate");
     Read(c, "polarCaps", s.climate.polarCaps);
     Read(c, "substellar", s.climate.substellar);

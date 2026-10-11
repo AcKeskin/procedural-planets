@@ -272,6 +272,16 @@ void SurfacePanel::DrawSurfaceRules(SurfaceSettings& s)
         color("Dark Layer", s.strata.colorB, "Colour of the dark rock layers");
         ImGui::TreePop();
     }
+    if (ImGui::TreeNode("Wetness"))
+    {
+        value("Wetness", s.wetness.strength, 0.0f, 1.0f, "Darker, glossier ground at coasts and on wet land: 0 = off");
+        value("Shore Width", s.wetness.shoreWidth, 0.0f, 0.4f, "How far above sea level the shore stays wet");
+        value("Wet Moisture", s.wetness.moisture, 0.0f, 1.0f, "Moisture above which inland ground turns wet (marshes, rain forest floor)");
+        value("Darkening", s.wetness.darkening, 0.0f, 0.9f, "How much darker wet ground gets");
+        value("Wet Roughness", s.wetness.roughness, 0.05f, 1.0f, "Roughness of wet ground: lower = more sun glint");
+        color("Wet Tint", s.wetness.tint, "Colour cast of wet ground, for stains like acid or brine");
+        ImGui::TreePop();
+    }
     if (ImGui::TreeNode("Seafloor"))
     {
         color("Shallow Floor", s.seafloor.shallowColor, "Ground colour just below sea level");

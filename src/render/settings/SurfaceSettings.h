@@ -112,6 +112,17 @@ struct SurfaceSettings
         glm::vec3 colorB = glm::vec3(0.3f, 0.26f, 0.22f); // dark layer
     };
 
+    // Wet ground: darker and smoother near sea level and on the wettest land. Strength 0 = off.
+    struct Wetness
+    {
+        float strength = 0.0f; // how wet the wet ground gets
+        float shoreWidth = 0.06f; // height above sea level the shore stays wet
+        float moisture = 0.35f; // moisture above which inland ground is wet
+        float darkening = 0.4f; // how much wet ground darkens
+        float roughness = 0.35f; // roughness of wet ground
+        glm::vec3 tint = glm::vec3(1.0f, 1.0f, 1.0f); // colour cast of the wet ground (acid stains)
+    };
+
     static constexpr int TextureCount = 5; // order matches GROUND_* in ground_material.glsl
 
     Rock rock;
@@ -123,6 +134,7 @@ struct SurfaceSettings
     Seafloor seafloor;
     Climate climate;
     Strata strata;
+    Wetness wetness;
 };
 
 } // namespace planets::render

@@ -31,6 +31,8 @@ layout(std140, binding = 5) uniform SurfaceBlock
     vec4 sSeafloorDeep;    // rgb
     vec4 sClimate;         // x polar caps, y substellar, z city coverage
     vec4 sTexture[5];      // per ground layer: x fine tile, y coarse tile, z strength, w normal strength
+    vec4 sWet0; // rgb tint, w strength
+    vec4 sWet1; // x shore width, y moisture, z darkening, w roughness
     vec4 sStrata0; // rgb light layer, w strength
     vec4 sStrata1; // rgb dark layer, w bands
     vec4 sStrata2; // x warp
