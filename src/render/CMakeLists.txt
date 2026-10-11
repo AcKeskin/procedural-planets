@@ -4,7 +4,8 @@ add_library(render STATIC
     Shader.cpp
     gui/GuiManager.cpp
     gui/ScenePanel.cpp
-    gui/TerrainPanel.cpp
+    gui/TerrainTab.cpp
+    gui/SystemTab.cpp
     gui/SurfacePanel.cpp
     gui/AtmospherePanel.cpp
     gui/DebugPanel.cpp

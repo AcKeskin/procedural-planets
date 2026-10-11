@@ -6,7 +6,8 @@
 #include "DebugPanel.h"
 #include "ScenePanel.h"
 #include "SurfacePanel.h"
-#include "TerrainPanel.h"
+#include "SystemTab.h"
+#include "TerrainTab.h"
 
 namespace planets::core
 {
@@ -50,6 +51,7 @@ struct PlanetUi
     float* autoOrbitSpeed = nullptr;
     CinematicSettings* cinematic = nullptr;
     float planetRadius = 1.0f;
+    float frameMs = 16.0f;
 };
 
 // What the user asked for this frame; the app carries it out.
@@ -70,7 +72,8 @@ public:
 
 private:
     ScenePanel _scene;
-    TerrainPanel _terrain;
+    TerrainTab _terrain;
+    SystemTab _system;
     SurfacePanel _surface;
     AtmospherePanel _atmosphere;
     CloudsPanel _clouds;

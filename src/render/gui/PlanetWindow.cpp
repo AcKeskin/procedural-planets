@@ -24,7 +24,10 @@ PlanetActions PlanetWindow::Draw(PlanetUi& ui)
     {
         if (ImGui::BeginTabItem("Terrain"))
         {
-            actions.regenerate |= _terrain.DrawContent(ui.body, *ui.gen, *ui.lod, *ui.stats, actions.randomize);
+            PushLabelColumn();
+            if (ui.body)
+                actions.regenerate |= _terrain.Draw(*ui.body);
+            ImGui::PopItemWidth();
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Surface"))
@@ -61,9 +64,7 @@ PlanetActions PlanetWindow::Draw(PlanetUi& ui)
         if (ImGui::BeginTabItem("System"))
         {
             PushLabelColumn();
-            ImGui::Text("Patches: %d active, %d visible", ui.stats->patchCount, ui.stats->visiblePatchCount);
-            ImGui::Text("GPU: terrain %.2f / ocean %.2f / effects %.2f ms", ui.stats->gpuTerrainMs,
-                        ui.stats->gpuOceanMs, ui.stats->gpuEffectsMs);
+            actions.regenerate |= _system.Draw(*ui.lod, *ui.stats, ui.frameMs);
             ImGui::PopItemWidth();
             ImGui::EndTabItem();
         }

@@ -404,6 +404,7 @@ void Application::RenderGui()
         ui.autoOrbitSpeed = &_autoOrbitSpeed;
         ui.cinematic = &_cinematicSettings;
         ui.planetRadius = PlanetRadius();
+        ui.frameMs = _frameMs;
 
         const render::PlanetActions actions = _planetWindow.Draw(ui);
         bool needsRegen = actions.regenerate;

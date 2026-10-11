@@ -126,27 +126,6 @@ bool SurfacePanel::DrawPlanetType(BodyRuntime& body, SurfaceSettings& surface)
         ImGui::SetItemTooltip("How much land is built up: low = separate cities, 1 = one planet-wide city "
                               "(Scene > Night Lights sets the brightness)");
 
-        ImGui::Separator();
-        ImGui::Text("Terrain Style (regenerates)");
-        auto& ts = body.Config().terrainStyle;
-        auto style = [&regen](const char* label, float& v, float max, const char* tip)
-        {
-            ImGui::SliderFloat(label, &v, 0.0f, max, "%.2f");
-            ImGui::SetItemTooltip("%s", tip);
-            if (ImGui::IsItemDeactivatedAfterEdit())
-                regen = true;
-        };
-        style("Dunes", ts.dunes, 3.0f, "Wind-aligned sand ridges on the land");
-        style("Dune Scale", ts.duneScale, 3.0f, "Higher = smaller, denser dunes");
-        style("Craters", ts.craters, 2.0f, "Impact craters with raised rims, everywhere");
-        style("Crater Scale", ts.craterScale, 3.0f, "Higher = smaller, more numerous craters");
-        style("Terraces", ts.terraces, 1.0f, "Stepped land: flat mesa tops and cliffs");
-        ImGui::SliderFloat("Terrace Steps", &ts.terraceSteps, 1.0f, 30.0f, "%.0f");
-        ImGui::SetItemTooltip("Number of steps over the land height");
-        if (ImGui::IsItemDeactivatedAfterEdit())
-            regen = true;
-        style("Canyons", ts.canyons, 2.0f, "Narrow carved channels and sinkholes");
-        style("Spires", ts.spires, 2.0f, "Tall pointed rock or crystal spikes");
     }
     return regen;
 }
