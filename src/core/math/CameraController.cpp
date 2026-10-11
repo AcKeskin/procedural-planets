@@ -311,11 +311,12 @@ void CameraController::EndMove(Camera& camera, bool snapToTarget)
 void CameraController::ToggleMode(const CameraBody& body, Camera& camera)
 {
     _bodyRadius = body.radius;
+    const CameraMode current = EffectiveMode(camera); // a running move counts as already arrived
     if (_move.active)
         EndMove(camera, /*snapToTarget=*/false);
     _velocity = glm::vec3(0.0f);
 
-    if (camera.GetMode() == CameraMode::Orbit)
+    if (current == CameraMode::Orbit)
     {
         camera.SetMode(CameraMode::FreeFly);
         camera.Relevel(LocalUp(camera.GetPosition(), body.radius));

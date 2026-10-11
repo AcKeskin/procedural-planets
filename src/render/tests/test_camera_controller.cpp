@@ -266,6 +266,25 @@ TEST_CASE("GoTo with a degenerate direction falls back to facing the planet", "[
     REQUIRE(glm::dot(cam.GetForward(), -glm::normalize(cam.GetPosition())) > 0.999f);
 }
 
+TEST_CASE("Toggling mode during an eased move counts the move as arrived", "[camera]")
+{
+    Camera cam;
+    CameraController ctl;
+    ctl.ResetView(TestBody(), cam, false);
+    ctl.ToggleMode(TestBody(), cam); // Orbit -> Fly at once
+    REQUIRE(cam.GetMode() == CameraMode::FreeFly);
+
+    ctl.ToggleMode(TestBody(), cam); // Fly -> Orbit, eased
+    REQUIRE(ctl.IsMoving());
+    REQUIRE(cam.GetMode() == CameraMode::FreeFly);
+    REQUIRE(ctl.EffectiveMode(cam) == CameraMode::Orbit);
+
+    ctl.ToggleMode(TestBody(), cam); // Orbit is the effective mode, so this goes back to Fly
+    REQUIRE_FALSE(ctl.IsMoving());
+    REQUIRE(cam.GetMode() == CameraMode::FreeFly);
+    REQUIRE(ctl.EffectiveMode(cam) == CameraMode::FreeFly);
+}
+
 TEST_CASE("A long vertical orbit drag carries on over the pole without a flip", "[camera]")
 {
     Camera cam;
