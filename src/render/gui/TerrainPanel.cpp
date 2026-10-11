@@ -26,7 +26,7 @@ bool TerrainPanel::Draw(BodyRuntime* activeBody,
         regen |= DrawTerrainBlocks(*activeBody, config.seed, randomizeRequested);
 
     if (ImGui::CollapsingHeader("LOD System"))
-        regen |= DrawLodContent(lod, stats);
+        regen |= DrawLodContent(activeBody, lod, stats);
 
     ImGui::PopItemWidth();
     ImGui::End();
@@ -238,7 +238,7 @@ bool TerrainPanel::DrawTerrainBlocks(BodyRuntime& body, uint32_t& seed, bool& ra
     return regen;
 }
 
-bool TerrainPanel::DrawLodContent(LodConfig& lod, const TerrainStats& stats)
+bool TerrainPanel::DrawLodContent(BodyRuntime* body, LodConfig& lod, const TerrainStats& stats)
 {
     bool regen = false;
     auto edited = [&]()
@@ -248,8 +248,12 @@ bool TerrainPanel::DrawLodContent(LodConfig& lod, const TerrainStats& stats)
     };
 
     ImGui::Text("Settings");
-    ImGui::SliderFloat("Planet Radius", &lod.planetRadius, 1.0f, 5000.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
-    edited();
+    if (body)
+    {
+        ImGui::SliderFloat(
+            "Planet Radius", &body->Config().metadata.radius, 1.0f, 5000.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
+        edited();
+    }
 
     const char* subdivLabels[] = {"20 patches", "80 patches", "320 patches", "1280 patches"};
     if (ImGui::Combo("Patch Density", &lod.patchSubdivisions, subdivLabels, 4))

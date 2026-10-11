@@ -102,7 +102,7 @@ bool Application::Initialize()
         const glm::vec3 target(0.0f);
         const glm::vec3 eye = _capture.hasCamera ? _capture.cameraPos
                                                  : -glm::normalize(_sceneSettings.lightDir) *
-                                                       (_lodConfig.planetRadius * _capture.distanceMultiplier);
+                                                       (PlanetRadius() * _capture.distanceMultiplier);
         _camera.SetMode(core::CameraMode::FreeFly);
         _camera.SetPosition(eye);
         _camera.LookAt(target);
@@ -110,7 +110,7 @@ bool Application::Initialize()
     else
     {
         _camera.SetPosition(
-            glm::vec3(0.0f, 0.0f, _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier));
+            glm::vec3(0.0f, 0.0f, PlanetRadius() * AppDefaults::InitialCameraDistanceMultiplier));
     }
 
     _lastTime = static_cast<float>(glfwGetTime());
@@ -598,7 +598,7 @@ void Application::Render()
     ctx.atmosphere = &_atmosphereSettings;
     ctx.clouds = &_cloudSettings;
     ctx.body = _activeBody.get();
-    ctx.planetRadius = _lodConfig.planetRadius;
+    ctx.planetRadius = PlanetRadius();
     ctx.seaLevel = _seaLevel;
 
     _renderer.DrawScene(ctx);
@@ -678,7 +678,7 @@ void Application::RenderGui()
         _debugPanel.Draw(_camera, _moveSpeed, _autoOrbit, _autoOrbitSpeed, visibility.debug);
 
         bool playRequested = false;
-        _cinematicPanel.Draw(_cinematicSettings, _lodConfig.planetRadius, playRequested, visibility.cinematic);
+        _cinematicPanel.Draw(_cinematicSettings, PlanetRadius(), playRequested, visibility.cinematic);
         if (playRequested)
             StartCinematic();
 
@@ -707,8 +707,7 @@ void Application::SwitchBody(planetgen::BodyConfig config, const render::types::
     }
     _terrainStats.gpuAvailable = true;
 
-    _lodConfig.planetRadius = _activeBody->GetRadius();
-    _seaLevel = _activeBody->GetSeaLevel();
+        _seaLevel = _activeBody->GetSeaLevel();
     // Each planet type brings its own sky, clouds, ocean and star; a switch replaces them.
     render::types::ApplyBodyLook(
         look, _atmosphereSettings, _cloudSettings, _oceanSettings, _sceneSettings, _surfaceSettings);
@@ -722,14 +721,14 @@ void Application::SwitchBody(planetgen::BodyConfig config, const render::types::
 
     if (resetCamera)
     {
-        float camDist = _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier;
+        float camDist = PlanetRadius() * AppDefaults::InitialCameraDistanceMultiplier;
         _camera.SetPosition(glm::vec3(0.0f, 0.0f, camDist));
         float farPlane =
-            (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
+            (std::max)(AppDefaults::MinFarPlane, PlanetRadius() * AppDefaults::FarPlaneRadiusMultiplier);
         _camera.SetFarPlane(farPlane);
     }
 
-    std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << _lodConfig.planetRadius
+    std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << PlanetRadius()
               << ")" << std::endl;
 }
 
@@ -794,7 +793,7 @@ void Application::StartCinematic()
 {
     _camera.SetOrbitTarget(glm::vec3(0.0f));
     _camera.SetMode(core::CameraMode::Orbit);
-    _cinematicController.Start(_cinematicSettings, _lodConfig.planetRadius, _camera);
+    _cinematicController.Start(_cinematicSettings, PlanetRadius(), _camera);
     _guiVisible = false;
 }
 
@@ -826,14 +825,19 @@ void Application::RegenerateLodSystem()
     _renderer.SetActiveBody(_libBody.Handle(), *_activeBody, BuildQuadTreeConfig(), _genConfig.seed);
 
     float farPlane =
-        (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
+        (std::max)(AppDefaults::MinFarPlane, PlanetRadius() * AppDefaults::FarPlaneRadiusMultiplier);
     _camera.SetFarPlane(farPlane);
+}
+
+float Application::PlanetRadius() const
+{
+    return _activeBody ? _activeBody->GetRadius() : planetgen::BodyConfig{}.metadata.radius;
 }
 
 render::lod::QuadTreeConfig Application::BuildQuadTreeConfig() const
 {
     render::lod::QuadTreeConfig config;
-    config.planetRadius = _lodConfig.planetRadius;
+    config.planetRadius = PlanetRadius();
     config.baseSubdivisions = _lodConfig.patchSubdivisions;
     config.meshResolution = _lodConfig.meshResolution;
     config.maxDepth = _lodConfig.maxDepth;

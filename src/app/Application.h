@@ -137,6 +137,7 @@ private:
 
     // Build QuadTreeConfig from current LodConfig
     render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
+    float PlanetRadius() const; // the active body's (its config owns it)
 
     // Core systems
     render::Window _window;

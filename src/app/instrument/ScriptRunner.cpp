@@ -187,7 +187,7 @@ void ScriptRunner::ReapplyCamera()
 
 float ScriptRunner::CurrentRadius() const
 {
-    return _app._activeBody ? _app._activeBody->Config().metadata.radius : 10.0f;
+    return _app.PlanetRadius();
 }
 
 void ScriptRunner::PumpFrames(int n)

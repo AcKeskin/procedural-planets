@@ -14,12 +14,11 @@ struct GenerationConfig
     bool useGpu = true;
 };
 
-// LOD system configuration
+// LOD system configuration. The planet radius is the body's (BodyConfig.metadata.radius).
 struct LodConfig
 {
     bool enabled = true;
     int patchSubdivisions = 2;
-    float planetRadius = 200.0f;
 
     // Quadtree parameters
     int meshResolution = 32;

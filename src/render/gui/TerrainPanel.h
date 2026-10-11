@@ -24,7 +24,7 @@ public:
 
 private:
     bool DrawTerrainBlocks(BodyRuntime& body, uint32_t& seed, bool& randomizeRequested);
-    bool DrawLodContent(LodConfig& lod, const TerrainStats& stats);
+    bool DrawLodContent(BodyRuntime* body, LodConfig& lod, const TerrainStats& stats);
 };
 
 } // namespace planets::render

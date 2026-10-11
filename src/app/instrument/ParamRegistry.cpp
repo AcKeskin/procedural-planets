@@ -253,7 +253,6 @@ const std::unordered_map<std::string, Entry>& Table()
         // ---- LOD (needs regen) ----
         {"lod.enabled", {true, SET_BOOL(t.lod->enabled)}},
         {"lod.patchSubdivisions", {true, SET_INT(t.lod->patchSubdivisions)}},
-        {"lod.planetRadius", {true, SET_FLOAT(t.lod->planetRadius)}},
         {"lod.meshResolution", {true, SET_INT(t.lod->meshResolution)}},
         {"lod.maxDepth", {true, SET_INT(t.lod->maxDepth)}},
         {"lod.splitThreshold", {true, SET_FLOAT(t.lod->splitThreshold)}},
@@ -276,6 +275,9 @@ const std::unordered_map<std::string, Entry>& Table()
         {"body.shading.colorSnow", {false, BODY_VEC3(t.body->shading.colorSnow)}},
         {"body.shading.colorShoreLow", {false, BODY_VEC3(t.body->shading.colorShoreLow)}},
         {"body.shading.colorSteepLow", {false, BODY_VEC3(t.body->shading.colorSteepLow)}},
+
+        // ---- body.metadata.radius (needs regen; the LOD reads it from the body) ----
+        {"body.metadata.radius", {true, BODY_FLOAT(t.body->metadata.radius)}},
 
         // ---- body.shape.* (needs regen) ----
         {"body.shape.heightScale", {true, BODY_FLOAT(t.body->shape.heightScale)}},
