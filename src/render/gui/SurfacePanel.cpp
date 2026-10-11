@@ -291,6 +291,14 @@ void SurfacePanel::DrawSurfaceRules(SurfaceSettings& s)
         value("Patchiness", s.sediment.patchiness, 0.0f, 1.0f, "0 = an even sheet, 1 = broken patches");
         ImGui::TreePop();
     }
+    if (ImGui::TreeNode("Vegetation"))
+    {
+        value("Treeline Strength", s.vegetation.strength, 0.0f, 1.0f, "Vegetation thins on steep ground and above the treeline: 0 = off");
+        range("Slope Limit", s.vegetation.slope, 0.0f, 0.6f, "Vegetation thins out over this steepness range");
+        range("Treeline", s.vegetation.treeline, 0.0f, 1.0f, "Vegetation thins out over this land height range (0-1)");
+        color("Bare Ground", s.vegetation.bareColor, "Colour of the ground where vegetation is gone");
+        ImGui::TreePop();
+    }
     if (ImGui::TreeNode("Seafloor"))
     {
         color("Shallow Floor", s.seafloor.shallowColor, "Ground colour just below sea level");

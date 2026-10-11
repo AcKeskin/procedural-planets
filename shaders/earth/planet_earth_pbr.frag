@@ -240,6 +240,16 @@ void main()
     float sandW = smoothstep(sSandRule.x, sSandRule.y, aridity) * (1.0 - smoothstep(sSandRule.z, sSandRule.w, h));
     sandW = max(sandW, sSandTint.w);
     Material flatMat = flatGroundMaterial(biome.color, vMedium);
+    // Vegetation thins on steep ground and above the treeline (noisy edge), showing bare ground.
+    float vegLoss = 0.0;
+    if (sVeg0.w > 0.0)
+    {
+        float edgeNoise = (vMedium - 0.5) * 0.08;
+        float density = (1.0 - smoothstep(sVeg1.x, sVeg1.y, steepness + edgeNoise))
+                      * (1.0 - smoothstep(sVeg1.z, sVeg1.w, h + edgeNoise));
+        vegLoss = (1.0 - density) * sVeg0.w;
+        flatMat.albedo = mix(flatMat.albedo, sVeg0.rgb * mix(0.85, 1.15, vMedium), vegLoss);
+    }
     flatMat.albedo    = mix(flatMat.albedo, sand.albedo, sandW);
     flatMat.roughness = mix(flatMat.roughness, sand.roughness, sandW);
 
@@ -301,7 +311,7 @@ void main()
     layerW[GROUND_ROCK]  = rockW * (1.0 - snowW);
     layerW[GROUND_SNOW]  = snowW;
     layerW[GROUND_SAND]  = flatW * sandW;
-    float grassShare = (1.0 - soilShare) * sGround.w;
+    float grassShare = (1.0 - soilShare) * sGround.w * (1.0 - vegLoss);
     layerW[GROUND_SOIL]  = flatW * (1.0 - sandW) * (1.0 - grassShare);
     layerW[GROUND_GRASS] = flatW * (1.0 - sandW) * grassShare;
 

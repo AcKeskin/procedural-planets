@@ -87,6 +87,15 @@ TEST_CASE("surface: sediment is off by default and read from render.surface.sedi
     CHECK(PackSurfaceBlock(look.surface).sed0.w == 0.7f);
 }
 
+TEST_CASE("surface: vegetation is off by default and read from render.surface.vegetation", "[surface]")
+{
+    CHECK(SurfaceSettings{}.vegetation.strength == 0.0f);
+    const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({"render": {"surface": {
+        "vegetation": {"strength": 0.9}}}})"));
+    CHECK(look.surface.vegetation.strength == 0.9f);
+    CHECK(PackSurfaceBlock(look.surface).veg0.w == 0.9f);
+}
+
 TEST_CASE("surface: wrong types are ignored", "[surface]")
 {
     const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({"render": {"surface": {

@@ -133,6 +133,15 @@ struct SurfaceSettings
         float patchiness = 0.5f; // 0 = even sheet, 1 = broken patches
     };
 
+    // Vegetation thins on steep ground and above a treeline, showing bare ground. Strength 0 = off.
+    struct Vegetation
+    {
+        float strength = 0.0f; // how fully slope and altitude strip the vegetation
+        glm::vec2 slope = glm::vec2(0.08f, 0.22f); // steepness range where vegetation thins out
+        glm::vec2 treeline = glm::vec2(0.45f, 0.7f); // land height range where vegetation thins out
+        glm::vec3 bareColor = glm::vec3(0.42f, 0.37f, 0.3f); // colour of the bare ground
+    };
+
     static constexpr int TextureCount = 5; // order matches GROUND_* in ground_material.glsl
 
     Rock rock;
@@ -146,6 +155,7 @@ struct SurfaceSettings
     Strata strata;
     Wetness wetness;
     Sediment sediment;
+    Vegetation vegetation;
 };
 
 } // namespace planets::render

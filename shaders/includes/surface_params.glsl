@@ -31,6 +31,8 @@ layout(std140, binding = 5) uniform SurfaceBlock
     vec4 sSeafloorDeep;    // rgb
     vec4 sClimate;         // x polar caps, y substellar, z city coverage
     vec4 sTexture[5];      // per ground layer: x fine tile, y coarse tile, z strength, w normal strength
+    vec4 sVeg0; // rgb bare ground, w strength
+    vec4 sVeg1; // xy slope range, zw treeline range
     vec4 sSed0; // rgb colour, w strength
     vec4 sSed1; // xy height range, zw slope range
     vec4 sSed2; // x patchiness
