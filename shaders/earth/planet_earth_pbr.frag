@@ -298,6 +298,25 @@ void main()
         mat.roughness = mix(mat.roughness, sWet1.w, wet);
     }
 
+    // Cover layer (ash, frost, dust) on top: slides off steep ground, can favour sunny or shaded
+    // slopes, and can follow the sun height on tidally locked worlds.
+    float coverW = 0.0;
+    if (sCover0.w > 0.0)
+    {
+        vec3 toSun = -normalize(uLightDir);
+        float slopeW = 1.0 - smoothstep(sCover1.x, sCover1.y, steepness);
+        float heightW = smoothstep(sCover1.z - 0.05, sCover1.z, h) * (1.0 - smoothstep(sCover1.w, sCover1.w + 0.05, h));
+        float facesSun = dot(geoN, toSun) - dot(sphereNormal, toSun);
+        float facingW = mix(1.0, smoothstep(-0.05, 0.05, facesSun * sign(sCover2.x)), abs(sCover2.x));
+        float sunHeight = dot(sphereNormal, toSun);
+        float sunW = sCover2.y >= 0.0 ? smoothstep(-0.2, 0.6, sunHeight) : smoothstep(0.2, -0.6, sunHeight);
+        sunW = mix(1.0, sunW, abs(sCover2.y));
+        float patches = mix(1.0, smoothstep(0.3, 0.7, vMedium + (vFine - 0.5) * 0.4), sCover2.w);
+        coverW = slopeW * heightW * facingW * sunW * patches * sCover0.w;
+        mat.albedo = mix(mat.albedo, sCover0.rgb * mix(0.9, 1.1, vFine), coverW);
+        mat.roughness = mix(mat.roughness, sCover2.z, coverW);
+    }
+
     // Fine grain on every material (grass took none before), weaker on snow.
     mat.albedo *= mix(1.0, mix(sDetail0.x, sDetail0.y, vFine), 1.0 - snowW * sDetail0.z);
 
@@ -330,7 +349,7 @@ void main()
     }
     if (texTotal > 0.0)
     {
-        mat.albedo *= texAlbedo / texTotal;
+        mat.albedo *= mix(texAlbedo / texTotal, vec3(1.0), coverW); // the cover hides the ground textures
         texNormal /= texTotal;
     }
 

@@ -142,6 +142,19 @@ struct SurfaceSettings
         glm::vec3 bareColor = glm::vec3(0.42f, 0.37f, 0.3f); // colour of the bare ground
     };
 
+    // One cover layer on top of everything: volcanic ash, frost or wind-blown dust. Strength 0 = off.
+    struct Cover
+    {
+        float strength = 0.0f; // how much the cover hides the ground
+        glm::vec3 color = glm::vec3(0.25f, 0.24f, 0.23f); // colour of the cover
+        float roughness = 0.9f; // roughness of the cover
+        glm::vec2 slope = glm::vec2(0.25f, 0.5f); // steepness range where the cover slides off
+        glm::vec2 height = glm::vec2(0.0f, 1.0f); // land height range the cover lies in
+        float facing = 0.0f; // +1 on slopes facing the sun, -1 on shaded slopes, 0 everywhere
+        float sunFollow = 0.0f; // +1 toward the point under the sun, -1 toward the night side
+        float patchiness = 0.4f; // 0 = even sheet, 1 = broken patches
+    };
+
     static constexpr int TextureCount = 5; // order matches GROUND_* in ground_material.glsl
 
     Rock rock;
@@ -156,6 +169,7 @@ struct SurfaceSettings
     Wetness wetness;
     Sediment sediment;
     Vegetation vegetation;
+    Cover cover;
 };
 
 } // namespace planets::render

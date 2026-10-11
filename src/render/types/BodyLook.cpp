@@ -153,6 +153,16 @@ void ReadSurface(const json& j, SurfaceSettings& s)
     Read(vegetationJ, "treeline", s.vegetation.treeline);
     Read(vegetationJ, "bareColor", s.vegetation.bareColor);
 
+    const json& coverJ = Block(j, "cover");
+    Read(coverJ, "strength", s.cover.strength);
+    Read(coverJ, "color", s.cover.color);
+    Read(coverJ, "roughness", s.cover.roughness);
+    Read(coverJ, "slope", s.cover.slope);
+    Read(coverJ, "height", s.cover.height);
+    Read(coverJ, "facing", s.cover.facing);
+    Read(coverJ, "sunFollow", s.cover.sunFollow);
+    Read(coverJ, "patchiness", s.cover.patchiness);
+
     const json& c = Block(j, "climate");
     Read(c, "polarCaps", s.climate.polarCaps);
     Read(c, "substellar", s.climate.substellar);

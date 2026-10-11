@@ -299,6 +299,18 @@ void SurfacePanel::DrawSurfaceRules(SurfaceSettings& s)
         color("Bare Ground", s.vegetation.bareColor, "Colour of the ground where vegetation is gone");
         ImGui::TreePop();
     }
+    if (ImGui::TreeNode("Cover Layer"))
+    {
+        value("Cover Strength", s.cover.strength, 0.0f, 1.0f, "Ash, frost or dust over the ground: 0 = off");
+        color("Cover Color", s.cover.color, "Colour of the cover: dark ash, white frost, ochre dust");
+        value("Cover Roughness", s.cover.roughness, 0.05f, 1.0f, "Roughness of the cover: frost glints, ash and dust stay matte");
+        range("Cover Slope", s.cover.slope, 0.0f, 1.0f, "The cover slides off steep ground over this steepness range");
+        range("Cover Height", s.cover.height, 0.0f, 1.0f, "Land height range (0-1) the cover lies in");
+        value("Facing", s.cover.facing, -1.0f, 1.0f, "+1 = only on slopes facing the sun, -1 = only on shaded slopes (frost), 0 = everywhere");
+        value("Follow Sun", s.cover.sunFollow, -1.0f, 1.0f, "+1 = grows toward the point under the sun (dust), -1 = toward the night side (frost); for tidally locked worlds");
+        value("Cover Patchiness", s.cover.patchiness, 0.0f, 1.0f, "0 = an even sheet, 1 = broken patches");
+        ImGui::TreePop();
+    }
     if (ImGui::TreeNode("Seafloor"))
     {
         color("Shallow Floor", s.seafloor.shallowColor, "Ground colour just below sea level");

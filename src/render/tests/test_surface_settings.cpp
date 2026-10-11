@@ -96,6 +96,15 @@ TEST_CASE("surface: vegetation is off by default and read from render.surface.ve
     CHECK(PackSurfaceBlock(look.surface).veg0.w == 0.9f);
 }
 
+TEST_CASE("surface: cover is off by default and read from render.surface.cover", "[surface]")
+{
+    CHECK(SurfaceSettings{}.cover.strength == 0.0f);
+    const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({"render": {"surface": {
+        "cover": {"strength": 0.5}}}})"));
+    CHECK(look.surface.cover.strength == 0.5f);
+    CHECK(PackSurfaceBlock(look.surface).cover0.w == 0.5f);
+}
+
 TEST_CASE("surface: wrong types are ignored", "[surface]")
 {
     const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({"render": {"surface": {
