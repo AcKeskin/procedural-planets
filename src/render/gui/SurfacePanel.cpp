@@ -291,7 +291,7 @@ void SurfacePanel::DrawSurfaceRules(SurfaceSettings& s)
         value("Patchiness", s.sediment.patchiness, 0.0f, 1.0f, "0 = an even sheet, 1 = broken patches");
         ImGui::TreePop();
     }
-    if (ImGui::TreeNode("Vegetation"))
+    if (ImGui::TreeNode("Treeline"))
     {
         value("Treeline Strength", s.vegetation.strength, 0.0f, 1.0f, "Vegetation thins on steep ground and above the treeline: 0 = off");
         range("Slope Limit", s.vegetation.slope, 0.0f, 0.6f, "Vegetation thins out over this steepness range");
