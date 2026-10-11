@@ -150,6 +150,49 @@
         ],
         "star": {
             "class": "blue"
+        },
+        "surface": {
+            "cover": {
+                "color": [
+                    0.85,
+                    0.9,
+                    1.0
+                ],
+                "facing": -1.0,
+                "roughness": 0.15,
+                "strength": 0.4
+            },
+            "detail": {
+                "matteRoughnessFloor": 0.2
+            },
+            "rock": {
+                "roughnessA": 0.35,
+                "roughnessB": 0.2,
+                "slope": 0.18
+            },
+            "skyAmbient": {
+                "fromSky": 1.0,
+                "strength": 0.8
+            },
+            "strata": {
+                "bands": 70,
+                "colorA": [
+                    0.85,
+                    0.85,
+                    1.0
+                ],
+                "colorB": [
+                    0.45,
+                    0.4,
+                    0.75
+                ],
+                "strength": 0.8
+            },
+            "textures": {
+                "rock": {
+                    "normalStrength": 2.5
+                }
+            }
         }
     },
     "shaderPaths": {
@@ -473,6 +516,18 @@
             "pick": [
                 "blue",
                 "white"
+            ]
+        },
+        "render.surface.cover.strength": {
+            "range": [
+                0.2,
+                0.6
+            ]
+        },
+        "render.surface.strata.bands": {
+            "range": [
+                40,
+                100
             ]
         },
         "terrainStyle.spires": {

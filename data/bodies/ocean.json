@@ -126,6 +126,47 @@
                 0.97
             ]
         ],
+        "surface": {
+            "rock": {
+                "slope": 0.22
+            },
+            "sediment": {
+                "color": [
+                    0.78,
+                    0.7,
+                    0.52
+                ],
+                "height": [
+                    0.0,
+                    0.15
+                ],
+                "slope": [
+                    0.02,
+                    0.08
+                ],
+                "strength": 0.5
+            },
+            "skyAmbient": {
+                "fromSky": 1.0,
+                "strength": 0.6
+            },
+            "vegetation": {
+                "slope": [
+                    0.1,
+                    0.25
+                ],
+                "strength": 0.8,
+                "treeline": [
+                    0.35,
+                    0.6
+                ]
+            },
+            "wetness": {
+                "moisture": 0.3,
+                "shoreWidth": 0.12,
+                "strength": 0.8
+            }
+        },
         "weather": "storms"
     },
     "shaderPaths": {
@@ -405,6 +446,18 @@
                 "yellow",
                 "white",
                 "blue"
+            ]
+        },
+        "render.surface.vegetation.strength": {
+            "range": [
+                0.5,
+                1.0
+            ]
+        },
+        "render.surface.wetness.strength": {
+            "range": [
+                0.5,
+                1.0
             ]
         },
         "render.weather": {

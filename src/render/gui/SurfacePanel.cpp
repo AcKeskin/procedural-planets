@@ -22,6 +22,7 @@ bool SurfacePanel::Draw(
     {
         regen |= DrawShadingBlock(*activeBody);
         regen |= DrawPlanetType(*activeBody, surface);
+        DrawSurfaceRules(surface);
     }
 
     if (activeBody && activeBody->HasSolidSurface())
@@ -115,24 +116,24 @@ bool SurfacePanel::DrawPlanetType(BodyRuntime& body, SurfaceSettings& surface)
     if (ImGui::CollapsingHeader("Planet Type"))
     {
         ImGui::Text("Materials");
-        ImGui::ColorEdit3("Rock Tint", &surface.rockTint.x);
+        ImGui::ColorEdit3("Rock Tint", &surface.rock.tint.x);
         ImGui::SetItemTooltip("Multiplies the rock on slopes (1 = Earth)");
-        ImGui::ColorEdit3("Sand Tint", &surface.sandTint.x);
+        ImGui::ColorEdit3("Sand Tint", &surface.sand.tint.x);
         ImGui::SetItemTooltip("Multiplies beaches, deserts and dunes (1 = Earth)");
-        ImGui::ColorEdit3("Snow Tint", &surface.snowTint.x);
+        ImGui::ColorEdit3("Snow Tint", &surface.snow.tint.x);
         ImGui::SetItemTooltip("Multiplies snow and ice caps (1 = Earth)");
-        ImGui::SliderFloat("Vegetation", &surface.vegetation, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Vegetation", &surface.ground.vegetation, 0.0f, 1.0f, "%.2f");
         ImGui::SetItemTooltip("Grass texture on the flats: 0 = bare soil (dead worlds), 1 = Earth");
-        ImGui::SliderFloat("Sand Cover", &surface.sandCover, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Sand Cover", &surface.sand.cover, 0.0f, 1.0f, "%.2f");
         ImGui::SetItemTooltip("Sand on every flat: 1 = dune sea");
 
         ImGui::Separator();
         ImGui::Text("Climate");
-        ImGui::SliderFloat("Polar Caps", &surface.polarCaps, 0.0f, 0.8f, "%.2f");
+        ImGui::SliderFloat("Polar Caps", &surface.climate.polarCaps, 0.0f, 0.8f, "%.2f");
         ImGui::SetItemTooltip("Ice caps from each pole, also on hot worlds (0 = Earth's climate only)");
-        ImGui::SliderFloat("Tidally Locked", &surface.substellar, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Tidally Locked", &surface.climate.substellar, 0.0f, 1.0f, "%.2f");
         ImGui::SetItemTooltip("1 = eye world: hot desert under the sun, a living ring, frozen night side");
-        ImGui::SliderFloat("City Coverage", &surface.cityCoverage, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("City Coverage", &surface.climate.cityCoverage, 0.0f, 1.0f, "%.2f");
         ImGui::SetItemTooltip("How much land is built up: low = separate cities, 1 = one planet-wide city "
                               "(Scene > Night Lights sets the brightness)");
 
@@ -159,6 +160,172 @@ bool SurfacePanel::DrawPlanetType(BodyRuntime& body, SurfaceSettings& surface)
         style("Spires", ts.spires, 2.0f, "Tall pointed rock or crystal spikes");
     }
     return regen;
+}
+
+void SurfacePanel::DrawSurfaceRules(SurfaceSettings& s)
+{
+    if (!ImGui::CollapsingHeader("Surface Rules"))
+        return;
+    auto color = [](const char* label, glm::vec3& c, const char* tip)
+    {
+        ImGui::ColorEdit3(label, &c.x);
+        ImGui::SetItemTooltip("%s", tip);
+    };
+    auto value = [](const char* label, float& v, float lo, float hi, const char* tip)
+    {
+        ImGui::SliderFloat(label, &v, lo, hi, "%.3f");
+        ImGui::SetItemTooltip("%s", tip);
+    };
+    auto range = [](const char* label, glm::vec2& v, float lo, float hi, const char* tip)
+    {
+        ImGui::SliderFloat2(label, &v.x, lo, hi, "%.2f");
+        ImGui::SetItemTooltip("%s", tip);
+    };
+
+    if (ImGui::TreeNode("Rock"))
+    {
+        color("Rock Dark", s.rock.colorA, "Rock colour at the dark end of the grain");
+        color("Rock Light", s.rock.colorB, "Rock colour at the light end of the grain");
+        color("Streak Color", s.rock.streakColor, "Colour of the iron-like streaks in the rock");
+        value("Streak Amount", s.rock.streakAmount, 0.0f, 1.0f, "How strongly the streaks show");
+        value("Roughness Dark", s.rock.roughnessA, 0.0f, 1.0f, "Roughness of the dark rock (1 = matte)");
+        value("Roughness Light", s.rock.roughnessB, 0.0f, 1.0f, "Roughness of the light rock (1 = matte)");
+        value("Rock Slope", s.rock.slope, 0.0f, 1.0f, "Steepness where rock replaces ground: lower = more rock");
+        value("Slope Noise", s.rock.slopeNoise, 0.0f, 0.6f, "How much that threshold wanders, so the edge is not clean");
+        value("Rock Softness", s.rock.softness, 0.0f, 0.4f, "Width of the blend between ground and rock");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Sand"))
+    {
+        color("Sand Dark", s.sand.colorA, "Sand colour at the dark end of the grain");
+        color("Sand Light", s.sand.colorB, "Sand colour at the light end of the grain");
+        value("Sand Roughness", s.sand.roughness, 0.0f, 1.0f, "Roughness of sand (1 = matte)");
+        range("Aridity", s.sand.aridity, 0.0f, 1.0f, "Dryness range where beaches and deserts turn to sand");
+        range("Beach Height", s.sand.beachHeight, 0.0f, 1.0f, "Sand fades out over this height range");
+        range("Desert Aridity", s.sand.desertAridity, 0.0f, 1.0f, "Dryness range where the sand texture takes over");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Snow"))
+    {
+        color("Snow Dark", s.snow.colorA, "Snow colour at the dark end of the grain");
+        color("Snow Light", s.snow.colorB, "Snow colour at the light end of the grain");
+        value("Snow Roughness", s.snow.roughness, 0.0f, 1.0f, "Roughness of snow (lower = more glint)");
+        value("Cold Lowering", s.snow.coldLowering, 0.0f, 0.3f, "How far cold climates pull the snow line down");
+        value("Blend Below", s.snow.blendBelow, 0.0f, 0.5f, "Snow fades in this far below the snow line");
+        value("Blend Above", s.snow.blendAbove, 0.0f, 0.5f, "Snow is full this far above the snow line");
+        value("Polar Temperature", s.snow.polarTemperature, 0.0f, 0.3f, "Temperature below which the poles freeze");
+        value("Polar Amount", s.snow.polarAmount, 0.0f, 1.0f, "How white the frozen poles get");
+        range("Slope Shed", s.snow.slopeShed, 0.0f, 1.0f, "Steepness range where snow slides off");
+        value("Shed Amount", s.snow.shedAmount, 0.0f, 1.0f, "How much snow steep slopes lose");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Ground"))
+    {
+        range("Lightness", s.ground.lightness, 0.0f, 2.0f, "Patchy lightness range of the biome colour");
+        value("Ground Roughness", s.ground.roughness, 0.0f, 1.0f, "Roughness of the flat ground");
+        range("Soil Dryness", s.ground.soilDryness, 0.0f, 1.0f, "Dryness range where bare soil replaces grass");
+        value("Soil Amount", s.ground.soilAmount, 0.0f, 1.0f, "Most of the flat ground that soil can cover");
+        value("Polar Soil", s.ground.polarSoil, 0.0f, 1.0f, "Bare soil in the cold tundra band");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Detail"))
+    {
+        range("Grain", s.detail.grain, 0.0f, 2.0f, "Range of the fine albedo grain on every material");
+        value("Grain Snow Fade", s.detail.grainSnowFade, 0.0f, 1.0f, "How much smoother snow is than other ground");
+        value("Grain Frequency", s.detail.fineFrequency, 0.5f, 12.0f, "Size of the grain: higher = finer");
+        value("Patch Frequency", s.detail.mediumFrequency, 0.1f, 4.0f, "Size of the patchy variation: higher = smaller");
+        value("Bump Frequency", s.detail.bumpFrequency, 5.0f, 150.0f, "Size of the fine bumps: higher = finer");
+        value("Bump Tilt", s.detail.bumpTilt, 0.0f, 0.05f, "How strongly the fine bumps tilt the light");
+        value("Bump Snow Fade", s.detail.bumpSnowFade, 0.0f, 1.0f, "How much flatter snow is");
+        value("Texture Bump", s.detail.textureBump, 0.0f, 2.0f, "Tilt from the material texture normal maps");
+        value("Roughness Floor", s.detail.roughnessFloor, 0.0f, 1.0f, "Ground never gets glossier than this");
+        value("Rock Roughness Floor", s.detail.matteRoughnessFloor, 0.0f, 1.0f,
+              "Rock and snow never get glossier than this");
+        value("Gamma", s.detail.gamma, 0.5f, 1.5f, "Below 1 lifts shadows and midtones");
+        value("Temperature Noise", s.detail.temperatureNoise, 0.0f, 0.3f, "Noise on the climate band borders");
+        value("Moisture Noise", s.detail.moistureNoise, 0.0f, 0.5f, "Patchy noise on moisture (biome borders)");
+        value("Moisture Detail", s.detail.moistureDetailNoise, 0.0f, 0.5f, "Fine noise on moisture");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Textures"))
+    {
+        const char* names[SurfaceSettings::TextureCount] = {"Rock", "Grass", "Sand", "Snow", "Soil"};
+        for (int i = 0; i < SurfaceSettings::TextureCount; ++i)
+        {
+            ImGui::PushID(i);
+            ImGui::SeparatorText(names[i]);
+            auto& t = s.textures[i];
+            value("Fine Tile", t.fineTile, 0.01f, 0.5f, "Size of the fine texture tile: larger = bigger features");
+            value("Coarse Tile", t.coarseTile, 0.05f, 2.0f, "Size of the coarse tile that breaks up the repeat");
+            value("Strength", t.strength, 0.0f, 2.0f, "How much the texture changes the colour");
+            value("Normal Strength", t.normalStrength, 0.0f, 3.0f, "How much the texture tilts the light");
+            ImGui::PopID();
+        }
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Strata"))
+    {
+        value("Strata Strength", s.strata.strength, 0.0f, 1.0f, "Rock layers on cliffs and crater walls: 0 = off");
+        value("Bands", s.strata.bands, 2.0f, 200.0f, "Number of layers over the land height: higher = thinner layers");
+        value("Warp", s.strata.warp, 0.0f, 3.0f, "How much the layers bend and wander along the cliff");
+        color("Light Layer", s.strata.colorA, "Colour of the light rock layers");
+        color("Dark Layer", s.strata.colorB, "Colour of the dark rock layers");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Wetness"))
+    {
+        value("Wetness", s.wetness.strength, 0.0f, 1.0f, "Darker, glossier ground at coasts and on wet land: 0 = off");
+        value("Shore Width", s.wetness.shoreWidth, 0.0f, 0.4f, "How far above sea level the shore stays wet");
+        value("Wet Moisture", s.wetness.moisture, 0.0f, 1.0f, "Moisture above which inland ground turns wet (marshes, rain forest floor)");
+        value("Darkening", s.wetness.darkening, 0.0f, 0.9f, "How much darker wet ground gets");
+        value("Wet Roughness", s.wetness.roughness, 0.05f, 1.0f, "Roughness of wet ground: lower = more sun glint");
+        color("Wet Tint", s.wetness.tint, "Colour cast of wet ground, for stains like acid or brine");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Sediment"))
+    {
+        value("Sediment", s.sediment.strength, 0.0f, 1.0f, "Fine fill on low, flat ground (crater floors, basins, slope feet): 0 = off");
+        color("Sediment Color", s.sediment.color, "Colour of the fill: sand, mud, salt, sulfur");
+        range("Height Range", s.sediment.height, 0.0f, 1.0f, "Full below the first value, gone above the second (land height 0-1)");
+        range("Slope Range", s.sediment.slope, 0.0f, 0.5f, "Only on flat ground: full below the first steepness, gone above the second");
+        value("Patchiness", s.sediment.patchiness, 0.0f, 1.0f, "0 = an even sheet, 1 = broken patches");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Treeline"))
+    {
+        value("Treeline Strength", s.vegetation.strength, 0.0f, 1.0f, "Vegetation thins on steep ground and above the treeline: 0 = off");
+        range("Slope Limit", s.vegetation.slope, 0.0f, 0.6f, "Vegetation thins out over this steepness range");
+        range("Treeline", s.vegetation.treeline, 0.0f, 1.0f, "Vegetation thins out over this land height range (0-1)");
+        color("Bare Ground", s.vegetation.bareColor, "Colour of the ground where vegetation is gone");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Cover Layer"))
+    {
+        value("Cover Strength", s.cover.strength, 0.0f, 1.0f, "Ash, frost or dust over the ground: 0 = off");
+        color("Cover Color", s.cover.color, "Colour of the cover: dark ash, white frost, ochre dust");
+        value("Cover Roughness", s.cover.roughness, 0.05f, 1.0f, "Roughness of the cover: frost glints, ash and dust stay matte");
+        range("Cover Slope", s.cover.slope, 0.0f, 1.0f, "The cover slides off steep ground over this steepness range");
+        range("Cover Height", s.cover.height, 0.0f, 1.0f, "Land height range (0-1) the cover lies in");
+        value("Facing", s.cover.facing, -1.0f, 1.0f, "+1 = only on slopes facing the sun, -1 = only on shaded slopes (frost), 0 = everywhere");
+        value("Follow Sun", s.cover.sunFollow, -1.0f, 1.0f, "+1 = grows toward the point under the sun (dust), -1 = toward the night side (frost); for tidally locked worlds");
+        value("Cover Patchiness", s.cover.patchiness, 0.0f, 1.0f, "0 = an even sheet, 1 = broken patches");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Sky Ambient"))
+    {
+        value("Sky Ambient", s.skyAmbient.strength, 0.0f, 1.0f, "Shadows take the sky colour from above and the ground colour from below: 0 = plain grey ambient");
+        color("Sky Fill", s.skyAmbient.skyColor, "Tint the sky adds to shadows (keep it near 1 in brightness)");
+        color("Ground Bounce", s.skyAmbient.groundColor, "Tint bounced up from the ground onto overhangs and steep faces");
+        value("From Sky", s.skyAmbient.fromSky, 0.0f, 1.0f, "1 = the sky fill takes its colour from the atmosphere");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Seafloor"))
+    {
+        color("Shallow Floor", s.seafloor.shallowColor, "Ground colour just below sea level");
+        color("Deep Floor", s.seafloor.deepColor, "Ground colour deep below sea level");
+        value("Depth Range", s.seafloor.depthRange, 0.005f, 0.3f, "Depth over which the floor goes from shallow to deep");
+        ImGui::TreePop();
+    }
 }
 
 void SurfacePanel::DrawOceanContent(effects::OceanSettings& settings, float& seaLevel)

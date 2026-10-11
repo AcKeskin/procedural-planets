@@ -47,6 +47,16 @@
     "paletteRef": {
         "paletteId": "earth"
     },
+    "render": {
+        "surface": {
+            "rock": { "slope": 0.2 },
+            "sediment": { "strength": 0.3 },
+            "skyAmbient": { "fromSky": 1.0, "strength": 0.6 },
+            "strata": { "strength": 0.4 },
+            "vegetation": { "strength": 0.7, "treeline": [0.4, 0.65] },
+            "wetness": { "moisture": 0.3, "strength": 0.6 }
+        }
+    },
     "shaderPaths": {
         "fragment": "shaders/earth/planet_earth_pbr.frag",
         "vertex": "shaders/earth/planet_earth.vert"

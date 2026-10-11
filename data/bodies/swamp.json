@@ -137,6 +137,34 @@
                 0.7
             ]
         ],
+        "surface": {
+            "sediment": {
+                "color": [
+                    0.25,
+                    0.22,
+                    0.15
+                ],
+                "height": [
+                    0.0,
+                    0.4
+                ],
+                "slope": [
+                    0.02,
+                    0.1
+                ],
+                "strength": 0.7
+            },
+            "skyAmbient": {
+                "fromSky": 1.0,
+                "strength": 0.7
+            },
+            "wetness": {
+                "darkening": 0.5,
+                "moisture": 0.2,
+                "shoreWidth": 0.3,
+                "strength": 1.0
+            }
+        },
         "weather": "fog"
     },
     "shaderPaths": {
@@ -402,6 +430,25 @@
                 "yellow",
                 "orange",
                 "white"
+            ]
+        },
+        "render.surface.sediment.color": {
+            "pick": [
+                [
+                    0.25,
+                    0.22,
+                    0.15
+                ],
+                [
+                    0.3,
+                    0.28,
+                    0.2
+                ],
+                [
+                    0.2,
+                    0.22,
+                    0.14
+                ]
             ]
         },
         "tectonics.coastlineNoise": {

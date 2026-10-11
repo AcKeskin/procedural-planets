@@ -61,6 +61,7 @@ Turn it on in the Terrain panel: **Generation > Macro World > Enable Macro World
 
 **App**
 - **Planet Types** — Earth plus dune, ice, ocean, toxic, barren, salt flats, alien lush, swamp, lava, eye (tidally locked), city and crystal. A type is one JSON file in `data/bodies`: palette, sky, weather, star colour, fluid (water, ice, lava, acid), terrain style (dunes, craters, terraces, canyons, spires) and climate traits
+- **Surface Rules** — Every rule of the surface shader is a field in the type's `render.surface` block: material colours, where rock, sand, snow and soil take over, detail, per-material texture tiling and bump, plus realism layers (rock strata, wet ground, sediment, vegetation by slope and treeline, an ash/frost/dust cover, sky-tinted shadows), all editable under Surface > Surface Rules. Earth and every planet type use them
 - **Parameter Randomizer** — One click gives a new world: a planet type rolls palette, sky, weather and terrain style from its `variety` block and the seed; Earth shuffles its parameters within Earth-like constraints
 - **Cinematic System** — Turntable camera (F5) and headless capture: single screenshots, turntable frame sequences, and a showcase that cycles through random worlds
 - **Instrument Mode** — Script the camera and any setting from a JSON timeline (`--script`) or a live socket (`--live`), and capture frames; the README media is rendered this way
@@ -124,7 +125,7 @@ All parameters are exposed in ImGui panels, grouped by topic with tooltips:
 
 - **Scene** — sun direction, size and colour, stars, camera exposure and bloom, lighting
 - **Terrain** — seed, height scale, continents, tectonics, the macro world layer, and the LOD quad-tree (mesh resolution, max depth, split threshold)
-- **Surface** — biome and climate controls, planet type traits (material tints, vegetation, polar caps, tidal lock, city lights, terrain styles) and the ocean (colours, clarity, waves, fluid)
+- **Surface** — biome and climate controls, Surface Rules (every material and realism layer), planet type traits (material tints, vegetation, polar caps, tidal lock, city lights, terrain styles) and the ocean (colours, clarity, waves, fluid)
 - **Atmosphere** — scattering colours and strength, haze (Mie) and its colour, density, quality; the Earth Preset button restores the defaults
 - **Clouds** — coverage, density, cloud size, base altitude, thickness, drift speed, shadow strength, colour and quality. Clouds are part of the atmosphere, so they hide when the atmosphere is off
 

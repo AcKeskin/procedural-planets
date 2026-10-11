@@ -137,7 +137,53 @@
                 0.62,
                 0.56
             ]
-        ]
+        ],
+        "surface": {
+            "cover": {
+                "color": [
+                    0.6,
+                    0.55,
+                    0.47
+                ],
+                "patchiness": 0.6,
+                "slope": [
+                    0.2,
+                    0.45
+                ],
+                "strength": 0.35
+            },
+            "rock": {
+                "slope": 0.15
+            },
+            "sediment": {
+                "color": [
+                    0.7,
+                    0.63,
+                    0.52
+                ],
+                "height": [
+                    0.9,
+                    1.0
+                ],
+                "slope": [
+                    0.03,
+                    0.12
+                ],
+                "strength": 0.8
+            },
+            "strata": {
+                "bands": 50,
+                "strength": 0.85
+            },
+            "textures": {
+                "rock": {
+                    "normalStrength": 2.0
+                },
+                "soil": {
+                    "normalStrength": 1.8
+                }
+            }
+        }
     },
     "shaderPaths": {
         "fragment": "shaders/earth/planet_earth_pbr.frag",
@@ -443,6 +489,24 @@
                 "white",
                 "red",
                 "orange"
+            ]
+        },
+        "render.surface.sediment.strength": {
+            "range": [
+                0.4,
+                0.9
+            ]
+        },
+        "render.surface.strata.bands": {
+            "range": [
+                25,
+                80
+            ]
+        },
+        "render.surface.strata.strength": {
+            "range": [
+                0.5,
+                1.0
             ]
         },
         "terrainStyle.canyons": {

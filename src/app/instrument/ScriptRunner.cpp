@@ -74,6 +74,7 @@ std::string ScriptRunner::Dispatch(const Command& cmd)
         t.ocean = &_app._oceanSettings;
         t.atmosphere = &_app._atmosphereSettings;
         t.clouds = &_app._cloudSettings;
+        t.surface = &_app._surfaceSettings;
         t.lod = &_app._lodConfig;
         t.gen = &_app._genConfig;
         t.seaLevel = &_app._seaLevel;

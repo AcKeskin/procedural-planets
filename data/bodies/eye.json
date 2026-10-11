@@ -56,6 +56,31 @@
         },
         "star": {
             "class": "red"
+        },
+        "surface": {
+            "cover": {
+                "color": [
+                    0.92,
+                    0.95,
+                    1.0
+                ],
+                "patchiness": 0.2,
+                "roughness": 0.3,
+                "slope": [
+                    0.4,
+                    0.9
+                ],
+                "strength": 0.9,
+                "sunFollow": -1.0
+            },
+            "skyAmbient": {
+                "fromSky": 1.0,
+                "strength": 0.6
+            },
+            "wetness": {
+                "moisture": 0.3,
+                "strength": 0.6
+            }
         }
     },
     "shaderPaths": {
@@ -188,6 +213,12 @@
             "pick": [
                 "red",
                 "orange"
+            ]
+        },
+        "render.surface.cover.strength": {
+            "range": [
+                0.6,
+                1.0
             ]
         },
         "tectonics.continentalFraction": {

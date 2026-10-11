@@ -1,5 +1,6 @@
 #include "Renderer.h"
 #include "GpuConstants.h"
+#include "settings/SurfaceBlock.h"
 #include <GL/gl3w.h>
 #include <algorithm>
 #include <iostream>
@@ -81,10 +82,19 @@ bool Renderer::Initialize(int width, int height)
         std::cerr << "[Renderer] Failed to initialize clouds" << std::endl;
         return false;
     }
+    glGenBuffers(1, &_surfaceUbo);
+    glBindBuffer(GL_UNIFORM_BUFFER, _surfaceUbo);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(SurfaceBlock), nullptr, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
     return true;
 }
 
-void Renderer::Shutdown() {}
+void Renderer::Shutdown()
+{
+    if (_surfaceUbo)
+        glDeleteBuffers(1, &_surfaceUbo);
+    _surfaceUbo = 0;
+}
 
 void Renderer::ResizeFramebuffer(int width, int height)
 {
@@ -222,15 +232,12 @@ void Renderer::DrawPlanet(const RenderContext& ctx, const glm::mat4& viewProject
         if (ctx.clouds)
             _clouds.SetLayerUniforms(_planetShader, *ctx.clouds, CloudLayer(ctx));
         _planetShader.SetFloat("uCloudShadowStrength", cloudsOn ? ctx.clouds->shadowStrength : 0.0f);
-        const SurfaceSettings surface = ctx.surface ? *ctx.surface : SurfaceSettings{};
-        _planetShader.SetVec3("uRockTint", surface.rockTint);
-        _planetShader.SetVec3("uSandTint", surface.sandTint);
-        _planetShader.SetVec3("uSnowTint", surface.snowTint);
-        _planetShader.SetFloat("uVegetation", surface.vegetation);
-        _planetShader.SetFloat("uSandCover", surface.sandCover);
-        _planetShader.SetFloat("uPolarCaps", surface.polarCaps);
-        _planetShader.SetFloat("uSubstellar", surface.substellar);
-        _planetShader.SetFloat("uCityCoverage", surface.cityCoverage);
+        const SurfaceBlock block =
+            PackSurfaceBlock(ResolveSkyAmbient(ctx.surface ? *ctx.surface : SurfaceSettings{}, ctx.atmosphere));
+        glBindBuffer(GL_UNIFORM_BUFFER, _surfaceUbo);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(block), &block);
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+        glBindBufferBase(GL_UNIFORM_BUFFER, SurfaceBlockBindingPoint, _surfaceUbo);
         _planetShader.SetFloat("uSunIntensity", ctx.scene->lighting.sunIntensity);
         _planetShader.SetFloat("uAmbientLight", ctx.scene->lighting.ambientLight);
         _planetShader.SetFloat("uSpecularStrength", ctx.scene->lighting.specularStrength);

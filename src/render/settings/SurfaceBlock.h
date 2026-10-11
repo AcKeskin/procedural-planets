@@ -1,0 +1,110 @@
+#pragma once
+
+#include "SurfaceSettings.h"
+#include "AtmosphereSettings.h"
+#include <cmath>
+#include <glm/glm.hpp>
+
+namespace planets::render
+{
+
+// std140 layout of SurfaceBlock in shaders/includes/surface_params.glsl: vec4 rows only, so C++ and
+// GLSL agree without padding rules. Row meanings are commented in the GLSL block.
+struct SurfaceBlock
+{
+    glm::vec4 rockColorA, rockColorB, rockStreak, rockTint;
+    glm::vec4 sandColorA, sandColorB, sandTint;
+    glm::vec4 snowColorA, snowColorB, snowTint;
+    glm::vec4 ground, rockRule, snowRule0, snowRule1, sandRule, soilRule, soilRule2;
+    glm::vec4 detail0, detail1, detail2, detail3;
+    glm::vec4 seafloorShallow, seafloorDeep;
+    glm::vec4 climate;
+    glm::vec4 texture[SurfaceSettings::TextureCount];
+    glm::vec4 amb0, amb1;
+    glm::vec4 cover0, cover1, cover2;
+    glm::vec4 veg0, veg1;
+    glm::vec4 sed0, sed1, sed2;
+    glm::vec4 wet0, wet1;
+    glm::vec4 strata0, strata1, strata2;
+};
+
+static_assert(sizeof(SurfaceBlock) == 44 * 16, "SurfaceBlock must match the std140 GLSL block");
+
+// Uniform buffer binding point of SurfaceBlock (separate namespace from the SSBO bindings).
+inline constexpr unsigned int SurfaceBlockBindingPoint = 5;
+
+// Colour of the sky light from the atmosphere's Rayleigh scattering, brightness about 1. Softened
+// (square root) because shadows see the whole sky, not only its deepest blue.
+inline glm::vec3 SkyFillTint(const effects::AtmosphereSettings& atmosphere)
+{
+    const glm::vec3 scatter = glm::pow(glm::vec3(400.0f) / atmosphere.wavelengths, glm::vec3(4.0f));
+    const glm::vec3 soft = glm::sqrt(scatter);
+    const float luma = glm::dot(soft, glm::vec3(0.2126f, 0.7152f, 0.0722f));
+    return luma > 0.0f ? soft / luma : glm::vec3(1.0f);
+}
+
+// The surface settings as drawn: sky ambient follows the atmosphere when asked, and an airless
+// body has no sky to fill its shadows.
+inline SurfaceSettings ResolveSkyAmbient(SurfaceSettings s, const effects::AtmosphereSettings* atmosphere)
+{
+    if (!atmosphere || !atmosphere->enabled)
+    {
+        s.skyAmbient.strength = 0.0f;
+        return s;
+    }
+    s.skyAmbient.skyColor = glm::mix(s.skyAmbient.skyColor, SkyFillTint(*atmosphere), s.skyAmbient.fromSky);
+    return s;
+}
+
+inline SurfaceBlock PackSurfaceBlock(const SurfaceSettings& s)
+{
+    SurfaceBlock b{};
+    b.rockColorA = glm::vec4(s.rock.colorA, s.rock.roughnessA);
+    b.rockColorB = glm::vec4(s.rock.colorB, s.rock.roughnessB);
+    b.rockStreak = glm::vec4(s.rock.streakColor, s.rock.streakAmount);
+    b.rockTint = glm::vec4(s.rock.tint, 0.0f);
+    b.sandColorA = glm::vec4(s.sand.colorA, s.sand.roughness);
+    b.sandColorB = glm::vec4(s.sand.colorB, 0.0f);
+    b.sandTint = glm::vec4(s.sand.tint, s.sand.cover);
+    b.snowColorA = glm::vec4(s.snow.colorA, s.snow.roughness);
+    b.snowColorB = glm::vec4(s.snow.colorB, 0.0f);
+    b.snowTint = glm::vec4(s.snow.tint, 0.0f);
+    b.ground = glm::vec4(s.ground.lightness, s.ground.roughness, s.ground.vegetation);
+    b.rockRule = glm::vec4(s.rock.slope, s.rock.slopeNoise, s.rock.softness, 0.0f);
+    b.snowRule0 = glm::vec4(s.snow.coldLowering, s.snow.blendBelow, s.snow.blendAbove, s.snow.polarTemperature);
+    b.snowRule1 = glm::vec4(s.snow.polarAmount, s.snow.slopeShed, s.snow.shedAmount);
+    b.sandRule = glm::vec4(s.sand.aridity, s.sand.beachHeight);
+    b.soilRule = glm::vec4(s.sand.desertAridity, s.ground.soilDryness);
+    b.soilRule2 = glm::vec4(s.ground.soilAmount, s.ground.polarSoil, 0.0f, 0.0f);
+    b.detail0 = glm::vec4(s.detail.grain, s.detail.grainSnowFade, s.detail.mediumFrequency);
+    b.detail1 = glm::vec4(s.detail.bumpFrequency, s.detail.bumpTilt, s.detail.bumpSnowFade, s.detail.textureBump);
+    b.detail2 = glm::vec4(s.detail.roughnessFloor, s.detail.matteRoughnessFloor, s.detail.gamma,
+                          s.detail.fineFrequency);
+    b.detail3 = glm::vec4(s.detail.temperatureNoise, s.detail.moistureNoise, s.detail.moistureDetailNoise, 0.0f);
+    b.seafloorShallow = glm::vec4(s.seafloor.shallowColor, s.seafloor.depthRange);
+    b.seafloorDeep = glm::vec4(s.seafloor.deepColor, 0.0f);
+    b.climate = glm::vec4(s.climate.polarCaps, s.climate.substellar, s.climate.cityCoverage, 0.0f);
+    for (int i = 0; i < SurfaceSettings::TextureCount; ++i)
+    {
+        const auto& t = s.textures[i];
+        b.texture[i] = glm::vec4(t.fineTile, t.coarseTile, t.strength, t.normalStrength);
+    }
+    b.strata0 = glm::vec4(s.strata.colorA, s.strata.strength);
+    b.strata1 = glm::vec4(s.strata.colorB, s.strata.bands);
+    b.strata2 = glm::vec4(s.strata.warp, 0.0f, 0.0f, 0.0f);
+    b.wet0 = glm::vec4(s.wetness.tint, s.wetness.strength);
+    b.wet1 = glm::vec4(s.wetness.shoreWidth, s.wetness.moisture, s.wetness.darkening, s.wetness.roughness);
+    b.sed0 = glm::vec4(s.sediment.color, s.sediment.strength);
+    b.sed1 = glm::vec4(s.sediment.height, s.sediment.slope);
+    b.sed2 = glm::vec4(s.sediment.patchiness, 0.0f, 0.0f, 0.0f);
+    b.veg0 = glm::vec4(s.vegetation.bareColor, s.vegetation.strength);
+    b.veg1 = glm::vec4(s.vegetation.slope, s.vegetation.treeline);
+    b.cover0 = glm::vec4(s.cover.color, s.cover.strength);
+    b.cover1 = glm::vec4(s.cover.slope, s.cover.height);
+    b.cover2 = glm::vec4(s.cover.facing, s.cover.sunFollow, s.cover.roughness, s.cover.patchiness);
+    b.amb0 = glm::vec4(s.skyAmbient.skyColor, s.skyAmbient.strength);
+    b.amb1 = glm::vec4(s.skyAmbient.groundColor, 0.0f);
+    return b;
+}
+
+} // namespace planets::render

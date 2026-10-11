@@ -136,6 +136,79 @@
                 0.9
             ]
         ],
+        "surface": {
+            "cover": {
+                "color": [
+                    0.86,
+                    0.66,
+                    0.42
+                ],
+                "patchiness": 0.7,
+                "slope": [
+                    0.15,
+                    0.4
+                ],
+                "strength": 0.35
+            },
+            "rock": {
+                "colorA": [
+                    0.55,
+                    0.4,
+                    0.27
+                ],
+                "colorB": [
+                    0.72,
+                    0.55,
+                    0.36
+                ],
+                "slope": 0.2
+            },
+            "sediment": {
+                "color": [
+                    0.85,
+                    0.66,
+                    0.42
+                ],
+                "height": [
+                    0.6,
+                    1.0
+                ],
+                "slope": [
+                    0.03,
+                    0.12
+                ],
+                "strength": 0.6
+            },
+            "skyAmbient": {
+                "fromSky": 1.0,
+                "groundColor": [
+                    1.1,
+                    0.95,
+                    0.75
+                ],
+                "strength": 0.8
+            },
+            "strata": {
+                "bands": 45,
+                "colorA": [
+                    0.82,
+                    0.6,
+                    0.38
+                ],
+                "colorB": [
+                    0.6,
+                    0.38,
+                    0.24
+                ],
+                "strength": 0.8
+            },
+            "textures": {
+                "sand": {
+                    "fineTile": 0.12,
+                    "normalStrength": 1.6
+                }
+            }
+        },
         "weather": "dust"
     },
     "shaderPaths": {
@@ -462,6 +535,18 @@
                 "yellow",
                 "white",
                 "orange"
+            ]
+        },
+        "render.surface.cover.strength": {
+            "range": [
+                0.2,
+                0.6
+            ]
+        },
+        "render.surface.strata.strength": {
+            "range": [
+                0.5,
+                1.0
             ]
         },
         "tectonics.continentalFraction": {
