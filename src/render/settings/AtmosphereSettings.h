@@ -20,6 +20,9 @@ struct AtmosphereSettings
     // Mie scattering: haze near the ground, grey extinction plus the forward halo around the sun
     float mieCoefficient = 0.4f;
     float mieDensityFalloff = 12.0f;
+    // Colour the haze scatters: white for Earth, ochre for dust, green for spores. Extinction stays
+    // grey, so a coloured haze also absorbs the other colours.
+    glm::vec3 hazeColor = glm::vec3(1.0f);
 
     int numInScatteringPoints = 10;
     int numOpticalDepthPoints = 10;

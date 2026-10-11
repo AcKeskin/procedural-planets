@@ -120,6 +120,7 @@ void CloudVolume::SetLayerUniforms(const Shader& shader, const CloudSettings& se
     shader.SetFloat("uCloudTopRadius", base + layer.planetRadius * std::max(settings.thickness, 0.001f));
     shader.SetFloat("uCloudCoverage", settings.coverage);
     shader.SetFloat("uCloudDensity", settings.density);
+    shader.SetVec3("uCloudColor", settings.color);
     shader.SetFloat("uCloudShapeScale", ShapeTilesPerRadius * settings.scale);
     shader.SetFloat("uCloudDrift", layer.time * settings.speed * DriftRate);
     glBindTextureUnit(WeatherBinding, _weather);

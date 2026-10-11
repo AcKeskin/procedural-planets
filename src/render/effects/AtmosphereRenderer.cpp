@@ -51,6 +51,7 @@ void SetSkyUniforms(const Shader& shader,
     shader.SetFloat("uIntensity", settings.intensity);
     shader.SetFloat("uMieCoefficient", settings.mieCoefficient / planetRadius);
     shader.SetFloat("uMieDensityFalloff", settings.mieDensityFalloff);
+    shader.SetVec3("uMieAlbedo", settings.hazeColor);
 }
 
 AtmosphereRenderer::AtmosphereRenderer() = default;

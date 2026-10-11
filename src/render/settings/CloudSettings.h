@@ -1,5 +1,7 @@
 #pragma once
 
+#include <glm/glm.hpp>
+
 namespace planets::render::effects
 {
 
@@ -14,6 +16,7 @@ struct CloudSettings
     float speed = 0.15f;         // drift of the weather around the planet
     float scale = 1.0f;          // size of individual clouds (higher = smaller clouds)
     float shadowStrength = 0.5f; // how much clouds darken the surface below
+    glm::vec3 color = glm::vec3(1.0f); // albedo tint: grey storms, yellow toxic clouds
     int viewSteps = 48;          // march steps per pixel: quality vs cost
 };
 

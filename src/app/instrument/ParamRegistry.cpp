@@ -217,6 +217,7 @@ const std::unordered_map<std::string, Entry>& Table()
         {"atmosphere.densityFalloff", {false, SET_FLOAT(t.atmosphere->densityFalloff)}},
         {"atmosphere.mieCoefficient", {false, SET_FLOAT(t.atmosphere->mieCoefficient)}},
         {"atmosphere.mieDensityFalloff", {false, SET_FLOAT(t.atmosphere->mieDensityFalloff)}},
+        {"atmosphere.hazeColor", {false, SET_VEC3(t.atmosphere->hazeColor)}},
         {"atmosphere.numInScatteringPoints", {false, SET_INT(t.atmosphere->numInScatteringPoints)}},
         {"atmosphere.numOpticalDepthPoints", {false, SET_INT(t.atmosphere->numOpticalDepthPoints)}},
         {"atmosphere.intensity", {false, SET_FLOAT(t.atmosphere->intensity)}},
@@ -233,6 +234,7 @@ const std::unordered_map<std::string, Entry>& Table()
         {"clouds.thickness", {false, SET_FLOAT(t.clouds->thickness)}},
         {"clouds.viewSteps", {false, SET_INT(t.clouds->viewSteps)}},
         {"clouds.shadowStrength", {false, SET_FLOAT(t.clouds->shadowStrength)}},
+        {"clouds.color", {false, SET_VEC3(t.clouds->color)}},
 
         // ---- sea level (real-time) ----
         {"seaLevel",

@@ -10,6 +10,7 @@ uniform vec3 uScatteringCoefficients; // Rayleigh, per world unit
 uniform float uDensityFalloff;
 uniform float uMieCoefficient;        // per world unit
 uniform float uMieDensityFalloff;
+uniform vec3 uMieAlbedo;              // colour the haze scatters (white on Earth)
 uniform float uIntensity;
 
 const float SKY_MAX_FLOAT = 3.402823466e+38;
@@ -119,7 +120,7 @@ SkyScatter skyScatter(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 sunDir,
         // Multiple scattering: isotropic, from the whole lit sky above the sample, so it follows
         // the local sun height and fades a little past the terminator instead of at it.
         float sunHeight = dot(normalize(inScatterPoint - uPlanetCenter), sunDir);
-        vec3 localScatter = localDensity.x * uScatteringCoefficients + localDensity.y * uMieCoefficient;
+        vec3 localScatter = localDensity.x * uScatteringCoefficients + localDensity.y * uMieCoefficient * uMieAlbedo;
         ambient += localScatter * skyTransmittance(viewOpticalDepth) * smoothstep(-0.2, 0.3, sunHeight);
 
         float visibility = skySunVisibility(inScatterPoint, sunDir);
@@ -136,7 +137,7 @@ SkyScatter skyScatter(vec3 rayOrigin, vec3 rayDir, float rayLength, vec3 sunDir,
 
     float cosTheta = dot(rayDir, sunDir);
     vec3 inScatter = rayleigh * uScatteringCoefficients * skyRayleighPhase(cosTheta)
-                   + mie * uMieCoefficient * skyMiePhase(cosTheta)
+                   + mie * uMieCoefficient * uMieAlbedo * skyMiePhase(cosTheta)
                    + ambient * SKY_MULTI_SCATTER;
     return SkyScatter(inScatter * uIntensity * stepSize, skyTransmittance(viewOpticalDepth));
 }

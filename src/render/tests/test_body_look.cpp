@@ -50,6 +50,21 @@ TEST_CASE("body_look: palette and material tints", "[body_look]")
     CHECK(look.surface.sandTint == glm::vec3(1.0f));
 }
 
+TEST_CASE("body_look: weather and star class fill in values the blocks can override", "[body_look]")
+{
+    const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({
+        "render": {"weather": "storms", "clouds": {"coverage": 0.6}, "star": {"class": "red"}}})"));
+    CHECK_THAT(look.clouds.coverage, WithinAbs(0.6, 1e-6));
+    CHECK(look.clouds.color != effects::CloudSettings{}.color);
+    CHECK(look.clouds.density != effects::CloudSettings{}.density);
+    CHECK(look.sunColor != SceneSettings{}.sunColor);
+
+    const auto unknown = types::ParseBodyLook(nlohmann::json::parse(R"({
+        "render": {"weather": "sunny", "star": {"class": "green"}}})"));
+    CHECK(unknown.clouds.color == effects::CloudSettings{}.color);
+    CHECK(unknown.sunColor == SceneSettings{}.sunColor);
+}
+
 TEST_CASE("body_look: wrong types are ignored", "[body_look]")
 {
     const auto look = types::ParseBodyLook(nlohmann::json::parse(R"({

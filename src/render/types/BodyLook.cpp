@@ -40,12 +40,68 @@ const json& Block(const json& j, const char* key)
     static const json empty = json::object();
     return j.contains(key) && j[key].is_object() ? j[key] : empty;
 }
+
+std::string Name(const json& j, const char* key)
+{
+    return j.contains(key) && j[key].is_string() ? j[key].get<std::string>() : std::string();
+}
+
+// Star colour by class, so a body can say "red" instead of an rgb. Unknown names keep the default.
+void ApplyStarClass(const std::string& name, BodyLook& look)
+{
+    if (name == "red")
+        look.sunColor = glm::vec3(1.0f, 0.55f, 0.32f);
+    else if (name == "orange")
+        look.sunColor = glm::vec3(1.0f, 0.78f, 0.55f);
+    else if (name == "white")
+        look.sunColor = glm::vec3(1.0f, 1.0f, 1.0f);
+    else if (name == "blue")
+        look.sunColor = glm::vec3(0.72f, 0.82f, 1.0f);
+}
+
+// Weather is a starting point for haze and clouds; the explicit atmosphere and cloud fields
+// read after it still win.
+void ApplyWeather(const std::string& name, BodyLook& look)
+{
+    auto& a = look.atmosphere;
+    auto& c = look.clouds;
+    if (name == "dust")
+    {
+        a.mieCoefficient = 10.0f;
+        a.mieDensityFalloff = 6.0f;
+        a.hazeColor = glm::vec3(0.95f, 0.68f, 0.40f);
+        c.coverage = 0.35f;
+        c.color = glm::vec3(0.95f, 0.80f, 0.62f);
+    }
+    else if (name == "spores")
+    {
+        a.mieCoefficient = 6.0f;
+        a.mieDensityFalloff = 10.0f;
+        a.hazeColor = glm::vec3(0.70f, 0.95f, 0.50f);
+    }
+    else if (name == "fog")
+    {
+        // Thin layer at sea level: shows over low land and lakes, sits under hills.
+        a.mieCoefficient = 12.0f;
+        a.mieDensityFalloff = 25.0f;
+        a.hazeColor = glm::vec3(0.85f, 0.90f, 0.85f);
+        c.altitude = 0.012f;
+    }
+    else if (name == "storms")
+    {
+        a.mieCoefficient = 1.5f;
+        c.coverage = 0.75f;
+        c.density = 450.0f;
+        c.color = glm::vec3(0.55f, 0.57f, 0.60f);
+    }
+}
 } // namespace
 
 BodyLook ParseBodyLook(const json& body)
 {
     BodyLook look;
     const json& render = Block(body, "render");
+    ApplyWeather(Name(render, "weather"), look);
 
     const json& a = Block(render, "atmosphere");
     Read(a, "enabled", look.atmosphere.enabled);
@@ -55,6 +111,7 @@ BodyLook ParseBodyLook(const json& body)
     Read(a, "densityFalloff", look.atmosphere.densityFalloff);
     Read(a, "mieCoefficient", look.atmosphere.mieCoefficient);
     Read(a, "mieDensityFalloff", look.atmosphere.mieDensityFalloff);
+    Read(a, "hazeColor", look.atmosphere.hazeColor);
     Read(a, "intensity", look.atmosphere.intensity);
 
     const json& c = Block(render, "clouds");
@@ -66,6 +123,7 @@ BodyLook ParseBodyLook(const json& body)
     Read(c, "thickness", look.clouds.thickness);
     Read(c, "speed", look.clouds.speed);
     Read(c, "shadowStrength", look.clouds.shadowStrength);
+    Read(c, "color", look.clouds.color);
 
     const json& o = Block(render, "ocean");
     Read(o, "enabled", look.ocean.enabled);
@@ -83,6 +141,7 @@ BodyLook ParseBodyLook(const json& body)
     Read(o, "crustColor", look.ocean.crustColor);
 
     const json& s = Block(render, "star");
+    ApplyStarClass(Name(s, "class"), look);
     Read(s, "color", look.sunColor);
     Read(s, "intensity", look.lighting.sunIntensity);
 

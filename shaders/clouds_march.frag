@@ -23,6 +23,7 @@ uniform float uSunIntensity;
 uniform int uViewSteps;
 uniform float uFrameJitter;
 uniform float uPixelAngle; // radians per pixel of this (half-res) target
+uniform vec3 uCloudColor;  // albedo tint per planet type (white on Earth)
 
 const int LIGHT_STEPS = 5;
 // Below 1 so sunlit tops keep their shading under the tonemap instead of burning to flat white.
@@ -169,7 +170,7 @@ void main()
             float h = clamp((length(p - uCloudCenter) - uCloudBaseRadius) / (uCloudTopRadius - uCloudBaseRadius), 0.0, 1.0);
             float sunVisible = skySunVisibility(p, sunDir);
             float toSun = lightOpticalDepth(p, sunDir, footprint) * sigmaScale;
-            vec3 inScatter = sunScatter(sunLight, toSun, cosTheta) * sunVisible + skyLight * mix(0.4, 1.0, h);
+            vec3 inScatter = (sunScatter(sunLight, toSun, cosTheta) * sunVisible + skyLight * mix(0.4, 1.0, h)) * uCloudColor;
             // Energy-conserving step integration (Hillaire 2015).
             float stepTransmittance = exp(-sigma * stepLength);
             light += transmittance * inScatter * (1.0 - stepTransmittance);
