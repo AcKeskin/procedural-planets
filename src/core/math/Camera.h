@@ -73,6 +73,9 @@ public:
     // Seat the orbit camera at an absolute yaw/pitch (OrbitRotate is delta-only).
     void SetOrbitAngles(float yaw, float pitch);
 
+    // Back-solve yaw/pitch from the position and leave the pose as it is (for the HUD).
+    void ReadOrbitAngles();
+
     // Matrix getters
     glm::mat4 GetViewMatrix() const;
     glm::mat4 GetProjectionMatrix(float aspectRatio) const;

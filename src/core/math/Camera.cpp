@@ -169,6 +169,16 @@ void Camera::SetOrbitAngles(float yaw, float pitch)
     OrbitRotate(0.0f, 0.0f); // recompute position + forward from the seated angles
 }
 
+void Camera::ReadOrbitAngles()
+{
+    const glm::vec3 offset = _position - _orbitTarget;
+    const float dist = glm::length(offset);
+    if (dist < 1e-6f)
+        return;
+    _yaw = glm::degrees(std::atan2(offset.z, offset.x));
+    _pitch = glm::degrees(std::asin(std::clamp(offset.y / dist, -1.0f, 1.0f)));
+}
+
 glm::mat4 Camera::GetViewMatrix() const
 {
     return glm::lookAt(_position, _position + _forward, _up);

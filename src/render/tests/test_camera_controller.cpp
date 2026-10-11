@@ -1,4 +1,5 @@
 #include "math/CameraController.h"
+#include <glm/gtc/quaternion.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -195,6 +196,36 @@ TEST_CASE("A sideways orbit drag after a vertical one keeps the pole upright", "
     cam.OrbitTumble(10.0f, 0.0f);
     REQUIRE(glm::dot(cam.GetPosition() - before, cam.GetRight()) < 0.0f);
     REQUIRE_THAT(glm::dot(cam.GetRight(), worldY), WithinAbs(0.0, 1e-4));
+}
+
+TEST_CASE("An eased move to a rolled Orbit pose ends without a snap", "[camera]")
+{
+    Camera cam;
+    CameraController ctl;
+    ctl.ResetView(TestBody(), cam, false);
+
+    CameraPose pose;
+    pose.mode = CameraMode::Orbit;
+    pose.position = glm::vec3(20.0f, 0.0f, 0.0f);
+    pose.forward = glm::vec3(-1.0f, 0.0f, 0.0f);
+    pose.up = glm::angleAxis(glm::radians(30.0f), pose.forward) * glm::vec3(0.0f, 1.0f, 0.0f);
+    ctl.GoTo(pose, cam);
+
+    glm::vec3 prevUp = cam.GetUp();
+    glm::vec3 prevForward = cam.GetForward();
+    float lastStep = 1.0f;
+    for (int i = 0; i < 90 && ctl.IsMoving(); ++i)
+    {
+        ctl.Update(1.0f / 60.0f, TestBody(), CameraControl{}, cam);
+        lastStep = (std::min)(glm::dot(prevUp, cam.GetUp()), glm::dot(prevForward, cam.GetForward()));
+        prevUp = cam.GetUp();
+        prevForward = cam.GetForward();
+    }
+    REQUIRE_FALSE(ctl.IsMoving());
+    REQUIRE(cam.GetMode() == CameraMode::Orbit);
+    REQUIRE(glm::dot(cam.GetForward(), pose.forward) > 0.9999f);
+    REQUIRE(glm::dot(cam.GetUp(), pose.up) > 0.9999f);
+    REQUIRE(lastStep > std::cos(glm::radians(1.0f)));
 }
 
 TEST_CASE("A long vertical orbit drag carries on over the pole without a flip", "[camera]")

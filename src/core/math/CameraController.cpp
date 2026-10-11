@@ -285,7 +285,12 @@ void CameraController::EndMove(Camera& camera, bool snapToTarget)
 
     if (to.mode == CameraMode::Orbit)
     {
-        SyncOrbit(camera, glm::vec3(0.0f)); // recomputes orientation: centre in view, world up
+        // Keep the eased pose: re-seating angles would snap a rolled or tumbled view to world up.
+        camera.SetMode(CameraMode::Orbit);
+        camera.SetOrbitTarget(glm::vec3(0.0f));
+        if (snapToTarget)
+            camera.SetOrientation(to.forward, to.up);
+        camera.ReadOrbitAngles();
     }
     else
     {
