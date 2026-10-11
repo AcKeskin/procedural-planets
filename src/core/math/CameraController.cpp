@@ -10,7 +10,8 @@ namespace
 {
 constexpr float ClearanceRadii = 0.01f;     // margin above the floor, in planet radii
 constexpr float MaxDistanceRadii = 30.0f;   // orbit zoom-out limit
-constexpr float FrameDistanceRadii = 2.5f;  // F: whole planet in view
+constexpr float FrameFill = 0.8f;           // F: the planet and its glow use this share of the view height
+constexpr float FrameGlowRadii = 1.08f;     // the atmosphere glow reaches about this far
 constexpr float LevelFullRadii = 1.5f;      // fully level below this distance from the centre
 constexpr float LevelNoneRadii = 4.0f;      // not levelled beyond this
 constexpr float ZoomNotchFraction = 0.85f;  // each notch keeps this share of the altitude
@@ -322,7 +323,10 @@ void CameraController::FramePlanet(const CameraBody& body, Camera& camera)
     glm::vec3 dir = SafeNormalize(camera.GetPosition(), glm::vec3(0.0f, 0.0f, 1.0f));
     dir.y = std::clamp(dir.y, -0.98f, 0.98f);
     dir = glm::normalize(dir);
-    BeginMove(OrbitPoseAt(dir * body.radius * FrameDistanceRadii), MoveSeconds, camera);
+    // Distance from the field of view, so the whole planet fits at any FOV.
+    const float halfView = glm::radians(camera.GetFov()) * 0.5f * FrameFill;
+    const float distance = body.radius * FrameGlowRadii / std::sin(halfView);
+    BeginMove(OrbitPoseAt(dir * distance), MoveSeconds, camera);
 }
 
 void CameraController::ResetView(const CameraBody& body, Camera& camera, bool eased)

@@ -96,7 +96,7 @@ TEST_CASE("An idle controller leaves a camera set from outside alone", "[camera]
     REQUIRE(cam.GetForward() == forward);
 }
 
-TEST_CASE("FramePlanet ends in Orbit at 2.5 radii", "[camera]")
+TEST_CASE("FramePlanet ends in Orbit with the whole planet in view", "[camera]")
 {
     Camera cam;
     CameraController ctl;
@@ -110,7 +110,10 @@ TEST_CASE("FramePlanet ends in Orbit at 2.5 radii", "[camera]")
     Run(ctl, cam, CameraControl{}, 3.0f);
     REQUIRE_FALSE(ctl.IsMoving());
     REQUIRE(cam.GetMode() == CameraMode::Orbit);
-    REQUIRE_THAT(glm::length(cam.GetPosition()), WithinAbs(25.0, 0.05));
+    // The planet's angular radius fits inside half the vertical field of view, with a margin.
+    const float halfAngle = std::asin(TestBody().radius / glm::length(cam.GetPosition()));
+    REQUIRE(halfAngle < glm::radians(cam.GetFov()) * 0.5f * 0.85f);
+    REQUIRE(halfAngle > glm::radians(cam.GetFov()) * 0.5f * 0.6f);
     REQUIRE(glm::dot(cam.GetForward(), -glm::normalize(cam.GetPosition())) > 0.999f);
 }
 
