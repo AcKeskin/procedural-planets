@@ -1,6 +1,5 @@
 #include "CinematicPanel.h"
 #include "../settings/CinematicSettings.h"
-#include "../../app/Keybinds.h"
 #include "GuiLayout.h"
 #include <imgui.h>
 #include <algorithm>
@@ -61,15 +60,6 @@ void CinematicPanel::DrawContent(CinematicSettings& settings, float planetRadius
     if (ImGui::Button("Play", ImVec2(-1, PlayButtonHeight)))
     {
         playRequested = true;
-    }
-
-    if (ImGui::CollapsingHeader("Hotkeys"))
-    {
-        using namespace planets::app;
-        ImGui::BulletText("%s", Keybinds::CinematicToggle);
-        ImGui::BulletText("%s", Keybinds::Screenshot);
-        ImGui::BulletText("%s", Keybinds::CinematicStop);
-        ImGui::BulletText("%s", Keybinds::GuiToggle);
     }
 
     ImGui::PopItemWidth();

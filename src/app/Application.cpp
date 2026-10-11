@@ -1,6 +1,7 @@
 #include "Application.h"
 #include "GpuConstants.h"
 #include "gui/Widgets.h"
+#include "Keybinds.h"
 #include "planetgen/model/BodyConfigJson.h"
 #include <nlohmann/json.hpp>
 #include <GL/gl3w.h>
@@ -8,6 +9,7 @@
 #include <glm/glm.hpp>
 #include <imgui.h>
 #include <cstdio>
+#include <filesystem>
 #include <iostream>
 #include <fstream>
 #include <random>
@@ -15,9 +17,14 @@
 namespace planets::app
 {
 
+namespace
+{
+constexpr float HoldHintDelaySeconds = 0.2f; // short taps do not flash the hint
+constexpr const char* BookmarksPath = "bookmarks.json";
+}
+
 Application::Application()
     : _seaLevel(AppDefaults::SeaLevel)
-    , _moveSpeed(AppDefaults::MoveSpeed)
     , _lastTime(0.0f)
     , _previousWidth(0)
     , _previousHeight(0)
@@ -45,6 +52,8 @@ bool Application::Initialize()
 
     _input.Initialize(_window.GetHandle());
     _guiManager.Initialize(_window.GetHandle());
+    if (!_capture.enabled)
+        _help.LoadFirstLaunchState();
 
     if (!_renderer.Initialize(_window.GetWidth(), _window.GetHeight()))
     {
@@ -99,7 +108,8 @@ bool Application::Initialize()
     }
     else
     {
-        _camera.SetPosition(glm::vec3(0.0f, 0.0f, PlanetRadius() * AppDefaults::InitialCameraDistanceMultiplier));
+        _cameraCtl.ResetView(CameraBodyNow(), _camera, /*eased=*/false);
+        _bookmarks.Load(BookmarksPath);
     }
 
     _lastTime = static_cast<float>(glfwGetTime());
@@ -238,51 +248,93 @@ void Application::Shutdown()
     _window.Shutdown();
 }
 
+namespace
+{
+// With keyboard nav on, WantCaptureKeyboard is true whenever any ImGui window has focus (the
+// Planet window gets it at launch), which would kill every shortcut. Block only while a text
+// field or another widget is being edited.
+bool KeyboardBlockedByGui()
+{
+    return ImGui::GetIO().WantTextInput || ImGui::IsAnyItemActive();
+}
+} // namespace
+
+void Application::HandleEscape(float deltaTime, bool keysBlocked)
+{
+    if (keysBlocked || !_input.IsKeyDown(Key::Escape))
+    {
+        _escHeld = 0.0f;
+        _escConsumed = false;
+        return;
+    }
+
+    // A press does one job: close help, else stop the turntable. It never quits by itself.
+    if (Keybinds::Pressed(_input, Action::Escape))
+    {
+        if (_help.IsOpen())
+        {
+            _help.Close();
+            _escConsumed = true;
+        }
+        else if (_cinematicController.IsPlaying())
+        {
+            StopCinematic();
+            _escConsumed = true;
+        }
+    }
+    if (_escConsumed)
+        return;
+
+    _escHeld += deltaTime;
+    if (_escHeld >= Keybinds::QuitHoldSeconds)
+        _window.SetShouldClose(true);
+}
+
 void Application::ProcessInput(float deltaTime)
 {
-    bool guiWantsKeyboard = ImGui::GetIO().WantTextInput;
+    const bool keysBlocked = KeyboardBlockedByGui();
 
-    if (_input.IsKeyDown(Key::Escape))
+    HandleEscape(deltaTime, keysBlocked);
+
+    if (!keysBlocked)
     {
-        if (_cinematicController.IsPlaying())
-            StopCinematic();
-        else
-            _window.SetShouldClose(true);
-    }
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::Tab))
-        _guiVisible = !_guiVisible;
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::F5))
-    {
-        if (_cinematicController.IsPlaying())
-            StopCinematic();
-        else
-            StartCinematic();
-    }
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::F12))
-        _screenshotRequested = true;
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::G))
-    {
-        _autoOrbit = !_autoOrbit;
-        if (_autoOrbit)
+        using Keybinds::Pressed;
+        if (Pressed(_input, Action::Help))
+            _help.Toggle();
+        if (Pressed(_input, Action::HidePanel))
+            _guiVisible = !_guiVisible;
+        if (Pressed(_input, Action::Turntable))
         {
-            _camera.SetOrbitTarget(glm::vec3(0.0f));
-            _camera.SetMode(core::CameraMode::Orbit);
+            if (_cinematicController.IsPlaying())
+                StopCinematic();
+            else
+                StartCinematic();
         }
-        else
+        if (Pressed(_input, Action::Screenshot))
+            _screenshotRequested = true;
+        if (Pressed(_input, Action::ToggleMode))
+            _cameraCtl.ToggleMode(CameraBodyNow(), _camera);
+        if (Pressed(_input, Action::AutoRotate))
         {
-            _camera.SetMode(core::CameraMode::FreeFly);
+            core::CameraHud& hud = _camera.Hud();
+            hud.autoRotate = !hud.autoRotate;
+            // Auto-rotate turns the orbit, so leave Fly for it.
+            if (hud.autoRotate && _camera.GetMode() != core::CameraMode::Orbit)
+                _cameraCtl.ToggleMode(CameraBodyNow(), _camera);
         }
+        if (Pressed(_input, Action::FramePlanet))
+            _cameraCtl.FramePlanet(CameraBodyNow(), _camera);
+        if (Pressed(_input, Action::ResetView))
+            _cameraCtl.ResetView(CameraBodyNow(), _camera, /*eased=*/true);
+        if (const int slot = Keybinds::DigitPressed(_input, Action::SaveBookmark))
+            SaveBookmark(slot);
+        if (const int slot = Keybinds::DigitPressed(_input, Action::RecallBookmark))
+            RecallBookmark(slot);
+        if (Pressed(_input, Action::Atmosphere))
+            _atmosphereSettings.enabled = !_atmosphereSettings.enabled;
+        if (Pressed(_input, Action::Reroll))
+            ShuffleTerrain();
     }
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::H))
-        _atmosphereSettings.enabled = !_atmosphereSettings.enabled;
-
-    if (!guiWantsKeyboard && _input.IsKeyPressed(Key::R))
-        ShuffleTerrain();
 
     if (_cinematicController.IsPlaying())
     {
@@ -292,40 +344,115 @@ void Application::ProcessInput(float deltaTime)
         return;
     }
 
-    if (_autoOrbit)
+    UpdateCamera(deltaTime, keysBlocked);
+}
+
+core::CameraBody Application::CameraBodyNow() const
+{
+    const float radius = PlanetRadius();
+    core::CameraBody body;
+    body.radius = radius;
+    body.seaRadius = radius * _seaLevel;
+    // Patch heights live on the GPU, so there is no cheap height under the camera. The floor is
+    // the highest terrain the shape allows.
+    const float heightScale = _activeBody ? _activeBody->GetHeightScale() : 0.0f;
+    body.floorRadius = body.seaRadius + radius * heightScale * AppDefaults::HeightRangeMultiplier;
+    body.startDistance = radius * AppDefaults::InitialCameraDistanceMultiplier;
+    return body;
+}
+
+void Application::UpdateCamera(float deltaTime, bool keysBlocked)
+{
+    const ImGuiIO& io = ImGui::GetIO();
+    const bool flying = _camera.GetMode() == core::CameraMode::FreeFly;
+    core::CameraControl control;
+
+    // A drag belongs to whoever got the press: a drag that starts on a panel never moves the camera.
+    const bool left = _input.IsMouseButtonDown(MouseButton::Left);
+    const bool right = _input.IsMouseButtonDown(MouseButton::Right);
+    if (left && !_leftWasDown)
+        _orbitDragging = !io.WantCaptureMouse;
+    if (right && !_rightWasDown)
+        _lookDragging = !io.WantCaptureMouse;
+    _orbitDragging = _orbitDragging && left;
+    _lookDragging = _lookDragging && right;
+    _leftWasDown = left;
+    _rightWasDown = right;
+
+    const glm::vec2 mouseDelta(_input.GetMouseDeltaX(), _input.GetMouseDeltaY());
+    if (_orbitDragging)
+        control.orbitDrag = mouseDelta;
+    if (_lookDragging && flying)
+        control.look = mouseDelta;
+
+    // Hide the cursor while looking, so the drag is not bounded by the window edge.
+    const bool wantHidden = _lookDragging && flying;
+    if (wantHidden == _input.IsCursorEnabled())
+        _input.SetCursorEnabled(!wantHidden);
+
+    if (!io.WantCaptureMouse)
+        control.zoomNotches = _input.GetScrollDelta();
+
+    if (!keysBlocked)
     {
-        _camera.OrbitRotate(_autoOrbitSpeed * deltaTime, 0.0f);
+        using namespace Keybinds;
+        const auto axis = [this](Key plus, Key minus) {
+            return (_input.IsKeyDown(plus) ? 1.0f : 0.0f) - (_input.IsKeyDown(minus) ? 1.0f : 0.0f);
+        };
+        control.move = glm::vec3(axis(MoveRight, MoveLeft), axis(MoveUp, MoveDown), axis(MoveForward, MoveBack));
+        if (_input.IsKeyDown(Faster))
+            control.boost *= FasterFactor;
+        if (_input.IsKeyDown(Slower))
+            control.boost *= SlowerFactor;
+    }
+    control.autoRotateDegPerSec = _autoOrbitSpeed;
+
+    if (_input.WasDoubleClicked() && !io.WantCaptureMouse)
+        FlyToCursor();
+
+    _cameraCtl.Update(deltaTime, CameraBodyNow(), control, _camera);
+}
+
+void Application::FlyToCursor()
+{
+    int width = 0;
+    int height = 0;
+    glfwGetWindowSize(_window.GetHandle(), &width, &height);
+    if (width <= 0 || height <= 0)
+        return;
+
+    const float ndcX = 2.0f * _input.GetMouseX() / static_cast<float>(width) - 1.0f;
+    const float ndcY = 1.0f - 2.0f * _input.GetMouseY() / static_cast<float>(height);
+    const glm::vec3 dir = core::CameraController::ScreenRay(_camera, ndcX, ndcY, _window.GetAspectRatio());
+
+    // The sea-level sphere stands in for the terrain; the camera lands above the safe floor anyway.
+    glm::vec3 hit;
+    if (core::CameraController::RaySphere(_camera.GetPosition(), dir, PlanetRadius() * _seaLevel, hit))
+        _cameraCtl.FlyToPoint(hit, CameraBodyNow(), _camera);
+}
+
+void Application::SaveBookmark(int slot)
+{
+    Bookmark bookmark;
+    bookmark.used = true;
+    bookmark.pose = _cameraCtl.CapturePose(_camera);
+    bookmark.sunDir = _sceneSettings.lightDir;
+    _bookmarks.Set(slot, bookmark);
+    ShowToast(_bookmarks.Save(BookmarksPath) ? "Saved bookmark " + std::to_string(slot)
+                                             : "Bookmark " + std::to_string(slot) + " not saved (file error)");
+}
+
+void Application::RecallBookmark(int slot)
+{
+    const Bookmark& bookmark = _bookmarks.Get(slot);
+    if (!bookmark.used)
+    {
+        ShowToast("Bookmark " + std::to_string(slot) + " is empty");
         return;
     }
-
-    if (_input.IsMouseButtonDown(MouseButton::Right))
-    {
-        if (_input.IsCursorEnabled())
-            _input.SetCursorEnabled(false);
-        _camera.Rotate(_input.GetMouseDeltaX() * AppDefaults::MouseRotationSensitivity,
-                       _input.GetMouseDeltaY() * AppDefaults::MouseRotationSensitivity);
-    }
-    else
-    {
-        if (!_input.IsCursorEnabled())
-            _input.SetCursorEnabled(true);
-    }
-
-    float speedMultiplier = _input.IsKeyDown(Key::LeftShift) ? AppDefaults::SprintSpeedMultiplier : 1.0f;
-    float speed = _moveSpeed * deltaTime * speedMultiplier;
-
-    if (_input.IsKeyDown(Key::W))
-        _camera.MoveForward(speed);
-    if (_input.IsKeyDown(Key::S))
-        _camera.MoveForward(-speed);
-    if (_input.IsKeyDown(Key::A))
-        _camera.MoveRight(-speed);
-    if (_input.IsKeyDown(Key::D))
-        _camera.MoveRight(speed);
-    if (_input.IsKeyDown(Key::E))
-        _camera.MoveUp(speed);
-    if (_input.IsKeyDown(Key::Q))
-        _camera.MoveUp(-speed);
+    _sceneSettings.lightDir = bookmark.sunDir;
+    _cameraCtl.GoTo(bookmark.pose, _camera);
+    ShowToast("Bookmark " + std::to_string(slot));
 }
 
 void Application::Render()
@@ -355,8 +482,12 @@ void Application::Render()
 
     if (_screenshotRequested)
     {
-        _captureManager.CaptureScreenshot(capW, capH);
+        const bool saved = _captureManager.CaptureScreenshot(capW, capH);
         _screenshotRequested = false;
+        if (saved)
+            ShowToast("Saved " + std::filesystem::absolute(_captureManager.GetLastCapturePath()).string());
+        else
+            ShowToast("Screenshot failed");
     }
 
     // Headless capture point: scene composited, before the GUI overlay.
@@ -377,6 +508,14 @@ void Application::RenderGui()
     if (!_cinematicController.IsPlaying())
         DrawBar();
     _guiManager.DrawDockspace();
+
+    if (!_cinematicController.IsPlaying())
+    {
+        _help.Draw();
+        _toasts.Draw();
+        if (_escHeld > HoldHintDelaySeconds)
+            Toasts::DrawHoldHint("Hold Esc to quit", _escHeld / Keybinds::QuitHoldSeconds);
+    }
 
     if (_guiVisible)
     {
@@ -399,8 +538,8 @@ void Application::RenderGui()
         ui.clouds = &_cloudSettings;
         ui.scene = &_sceneSettings;
         ui.camera = &_camera;
-        ui.moveSpeed = &_moveSpeed;
-        ui.autoOrbit = _autoOrbit;
+        ui.moveSpeed = &_cameraCtl.SpeedMultiplier();
+        ui.autoOrbit = _camera.Hud().autoRotate;
         ui.autoOrbitSpeed = &_autoOrbitSpeed;
         ui.cinematic = &_cinematicSettings;
         ui.planetRadius = PlanetRadius();
@@ -432,6 +571,11 @@ void Application::DrawBar()
     if (!ImGui::BeginMainMenuBar())
         return;
 
+    if (ImGui::BeginMenu("Help"))
+    {
+        ImGui::MenuItem("Controls", "F1", _help.OpenFlag());
+        ImGui::EndMenu();
+    }
     if (ImGui::BeginMenu("View"))
     {
         ImGui::MenuItem("Planet window", "Tab", &_guiVisible);
@@ -477,10 +621,22 @@ void Application::DrawBar()
         ShuffleTerrain();
     ImGui::SetItemTooltip("New random seed. Unlocked tabs take new values. Key: R.");
 
-    // Frame time on the right; the GPU split on hover.
+    // Frame time on the right; the GPU split on hover. A dim hint sits to its left.
     char frame[48];
     std::snprintf(frame, sizeof(frame), "%.1f ms  %.0f fps", _frameMs, _frameMs > 0.0f ? 1000.0f / _frameMs : 0.0f);
-    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize(frame).x - ImGui::GetStyle().ItemSpacing.x * 2.0f);
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float frameX = ImGui::GetWindowWidth() - ImGui::CalcTextSize(frame).x - spacing * 2.0f;
+    char hint[96];
+    std::snprintf(hint, sizeof(hint), "%s  alt %.2f  speed %.2f   F1 help",
+                  _camera.GetMode() == core::CameraMode::Orbit ? "Orbit" : "Fly", _camera.Hud().altitude,
+                  _camera.Hud().speed);
+    const float hintX = frameX - ImGui::CalcTextSize(hint).x - spacing * 4.0f;
+    if (hintX > ImGui::GetCursorPosX())
+    {
+        ImGui::SameLine(hintX);
+        ImGui::TextDisabled("%s", hint);
+    }
+    ImGui::SameLine(frameX);
     ImGui::TextUnformatted(frame);
     if (ImGui::IsItemHovered())
     {
@@ -545,6 +701,7 @@ void Application::ApplyLook(const render::types::LookState& s, bool rebuildBody,
     {
         float camDist = PlanetRadius() * AppDefaults::InitialCameraDistanceMultiplier;
         _camera.SetPosition(glm::vec3(0.0f, 0.0f, camDist));
+        _cameraCtl.Cancel(_camera); // the controller re-adopts the pose next frame
         float farPlane = (std::max)(AppDefaults::MinFarPlane, PlanetRadius() * AppDefaults::FarPlaneRadiusMultiplier);
         _camera.SetFarPlane(farPlane);
     }
@@ -646,6 +803,7 @@ void Application::ShuffleTerrain()
     // A new world is a new seed: unlocked tabs take the type's values at that seed; Earth gets
     // new continents.
     _genConfig.seed = std::random_device{}();
+    ShowToast("New seed " + std::to_string(_genConfig.seed));
     if (!RerollWorld())
         RegenerateLodSystem();
 }
@@ -665,6 +823,8 @@ void Application::ResetUnit(render::types::LookUnit unit)
 
 void Application::StartCinematic()
 {
+    _cameraCtl.Cancel(_camera);
+    _camera.Hud().autoRotate = false;
     _camera.SetOrbitTarget(glm::vec3(0.0f));
     _camera.SetMode(core::CameraMode::Orbit);
     _cinematicController.Start(_cinematicSettings, PlanetRadius(), _camera);
@@ -675,7 +835,9 @@ void Application::StopCinematic()
 {
     _cinematicController.Stop();
     _guiVisible = true;
-    _camera.SetMode(core::CameraMode::FreeFly);
+    // The turntable orbits, so the camera stays in Orbit; the controller re-adopts the pose.
+    _camera.SetMode(core::CameraMode::Orbit);
+    _cameraCtl.Cancel(_camera);
 }
 
 void Application::RegenerateLodSystem()

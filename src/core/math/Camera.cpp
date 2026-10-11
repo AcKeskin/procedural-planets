@@ -1,5 +1,6 @@
 #include "Camera.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <algorithm>
 #include <cmath>
 
@@ -59,6 +60,41 @@ void Camera::LookAt(const glm::vec3& target)
     // Back-solve the Euler state so a later delta Rotate continues smoothly from here.
     _pitch = glm::degrees(std::asin(std::clamp(_forward.y, -1.0f, 1.0f)));
     _yaw = glm::degrees(std::atan2(_forward.z, _forward.x));
+}
+
+void Camera::SetOrientation(const glm::vec3& forward, const glm::vec3& upHint)
+{
+    _forward = glm::normalize(forward);
+
+    glm::vec3 right = glm::cross(_forward, upHint);
+    if (glm::dot(right, right) < 1e-8f)
+        right = _right; // looking along the hint: keep the old roll
+    _right = glm::normalize(right);
+    _up = glm::normalize(glm::cross(_right, _forward));
+
+    _pitch = glm::degrees(std::asin(std::clamp(_forward.y, -1.0f, 1.0f)));
+    _yaw = glm::degrees(std::atan2(_forward.z, _forward.x));
+}
+
+void Camera::Look(float yawDelta, float pitchDelta, const glm::vec3& up)
+{
+    const glm::vec3 vertical = glm::normalize(up);
+
+    // Yaw (positive = turn right, same sense as Rotate) about the vertical.
+    glm::vec3 forward = glm::angleAxis(glm::radians(-yawDelta), vertical) * _forward;
+
+    const float current = glm::degrees(std::asin(std::clamp(glm::dot(forward, vertical), -1.0f, 1.0f)));
+    const float wanted = std::clamp(current + pitchDelta, -CameraDefaults::MaxPitch, CameraDefaults::MaxPitch);
+    const glm::vec3 right = glm::cross(forward, vertical);
+    if (glm::dot(right, right) > 1e-8f)
+        forward = glm::angleAxis(glm::radians(wanted - current), glm::normalize(right)) * forward;
+
+    SetOrientation(forward, vertical);
+}
+
+void Camera::Relevel(const glm::vec3& up)
+{
+    SetOrientation(_forward, up);
 }
 
 void Camera::SetOrbitTarget(const glm::vec3& target)
