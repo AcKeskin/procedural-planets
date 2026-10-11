@@ -17,22 +17,16 @@ Inspired by [Sebastian Lague's Solar System](https://github.com/SebLague/Solar-S
   <img src="docs/images/flyover.gif" alt="Orbit around the planet, then a descent through the clouds to a low view over the land" width="480">
 </p>
 
-Earth and the 12 planet types, plus a row of four seeds of the Lush type:
-
 <p align="center">
-  <img src="docs/images/types_gallery.png" alt="Earth and the 12 planet types, with four seeds of the Lush type below" width="720">
+  <img src="docs/images/types_gallery.png" alt="Planet types" width="720">
 </p>
 
-A random type and seed every two seconds while the planet turns:
-
 <p align="center">
-  <img src="docs/images/random_worlds.gif" alt="A turning planet that changes to a random type and seed every two seconds" width="480">
+  <img src="docs/images/random_worlds.gif" alt="Random worlds" width="480">
 </p>
 
-One type, rerolled to a new seed about every 1.5 seconds while it turns:
-
 <p align="center">
-  <img src="docs/images/lush_reroll.gif" alt="A turning Lush planet that gets a new seed about every 1.5 seconds" width="480">
+  <img src="docs/images/lush_reroll.gif" alt="Lush rerolled" width="480">
 </p>
 
 ## Macro World Layer
