@@ -819,6 +819,8 @@ void Application::ResetUnit(render::types::LookUnit unit)
 
 void Application::StartCinematic()
 {
+    // The GUI hides during the turntable, so a hidden open help would eat the first Esc.
+    _help.Close();
     _cameraCtl.Cancel(_camera);
     _camera.Hud().autoRotate = false;
     _camera.SetOrbitTarget(glm::vec3(0.0f));
