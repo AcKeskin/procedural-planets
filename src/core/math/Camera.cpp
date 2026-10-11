@@ -123,18 +123,40 @@ void Camera::OrbitRotate(float yawDelta, float pitchDelta)
     _up = glm::normalize(glm::cross(_right, _forward));
 }
 
+void Camera::OrbitTumble(float yawDelta, float pitchDelta)
+{
+    // Negative angles match OrbitRotate: +yaw moves from +x toward +z, +pitch moves up.
+    const glm::quat turn =
+        glm::angleAxis(glm::radians(-yawDelta), _up) * glm::angleAxis(glm::radians(-pitchDelta), _right);
+    const glm::vec3 offset = turn * (_position - _orbitTarget);
+    _position = _orbitTarget + offset;
+    _forward = glm::normalize(-offset);
+    _right = glm::normalize(glm::cross(_forward, turn * _up));
+    _up = glm::cross(_right, _forward);
+
+    // Keep yaw/pitch readable for the HUD and for code that seats angles later.
+    const float dist = glm::length(offset);
+    _yaw = glm::degrees(std::atan2(offset.z, offset.x));
+    _pitch = glm::degrees(std::asin(std::clamp(offset.y / dist, -1.0f, 1.0f)));
+}
+
 void Camera::OrbitZoom(float amount)
 {
-    _orbitDistance -= amount;
-    _orbitDistance = std::max(_orbitDistance, CameraDefaults::MinOrbitDistance);
-
-    OrbitRotate(0.0f, 0.0f);
+    SetOrbitDistance(_orbitDistance - amount);
 }
 
 void Camera::SetOrbitDistance(float distance)
 {
+    // Moves along the current direction and keeps the orientation, so a tumbled view stays as it is.
     _orbitDistance = std::max(distance, CameraDefaults::MinOrbitDistance);
-    OrbitRotate(0.0f, 0.0f);
+    const glm::vec3 offset = _position - _orbitTarget;
+    const float len = glm::length(offset);
+    if (len < 1e-6f)
+    {
+        OrbitRotate(0.0f, 0.0f);
+        return;
+    }
+    _position = _orbitTarget + offset * (_orbitDistance / len);
 }
 
 void Camera::SetOrbitAngles(float yaw, float pitch)

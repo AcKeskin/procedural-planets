@@ -13,7 +13,10 @@ namespace
 constexpr float MinFovDegrees = 20.0f;
 constexpr float MaxFovDegrees = 100.0f;
 constexpr float PlayButtonHeight = 32.0f;
-constexpr const char* DurationModeItems = "Rotations\0Seconds\0Loop\0";
+// "Stop After" lists Never first; the enum keeps its order for scripts.
+constexpr const char* StopAfterItems = "Never\0Turns\0Seconds\0";
+constexpr CinematicDurationMode StopAfterModes[] = {CinematicDurationMode::Loop, CinematicDurationMode::Rotations,
+                                                    CinematicDurationMode::Seconds};
 } // namespace
 
 void CameraTab::Draw(core::Camera& camera, float& flySpeed, CinematicSettings& cinematic, bool& play)
@@ -78,10 +81,15 @@ void CameraTab::Draw(core::Camera& camera, float& flySpeed, CinematicSettings& c
                "%.2f radii", "Camera distance at the end, in planet radii.", ImGuiSliderFlags_Logarithmic);
         Check("Zoom Easing", t.zoomEasing, "Ease the distance change.");
 
-        int mode = static_cast<int>(t.durationMode);
-        if (ImGui::Combo("Length", &mode, DurationModeItems))
-            t.durationMode = static_cast<CinematicDurationMode>(mode);
-        ImGui::SetItemTooltip("Stop after some turns or seconds, or loop until Esc.");
+        int item = 0;
+        for (int i = 0; i < 3; ++i)
+        {
+            if (StopAfterModes[i] == t.durationMode)
+                item = i;
+        }
+        if (ImGui::Combo("Stop After", &item, StopAfterItems))
+            t.durationMode = StopAfterModes[item];
+        ImGui::SetItemTooltip("Never = keep turning until F5 or Esc. Or stop after some turns or seconds.");
         if (t.durationMode == CinematicDurationMode::Rotations)
             Slider("Turns", t.durationValue, limits::MinRotations, limits::MaxRotations, "%.1f",
                    "Full turns before it stops. 1 to 10.");

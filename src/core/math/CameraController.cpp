@@ -165,7 +165,7 @@ void CameraController::UpdateOrbit(float dt, const CameraBody& body, const Camer
     if (camera.Hud().autoRotate)
         yaw += input.autoRotateDegPerSec * dt;
     if (yaw != 0.0f || pitch != 0.0f)
-        camera.OrbitRotate(yaw, pitch);
+        camera.OrbitTumble(yaw, pitch);
 
     if (std::abs(_zoomTarget - distance) > 1e-4f * body.radius)
     {

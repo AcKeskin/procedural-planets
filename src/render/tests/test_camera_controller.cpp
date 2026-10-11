@@ -153,3 +153,40 @@ TEST_CASE("RaySphere hits the near side and misses beside the sphere", "[camera]
     REQUIRE_THAT(hit.z, WithinAbs(10.0, 1e-4));
     REQUIRE_FALSE(CameraController::RaySphere(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(1.0f, 0.0f, 0.0f), 10.0f, hit));
 }
+
+TEST_CASE("OrbitTumble moves like OrbitRotate away from the poles", "[camera]")
+{
+    Camera a;
+    a.SetMode(CameraMode::Orbit);
+    a.SetOrbitTarget(glm::vec3(0.0f));
+    a.SetOrbitDistance(20.0f);
+    a.SetOrbitAngles(30.0f, 10.0f);
+    Camera b = a;
+    a.OrbitRotate(2.0f, 1.5f);
+    b.OrbitTumble(2.0f, 1.5f);
+    REQUIRE(glm::distance(a.GetPosition(), b.GetPosition()) < 0.05f);
+    REQUIRE(glm::dot(a.GetForward(), b.GetForward()) > 0.9999f);
+}
+
+TEST_CASE("A long vertical orbit drag carries on over the pole without a flip", "[camera]")
+{
+    Camera cam;
+    CameraController ctl;
+    ctl.ResetView(TestBody(), cam, false);
+    const float distance = glm::length(cam.GetPosition());
+
+    CameraControl drag;
+    drag.orbitDrag = glm::vec2(0.0f, -10.0f); // drag down: the camera climbs
+    float topY = cam.GetPosition().y;
+    glm::vec3 up = cam.GetUp();
+    for (int i = 0; i < 120; ++i)
+    {
+        ctl.Update(1.0f / 60.0f, TestBody(), drag, cam);
+        REQUIRE(glm::dot(cam.GetUp(), up) > 0.9f); // no snap between frames
+        up = cam.GetUp();
+        topY = (std::max)(topY, cam.GetPosition().y);
+    }
+    // 120 steps of 3 degrees = 360: up over the pole, down the far side and back around.
+    REQUIRE(topY > distance * 0.999f);
+    REQUIRE_THAT(glm::length(cam.GetPosition()), WithinAbs(distance, 1e-2));
+}
