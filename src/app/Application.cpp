@@ -323,7 +323,7 @@ void Application::ProcessInput(float deltaTime)
                 core::CameraHud& hud = _camera.Hud();
                 hud.autoRotate = !hud.autoRotate;
                 // Auto-rotate turns the orbit, so leave Fly for it.
-                if (hud.autoRotate && _camera.GetMode() != core::CameraMode::Orbit)
+                if (hud.autoRotate && _cameraCtl.EffectiveMode(_camera) != core::CameraMode::Orbit)
                     _cameraCtl.ToggleMode(CameraBodyNow(), _camera);
             }
             if (Pressed(_input, Action::FramePlanet))
@@ -455,7 +455,7 @@ void Application::RecallBookmark(int slot)
         return;
     }
     _sceneSettings.lightDir = bookmark.sunDir;
-    _cameraCtl.GoTo(bookmark.pose, _camera);
+    _cameraCtl.GoTo(bookmark.pose, CameraBodyNow(), _camera);
     ShowToast("Bookmark " + std::to_string(slot));
 }
 
