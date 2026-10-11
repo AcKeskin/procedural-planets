@@ -41,6 +41,13 @@ std::string ScriptRunner::Dispatch(const Command& cmd)
     case CommandType::SetSeed:
     {
         _app._genConfig.seed = std::get<SetSeedCommand>(cmd.payload).seed;
+        // A planet type is type + seed: a new seed rolls its traits again.
+        if (_app.RerollActiveBody())
+        {
+            _dirty = false;
+            ReapplyCamera();
+            return "ok (rerolled)";
+        }
         _dirty = true;
         return "ok (dirty)";
     }
@@ -49,7 +56,10 @@ std::string ScriptRunner::Dispatch(const Command& cmd)
         const auto& c = std::get<SetBodyCommand>(cmd.payload);
         // By id through the registry; an explicit path loads that file directly.
         if (!c.path.empty())
-            _app.SwitchBody(_app.LoadBodyConfigPublic(c.path), render::types::LoadBodyLook(c.path));
+        {
+            if (!_app.SwitchBodyByPath(c.path))
+                return "error: cannot load '" + c.path + "'";
+        }
         else if (!_app.SwitchBodyById(c.body))
             return "error: unknown body '" + c.body + "'";
         _dirty = false;

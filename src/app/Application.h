@@ -104,6 +104,8 @@ private:
     void RenderGui();
 
     void RegenerateLodSystem();
+    // New world: a planet type with a variety block rolls a new seed; others (Earth) shuffle
+    // their generation parameters.
     void ShuffleTerrain();
     void StartCinematic();
     void StopCinematic();
@@ -124,14 +126,14 @@ private:
     // Pin capture-mode lighting exposure (re-applied after a showcase regenerate).
     void ApplyCaptureExposure();
 
-    // Load a BodyConfig from data/bodies/<name>.json and switch to it
     // Makes this body active and applies its look (sky, clouds, ocean, star).
-    void SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look = {});
+    void SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look = {}, bool resetCamera = true);
     // Switches to a planet type from the registry; false (and a log line) when the id is unknown.
     bool SwitchBodyById(const std::string& id);
-
-    // Load a BodyConfig from a path (file-scoped helper made reachable for the runner).
-    planetgen::BodyConfig LoadBodyConfigPublic(const std::string& path);
+    // Switches to the body JSON at path, its variety rolled with the current seed.
+    bool SwitchBodyByPath(const std::string& path, bool resetCamera = true);
+    // After a seed change: rolls the active type's variety again. False when it has none.
+    bool RerollActiveBody();
 
     // Build QuadTreeConfig from current LodConfig
     render::lod::QuadTreeConfig BuildQuadTreeConfig() const;
@@ -188,6 +190,8 @@ private:
     std::vector<render::types::BodyEntry> _bodies; // planet types found in data/bodies
     int _selectedBodyType = 0;                     // index into _bodies
     std::string _activeBodyId;                     // registry id of the active body
+    std::string _activeBodyPath;                   // JSON the active body came from
+    bool _activeHasVariety = false;                // its type rolls traits from the seed
 
     // Frame state
     float _lastTime;

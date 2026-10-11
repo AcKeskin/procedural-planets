@@ -4,6 +4,8 @@
 #include "instrument/TimelineParser.h"
 #include "instrument/LiveServer.h"
 #include <model/BodyConfigJson.h>
+#include <types/BodyVariety.h>
+#include <nlohmann/json.hpp>
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -21,15 +23,6 @@ namespace
 {
 
 // Load a BodyConfig from a JSON file; crash-safe fallback returns default
-planetgen::BodyConfig LoadBodyConfig(const std::string& path)
-{
-    planetgen::BodyConfig cfg;
-    std::string err = planetgen::BodyConfigLoadFile(path, cfg);
-    if (!err.empty())
-        std::cerr << "[Application] Failed to load " << path << ": " << err << std::endl;
-    return cfg;
-}
-
 } // namespace
 
 Application::Application()
@@ -379,11 +372,6 @@ bool Application::RunGenerationShowcase(const CaptureRequest& request)
     return written == total;
 }
 
-planetgen::BodyConfig Application::LoadBodyConfigPublic(const std::string& path)
-{
-    return LoadBodyConfig(path);
-}
-
 bool Application::RunScript(const CaptureRequest& request)
 {
     ApplyCaptureOverrides(request);
@@ -679,11 +667,7 @@ void Application::RenderGui()
             _terrainPanel.Draw(_activeBody.get(), _genConfig, _lodConfig, _terrainStats, visibility.terrain, randomize);
 
         if (randomize && _activeBody)
-        {
-            render::RandomizeBodyParameters(
-                _activeBody->Config(), _sceneSettings, _atmosphereSettings, _genConfig.seed);
-            needsRegen = true;
-        }
+            ShuffleTerrain();
 
         needsRegen |= _surfacePanel.Draw(_activeBody.get(), _oceanSettings, _seaLevel, visibility.surface);
         _atmospherePanel.Draw(_atmosphereSettings, visibility.atmosphere);
@@ -702,7 +686,7 @@ void Application::RenderGui()
     _guiManager.EndFrame();
 }
 
-void Application::SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look)
+void Application::SwitchBody(planetgen::BodyConfig config, const render::types::BodyLook& look, bool resetCamera)
 {
     _activeBody = std::make_unique<render::BodyRuntime>(std::move(config), _paletteRegistry);
 
@@ -733,11 +717,14 @@ void Application::SwitchBody(planetgen::BodyConfig config, const render::types::
 
     RegenerateLodSystem();
 
-    float camDist = _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier;
-    _camera.SetPosition(glm::vec3(0.0f, 0.0f, camDist));
-    float farPlane =
-        (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
-    _camera.SetFarPlane(farPlane);
+    if (resetCamera)
+    {
+        float camDist = _lodConfig.planetRadius * AppDefaults::InitialCameraDistanceMultiplier;
+        _camera.SetPosition(glm::vec3(0.0f, 0.0f, camDist));
+        float farPlane =
+            (std::max)(AppDefaults::MinFarPlane, _lodConfig.planetRadius * AppDefaults::FarPlaneRadiusMultiplier);
+        _camera.SetFarPlane(farPlane);
+    }
 
     std::cout << "[SwitchBody] Switched to " << _activeBody->GetTypeName() << " (radius=" << _lodConfig.planetRadius
               << ")" << std::endl;
@@ -753,12 +740,47 @@ bool Application::SwitchBodyById(const std::string& id)
     }
     _selectedBodyType = index;
     _activeBodyId = id;
-    SwitchBody(LoadBodyConfig(_bodies[index].path), render::types::LoadBodyLook(_bodies[index].path));
+    return SwitchBodyByPath(_bodies[index].path);
+}
+
+bool Application::SwitchBodyByPath(const std::string& path, bool resetCamera)
+{
+    std::ifstream in(path);
+    const nlohmann::json body = nlohmann::json::parse(in, nullptr, false);
+    if (body.is_discarded())
+    {
+        std::cerr << "[SwitchBody] Cannot read " << path << std::endl;
+        return false;
+    }
+    const nlohmann::json world = render::types::RollVariety(body, _genConfig.seed);
+    planetgen::BodyConfig config;
+    const std::string err = planetgen::BodyConfigFromJson(world.dump(), config);
+    if (!err.empty())
+    {
+        std::cerr << "[SwitchBody] Bad body config in " << path << ": " << err << std::endl;
+        return false;
+    }
+    _activeBodyPath = path;
+    _activeHasVariety = render::types::HasVariety(body);
+    SwitchBody(std::move(config), render::types::ParseBodyLook(world), resetCamera);
     return true;
+}
+
+bool Application::RerollActiveBody()
+{
+    if (!_activeHasVariety)
+        return false;
+    return SwitchBodyByPath(_activeBodyPath, /*resetCamera=*/false);
 }
 
 void Application::ShuffleTerrain()
 {
+    if (_activeHasVariety)
+    {
+        _genConfig.seed = std::random_device{}();
+        RerollActiveBody();
+        return;
+    }
     if (_activeBody)
         render::RandomizeBodyParameters(_activeBody->Config(), _sceneSettings, _atmosphereSettings, _genConfig.seed);
     RegenerateLodSystem();
