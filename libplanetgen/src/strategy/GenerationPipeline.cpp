@@ -1,5 +1,8 @@
 #include "GenerationPipeline.h"
 #include "ContinentMaskPass.h"
+#include "HeightStrategy.h"
+#include "ErosionStrategy.h"
+#include "ShadingStrategy.h"
 #include "../model/BodyConfigProjection.h"
 
 namespace planetgen
@@ -33,8 +36,14 @@ GpuTextureHandle ResolveMacro(IComputeBackend& backend, const ShaderRegistry& re
 
 GenerationPipeline::GenerationPipeline(IComputeBackend& backend,
                                        const ShaderRegistry& registry,
-                                       const PaletteRegistry& palettes)
-    : _backend(backend), _registry(registry), _palettes(palettes)
+                                       const PaletteRegistry& palettes,
+                                       GenerationStrategies strategies)
+    : _backend(backend)
+    , _registry(registry)
+    , _palettes(palettes)
+    , _height(strategies.height ? std::move(strategies.height) : std::make_unique<HeightStrategy>())
+    , _erosion(strategies.erosion ? std::move(strategies.erosion) : std::make_unique<ErosionStrategy>())
+    , _shading(strategies.shading ? std::move(strategies.shading) : std::make_unique<ShadingStrategy>())
 {
 }
 
@@ -64,7 +73,7 @@ PipelineResult GenerationPipeline::Generate(const BodyConfig& config,
     _backend.UploadBuffer(vertexBuf, vertices, vertexBytes);
 
     // --- Height (always) ---
-    HeightBuffers hb = _height.Run(sc, bodyDesc, vertexBuf);
+    HeightBuffers hb = _height->Run(sc, bodyDesc, vertexBuf);
     GpuBufferHandle heights = hb.heights;
     const GpuBufferHandle normals = hb.normals;
 
@@ -74,16 +83,16 @@ PipelineResult GenerationPipeline::Generate(const BodyConfig& config,
     if (config.erosion.enabled)
     {
         const GpuBufferHandle preErosion = heights;
-        heights = _erosion.Run(sc, erosionDesc, heights);
+        heights = _erosion->Run(sc, erosionDesc, heights);
         if (heights != preErosion)
             _backend.DestroyBuffer(preErosion);
     }
 
     // --- Shading (always) ---
-    const GpuBufferHandle shading = _shading.Run(sc, shadingDesc, vertexBuf, heights);
+    const GpuBufferHandle shading = _shading->Run(sc, shadingDesc, vertexBuf, heights);
 
     // --- Palette (pure lookup) ---
-    result.palette = _palette.Resolve(_palettes, config.paletteRef.paletteId);
+    result.palette = _palettes.Resolve(config.paletteRef.paletteId);
 
     // Read back to CPU.
     result.count = vertexCount;
@@ -142,8 +151,8 @@ bool GenerationPipeline::GeneratePatch(const BodyConfig& config,
     _backend.UploadBuffer(vertexBuf, vertices, vertexBytes);
 
     // Height -> shading, no erosion. The strategies bind sc.outXxx in place.
-    const HeightBuffers hb = _height.Run(sc, bodyDesc, vertexBuf);
-    _shading.Run(sc, shadingDesc, vertexBuf, hb.heights);
+    const HeightBuffers hb = _height->Run(sc, bodyDesc, vertexBuf);
+    _shading->Run(sc, shadingDesc, vertexBuf, hb.heights);
 
     // No DownloadBuffer, no fence: the data is GPU-resident in the caller's
     // buffers and the caller owns completion tracking. Only the scratch vertex
@@ -171,7 +180,7 @@ HeightBuffers GenerationPipeline::GenerateHeights(const BodyConfig& config,
     const GpuBufferHandle vertexBuf = _backend.CreateBuffer(vertexBytes);
     _backend.UploadBuffer(vertexBuf, vertices, vertexBytes);
 
-    const HeightBuffers hb = _height.Run(sc, ProjectToBodyDesc(config), vertexBuf);
+    const HeightBuffers hb = _height->Run(sc, ProjectToBodyDesc(config), vertexBuf);
 
     _backend.DestroyBuffer(vertexBuf);
     return hb;
@@ -200,7 +209,7 @@ GpuBufferHandle GenerationPipeline::GenerateShading(const BodyConfig& config,
     _backend.UploadBuffer(vertexBuf, vertices, vertexBytes);
     _backend.UploadBuffer(heightBuf, heights, heightBytes);
 
-    const GpuBufferHandle shading = _shading.Run(sc, desc, vertexBuf, heightBuf);
+    const GpuBufferHandle shading = _shading->Run(sc, desc, vertexBuf, heightBuf);
 
     _backend.DestroyBuffer(vertexBuf);
     _backend.DestroyBuffer(heightBuf);

@@ -1,20 +1,16 @@
 #pragma once
 
-// The generation orchestrator. Built from a BodyConfig, it owns the fixed
-// built-in strategy set and the canonical pass sequence height -> [erosion] ->
-// shading, threading buffers between stages. Stateless and synchronous per call:
+// The generation orchestrator. Built from a BodyConfig, it runs the canonical
+// pass sequence height -> [erosion] -> shading through the strategy interfaces
+// (built-ins unless the caller injects its own), threading buffers between stages. Stateless and synchronous per call:
 // (config, seed, geometry, backend) -> per-vertex data + palette. LOD/streaming
 // stays app-side and is no concern of the pipeline.
 //
 // Closed extension: a new stage is a new IGenerationStrategy impl + shader +
-// config block. The orchestrator composes through the interfaces; swapping a
-// strategy impl needs no edit to sibling strategies.
+// config block. Swapping a strategy impl is a constructor argument; it needs no
+// edit to sibling strategies or the orchestrator.
 
 #include "IGenerationStrategy.h"
-#include "HeightStrategy.h"
-#include "ShadingStrategy.h"
-#include "ErosionStrategy.h"
-#include "PaletteProvider.h"
 #include "ContinentMaskPass.h"
 #include "MacroWorldPass.h"
 #include "../model/BodyConfig.h"
@@ -65,7 +61,8 @@ class GenerationPipeline
 public:
     GenerationPipeline(IComputeBackend& backend,
                        const ShaderRegistry& registry,
-                       const PaletteRegistry& palettes);
+                       const PaletteRegistry& palettes,
+                       GenerationStrategies strategies = {});
 
     using MaskCache  = PipelineMaskCache;
     using MacroCache = PipelineMacroCache;
@@ -120,11 +117,9 @@ private:
     const ShaderRegistry& _registry;
     const PaletteRegistry& _palettes;
 
-    // Fixed built-in strategy set.
-    HeightStrategy  _height;
-    ErosionStrategy _erosion;
-    ShadingStrategy _shading;
-    PaletteProvider _palette;
+    std::unique_ptr<IHeightStrategy>  _height;
+    std::unique_ptr<IErosionStrategy> _erosion;
+    std::unique_ptr<IShadingStrategy> _shading;
 };
 
 } // namespace planetgen

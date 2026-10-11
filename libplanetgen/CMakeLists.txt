@@ -58,7 +58,6 @@ set(PLANETGEN_SOURCES
     src/strategy/HeightStrategy.cpp
     src/strategy/ShadingStrategy.cpp
     src/strategy/ErosionStrategy.cpp
-    src/strategy/PaletteProvider.cpp
     src/strategy/ContinentMaskPass.cpp
     src/strategy/MacroWorldPass.cpp
     src/strategy/GenerationPipeline.cpp
@@ -85,7 +84,6 @@ set(PLANETGEN_HEADERS
     src/strategy/HeightStrategy.h
     src/strategy/ShadingStrategy.h
     src/strategy/ErosionStrategy.h
-    src/strategy/PaletteProvider.h
     src/strategy/ContinentMaskPass.h
     src/strategy/MacroWorldPass.h
     src/strategy/GenerationPipeline.h
@@ -186,7 +184,6 @@ target_sources(planetgen_tests PRIVATE
     src/strategy/HeightStrategy.cpp
     src/strategy/ShadingStrategy.cpp
     src/strategy/ErosionStrategy.cpp
-    src/strategy/PaletteProvider.cpp
     src/strategy/ContinentMaskPass.cpp
     src/strategy/MacroWorldPass.cpp
     src/strategy/GenerationPipeline.cpp
