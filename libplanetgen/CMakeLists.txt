@@ -156,6 +156,7 @@ set(PLANETGEN_TEST_SOURCES
     tests/test_ground_materials.cpp
     tests/test_cloud_noise.cpp
     tests/test_terrain_style.cpp
+    tests/test_body_desc.cpp
 )
 
 add_executable(planetgen_tests ${PLANETGEN_TEST_SOURCES})

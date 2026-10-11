@@ -69,8 +69,7 @@ struct PgContext_T
 struct PgBody_T
 {
     PgContext_T* ctx = nullptr;
-    PgBodyDesc desc{};
-    planetgen::BodyConfig config{};
+    planetgen::BodyConfig config{}; // the one source of truth, also for bodies made from a desc
 
     planetgen::GpuTextureHandle maskTexture = 0; // 0 = not yet baked
     uint64_t maskBuiltKey = 0;

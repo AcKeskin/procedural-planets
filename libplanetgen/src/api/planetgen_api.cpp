@@ -194,7 +194,7 @@ PgBody pg_body_create(PgContext ctx, const PgBodyDesc* desc)
         return nullptr;
 
     body->ctx = ctx;
-    body->desc = *desc; // flat path: desc authoritative, config stays default
+    body->config = planetgen::BodyConfigFromDesc(*desc);
     ctx->ClearError();
     return body;
 }
@@ -228,7 +228,6 @@ PgBody pg_body_create_from_json(PgContext ctx, const char* json_path)
 
     body->ctx = ctx;
     body->config = config;
-    body->desc = planetgen::ProjectToBodyDesc(config);
     ctx->ClearError();
     return body;
 }
@@ -259,7 +258,6 @@ PgBody pg_body_create_from_json_string(PgContext ctx, const char* json)
 
     body->ctx = ctx;
     body->config = config;
-    body->desc = planetgen::ProjectToBodyDesc(config);
     ctx->ClearError();
     return body;
 }
@@ -298,7 +296,7 @@ PgResult pg_generate_heights(PgBody body, const float* vertices, uint32_t vertex
     // Dispatch through the height strategy — the C ABI keeps per-call granularity.
     planetgen::StrategyContext sc{ gpu, ctx->registry, vertex_count, seed };
     planetgen::HeightStrategy strategy;
-    const planetgen::HeightBuffers hb = strategy.Run(sc, body->desc, vertexBuf);
+    const planetgen::HeightBuffers hb = strategy.Run(sc, planetgen::ProjectToBodyDesc(body->config), vertexBuf);
 
     if (!hb.heights || !hb.normals)
     {
