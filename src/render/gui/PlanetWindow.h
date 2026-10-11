@@ -45,7 +45,7 @@ struct PlanetUi
     effects::AtmosphereSettings* atmosphere = nullptr;
     effects::CloudSettings* clouds = nullptr;
     SceneSettings* scene = nullptr;
-    const core::Camera* camera = nullptr;
+    core::Camera* camera = nullptr; // the Camera tab edits FOV and auto-rotate
     float* moveSpeed = nullptr;
     bool autoOrbit = false;
     float* autoOrbitSpeed = nullptr;

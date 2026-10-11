@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Input.h"
+#include "Bookmarks.h"
 #include "HelpOverlay.h"
 #include "Toast.h"
 #include "Window.h"
@@ -23,6 +24,7 @@
 #include "cinematic/CinematicController.h"
 #include "cinematic/CaptureManager.h"
 #include "math/Camera.h"
+#include "math/CameraController.h"
 #include "CaptureRequest.h"
 #include "planetgen/model/PaletteRegistry.h"
 
@@ -37,10 +39,7 @@ class ScriptRunner;
 namespace AppDefaults
 {
 inline constexpr float SeaLevel = 0.995f;
-inline constexpr float MoveSpeed = 75.0f;
 inline constexpr float InitialCameraDistanceMultiplier = 2.0f;
-inline constexpr float MouseRotationSensitivity = 0.1f;
-inline constexpr float SprintSpeedMultiplier = 5.0f;
 inline constexpr float AutoOrbitSpeed = 5.0f;
 inline constexpr float FresnelStrengthNear = 0.5f;
 inline constexpr float FresnelStrengthFar = 2.0f;
@@ -105,6 +104,14 @@ public:
 
 private:
     void ProcessInput(float deltaTime);
+    // Camera input for this frame (keys, drags, wheel), then the controller update.
+    void UpdateCamera(float deltaTime, bool keysBlocked);
+    // Double-click: fly to the sea-level point under the cursor, if the ray hits the planet.
+    void FlyToCursor();
+    void SaveBookmark(int slot);
+    void RecallBookmark(int slot);
+    core::CameraBody CameraBodyNow() const;
+
     // Esc: close help, else stop the turntable; held for a second it quits.
     void HandleEscape(float deltaTime, bool keysBlocked);
     void Render();
@@ -158,11 +165,15 @@ private:
     render::SurfaceSettings _surfaceSettings;
     float _seaLevel;
 
-    // Camera
+    // Camera. Auto-rotate lives in _camera.Hud().autoRotate (the O key and the Camera tab share it).
     core::Camera _camera;
-    float _moveSpeed;
-    bool _autoOrbit = false;
+    core::CameraController _cameraCtl;
     float _autoOrbitSpeed = AppDefaults::AutoOrbitSpeed;
+    Bookmarks _bookmarks;
+    bool _orbitDragging = false; // LMB drag that started on the scene, not on a panel
+    bool _lookDragging = false;  // same for RMB
+    bool _leftWasDown = false;
+    bool _rightWasDown = false;
 
     // Cinematic
     render::CinematicController _cinematicController;
